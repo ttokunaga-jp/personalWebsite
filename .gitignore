@@ -1,19 +1,46 @@
 # Global
 .DS_Store
 Thumbs.db
+
+# Build artifacts
 node_modules/
 dist/
 build/
+coverage/
+.gocache/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+*.log
+
+# Environment files
 .env
 .env.*
-!.env.example
-coverage/
 
 # Go
 backend/bin/
 backend/coverage.out
+backend/coverage/
+backend/.gocache/
+backend/.cache/
+backend/tmp/
 
 # Editor
 .idea/
 .vscode/
 *.swp
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*.tfvars
+S*.tfvars.json

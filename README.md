@@ -1,4 +1,4 @@
-# Personal Website Platform
+# Personal Website
 
 ## 概要
 このリポジトリは Go (Gin) 製バックエンド API、React + TypeScript + Tailwind による SPA（公開用・管理用）および GCP（Cloud Run / Cloud SQL / VPC）向け Terraform 構成を含む環境セットアップ用テンプレートです。品質・可観測性・セキュリティで妥当な初期設定を整え、すぐに開発を開始できる状態を提供します。

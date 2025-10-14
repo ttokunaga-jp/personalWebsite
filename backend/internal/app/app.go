@@ -53,7 +53,8 @@ func (a *Application) Stop(ctx context.Context) error {
 	return nil
 }
 
-func newEngine() *gin.Engine {
+func newEngine(cfg *config.AppConfig) *gin.Engine {
+	gin.SetMode(cfg.Server.Mode)
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	return engine

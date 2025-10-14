@@ -11,17 +11,26 @@ import (
 
 	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/handler"
+	"github.com/takumi/personal-website/internal/middleware"
 )
 
 var Module = fx.Module("http",
 	fx.Provide(
 		newHTTPServer,
-		handler.NewHealthHandler,
 	),
 )
 
-func newHTTPServer(engine *gin.Engine, cfg *config.AppConfig, healthHandler *handler.HealthHandler) *http.Server {
-	registerRoutes(engine, healthHandler)
+func newHTTPServer(
+	engine *gin.Engine,
+	cfg *config.AppConfig,
+	healthHandler *handler.HealthHandler,
+	profileHandler *handler.ProfileHandler,
+	projectHandler *handler.ProjectHandler,
+	researchHandler *handler.ResearchHandler,
+	contactHandler *handler.ContactHandler,
+	jwtMiddleware *middleware.JWTMiddleware,
+) *http.Server {
+	registerRoutes(engine, healthHandler, profileHandler, projectHandler, researchHandler, contactHandler, jwtMiddleware)
 
 	return &http.Server{
 		Addr:              fmt.Sprintf(":%s", cfg.Server.Port),

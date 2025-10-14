@@ -4,6 +4,8 @@ go 1.22
 
 require (
 	github.com/gin-gonic/gin v1.9.1
+	github.com/go-sql-driver/mysql v1.7.1
+	github.com/jmoiron/sqlx v1.3.5
 	github.com/spf13/viper v1.17.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/fx v1.22.0

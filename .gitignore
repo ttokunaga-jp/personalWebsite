@@ -1,0 +1,19 @@
+# Global
+.DS_Store
+Thumbs.db
+node_modules/
+dist/
+build/
+.env
+.env.*
+!.env.example
+coverage/
+
+# Go
+backend/bin/
+backend/coverage.out
+
+# Editor
+.idea/
+.vscode/
+*.swp

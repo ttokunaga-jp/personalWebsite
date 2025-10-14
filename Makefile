@@ -21,7 +21,11 @@ lint-backend:
 	cd backend && $(GO) vet ./...
 
 lint-frontend:
-	cd frontend && $(PNPM) lint
+	cd frontend && { \
+		command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) lint || \
+		(command -v corepack >/dev/null 2>&1 && corepack pnpm lint) || \
+		npx pnpm@8.15.4 lint; \
+	}
 
 test: test-backend test-frontend
 
@@ -29,7 +33,11 @@ test-backend:
 	cd backend && $(GO) test ./...
 
 test-frontend:
-	cd frontend && $(PNPM) test
+	cd frontend && { \
+		command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) test || \
+		(command -v corepack >/dev/null 2>&1 && corepack pnpm test) || \
+		npx pnpm@8.15.4 test; \
+	}
 
 build: build-backend build-frontend
 
@@ -37,7 +45,11 @@ build-backend:
 	cd backend && $(GO) build ./cmd/server
 
 build-frontend:
-	cd frontend && $(PNPM) build
+	cd frontend && { \
+		command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) build || \
+		(command -v corepack >/dev/null 2>&1 && corepack pnpm build) || \
+		npx pnpm@8.15.4 build; \
+	}
 
 up:
 	$(DOCKER_COMPOSE) up --build

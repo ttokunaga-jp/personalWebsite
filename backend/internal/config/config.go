@@ -23,17 +23,33 @@ type DatabaseConfig struct {
 }
 
 type AuthConfig struct {
-	JWTSecret        string   `mapstructure:"jwt_secret"`
-	Issuer           string   `mapstructure:"issuer"`
-	Audience         []string `mapstructure:"audience"`
-	ClockSkewSeconds int64    `mapstructure:"clock_skew_seconds"`
-	Disabled         bool     `mapstructure:"disabled"`
+	JWTSecret             string   `mapstructure:"jwt_secret"`
+	Issuer                string   `mapstructure:"issuer"`
+	Audience              []string `mapstructure:"audience"`
+	ClockSkewSeconds      int64    `mapstructure:"clock_skew_seconds"`
+	AccessTokenTTLMinutes int64    `mapstructure:"access_token_ttl_minutes"`
+	StateSecret           string   `mapstructure:"state_secret"`
+	StateTTLSeconds       int64    `mapstructure:"state_ttl_seconds"`
+	Disabled              bool     `mapstructure:"disabled"`
+}
+
+type GoogleOAuthConfig struct {
+	ClientID       string   `mapstructure:"client_id"`
+	ClientSecret   string   `mapstructure:"client_secret"`
+	RedirectURL    string   `mapstructure:"redirect_url"`
+	Scopes         []string `mapstructure:"scopes"`
+	AuthURL        string   `mapstructure:"auth_url"`
+	TokenURL       string   `mapstructure:"token_url"`
+	UserInfoURL    string   `mapstructure:"userinfo_url"`
+	AllowedDomains []string `mapstructure:"allowed_domains"`
+	AllowedEmails  []string `mapstructure:"allowed_emails"`
 }
 
 type AppConfig struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Auth     AuthConfig     `mapstructure:"auth"`
+	Server   ServerConfig      `mapstructure:"server"`
+	Database DatabaseConfig    `mapstructure:"database"`
+	Auth     AuthConfig        `mapstructure:"auth"`
+	Google   GoogleOAuthConfig `mapstructure:"google"`
 }
 
 var Module = fx.Module("config",
@@ -61,7 +77,20 @@ func load() (*AppConfig, error) {
 	v.SetDefault("auth.issuer", "personal-website")
 	v.SetDefault("auth.audience", []string{"personal-website-admin"})
 	v.SetDefault("auth.clock_skew_seconds", 30)
+	v.SetDefault("auth.access_token_ttl_minutes", 60)
+	v.SetDefault("auth.state_secret", "local-dev-state-secret-change-me")
+	v.SetDefault("auth.state_ttl_seconds", 300)
 	v.SetDefault("auth.disabled", false)
+	v.SetDefault("google.auth_url", "https://accounts.google.com/o/oauth2/v2/auth")
+	v.SetDefault("google.token_url", "https://oauth2.googleapis.com/token")
+	v.SetDefault("google.userinfo_url", "https://openidconnect.googleapis.com/v1/userinfo")
+	v.SetDefault("google.scopes", []string{
+		"openid",
+		"email",
+		"profile",
+	})
+	v.SetDefault("google.allowed_domains", []string{})
+	v.SetDefault("google.allowed_emails", []string{})
 
 	if err := v.ReadInConfig(); err != nil {
 		// Ignore missing file; rely on defaults/env overrides.

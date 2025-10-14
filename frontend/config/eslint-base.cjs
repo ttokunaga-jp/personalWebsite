@@ -24,7 +24,7 @@ module.exports = {
           "order": "asc",
           "caseInsensitive": true
         },
-        "newlines-between": "after-each"
+        "newlines-between": "always"
       }
     ]
   }

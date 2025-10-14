@@ -14,6 +14,7 @@ func registerRoutes(
 	projectHandler *handler.ProjectHandler,
 	researchHandler *handler.ResearchHandler,
 	contactHandler *handler.ContactHandler,
+	authHandler *handler.AuthHandler,
 	jwtMiddleware *middleware.JWTMiddleware,
 ) {
 	api := r.Group("/api")
@@ -23,6 +24,8 @@ func registerRoutes(
 		api.GET("/projects", projectHandler.ListProjects)
 		api.GET("/research", researchHandler.ListResearch)
 		api.POST("/contact", contactHandler.SubmitContact)
+		api.GET("/auth/login", authHandler.Login)
+		api.GET("/auth/callback", authHandler.Callback)
 	}
 
 	admin := api.Group("/admin")

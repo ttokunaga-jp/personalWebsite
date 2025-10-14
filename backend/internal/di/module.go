@@ -14,6 +14,10 @@ import (
 var Module = fx.Module("di",
 	fx.Provide(
 		database.NewMySQLClient,
+		auth.NewJWTIssuer,
+		auth.NewStateManager,
+		auth.NewGoogleOAuthProvider,
+		auth.NewService,
 		auth.NewJWTVerifier,
 		inmemory.NewProfileRepository,
 		inmemory.NewProjectRepository,
@@ -28,6 +32,7 @@ var Module = fx.Module("di",
 		handler.NewProjectHandler,
 		handler.NewResearchHandler,
 		handler.NewContactHandler,
+		handler.NewAuthHandler,
 		middleware.NewJWTMiddleware,
 	),
 )

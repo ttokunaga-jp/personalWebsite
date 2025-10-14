@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -47,6 +48,7 @@ func TestRegisterRoutes(t *testing.T) {
 		handler.NewProjectHandler(projectSvc),
 		handler.NewResearchHandler(researchSvc),
 		handler.NewContactHandler(contactSvc),
+		handler.NewAuthHandler(&stubAuthService{}),
 		jwtMiddleware,
 	)
 
@@ -96,6 +98,25 @@ func TestRegisterRoutes(t *testing.T) {
 		require.Equal(t, http.StatusAccepted, rec.Code)
 		require.Contains(t, rec.Body.String(), `"data"`)
 	})
+
+	t.Run("auth login route responds", func(t *testing.T) {
+		t.Helper()
+		rec := performRequest(engine, http.MethodGet, "/api/auth/login", nil)
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Contains(t, rec.Body.String(), `"state"`)
+	})
+
+	t.Run("auth callback route responds", func(t *testing.T) {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodGet, "/api/auth/callback?state=stub&code=ok", nil)
+		require.NoError(t, err)
+
+		rec := httptest.NewRecorder()
+		engine.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Contains(t, rec.Body.String(), `"token"`)
+	})
 }
 
 func performRequest(engine *gin.Engine, method, path string, body []byte) *httptest.ResponseRecorder {
@@ -115,4 +136,21 @@ func performRequest(engine *gin.Engine, method, path string, body []byte) *httpt
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)
 	return rec
+}
+
+type stubAuthService struct{}
+
+func (s *stubAuthService) StartLogin(context.Context, string) (*auth.LoginResult, error) {
+	return &auth.LoginResult{
+		AuthURL: "",
+		State:   "stub-state",
+	}, nil
+}
+
+func (s *stubAuthService) HandleCallback(context.Context, string, string) (*auth.CallbackResult, error) {
+	return &auth.CallbackResult{
+		Token:       "stub-token",
+		ExpiresAt:   123,
+		RedirectURI: "/admin",
+	}, nil
 }

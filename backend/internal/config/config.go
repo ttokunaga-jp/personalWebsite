@@ -45,11 +45,21 @@ type GoogleOAuthConfig struct {
 	AllowedEmails  []string `mapstructure:"allowed_emails"`
 }
 
+type ContactConfig struct {
+	Timezone         string `mapstructure:"timezone"`
+	SlotDurationMin  int    `mapstructure:"slot_duration_minutes"`
+	WorkdayStartHour int    `mapstructure:"workday_start_hour"`
+	WorkdayEndHour   int    `mapstructure:"workday_end_hour"`
+	HorizonDays      int    `mapstructure:"horizon_days"`
+	BufferMinutes    int    `mapstructure:"buffer_minutes"`
+}
+
 type AppConfig struct {
 	Server   ServerConfig      `mapstructure:"server"`
 	Database DatabaseConfig    `mapstructure:"database"`
 	Auth     AuthConfig        `mapstructure:"auth"`
 	Google   GoogleOAuthConfig `mapstructure:"google"`
+	Contact  ContactConfig     `mapstructure:"contact"`
 }
 
 var Module = fx.Module("config",
@@ -65,7 +75,7 @@ func load() (*AppConfig, error) {
 	v.SetEnvPrefix("APP")
 	v.AutomaticEnv()
 
-	v.SetDefault("server.port", "8080")
+	v.SetDefault("server.port", "8100")
 	v.SetDefault("server.mode", "release")
 	v.SetDefault("database.dsn", "")
 	v.SetDefault("database.max_open_conns", 10)
@@ -91,6 +101,12 @@ func load() (*AppConfig, error) {
 	})
 	v.SetDefault("google.allowed_domains", []string{})
 	v.SetDefault("google.allowed_emails", []string{})
+	v.SetDefault("contact.timezone", "Asia/Tokyo")
+	v.SetDefault("contact.slot_duration_minutes", 30)
+	v.SetDefault("contact.workday_start_hour", 9)
+	v.SetDefault("contact.workday_end_hour", 18)
+	v.SetDefault("contact.horizon_days", 14)
+	v.SetDefault("contact.buffer_minutes", 30)
 
 	if err := v.ReadInConfig(); err != nil {
 		// Ignore missing file; rely on defaults/env overrides.

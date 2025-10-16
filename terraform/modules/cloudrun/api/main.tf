@@ -18,11 +18,11 @@ resource "google_cloud_run_v2_service" "api" {
     containers {
       image = var.image
       ports {
-        container_port = 8080
+        container_port = 8100
       }
       env {
         name  = "PORT"
-        value = "8080"
+        value = "8100"
       }
     }
 

@@ -37,6 +37,7 @@ func TestJWTIssuerIssueSuccess(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "google-123", claims.Subject)
 	require.Equal(t, "user@example.com", claims.Email)
+	require.True(t, claims.HasRole("admin"))
 }
 
 func TestJWTIssuerRequiresSubject(t *testing.T) {

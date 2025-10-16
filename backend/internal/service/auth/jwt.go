@@ -22,6 +22,7 @@ type Claims struct {
 	Issuer    string
 	Audience  []string
 	ExpiresAt time.Time
+	Roles     []string
 	Raw       map[string]any
 }
 
@@ -57,7 +58,8 @@ func (v *jwtVerifier) Verify(ctx context.Context, token string) (*Claims, error)
 			Issuer:    v.issuer,
 			Audience:  v.audience,
 			ExpiresAt: time.Now().Add(24 * time.Hour),
-			Raw:       map[string]any{"disabled": true},
+			Roles:     []string{"admin"},
+			Raw:       map[string]any{"disabled": true, "roles": []string{"admin"}},
 		}, nil
 	}
 
@@ -113,6 +115,8 @@ func (v *jwtVerifier) extractClaims(payload map[string]any) (*Claims, error) {
 		Raw: payload,
 	}
 
+	roleSet := map[string]struct{}{}
+
 	if sub, ok := payload["sub"].(string); ok {
 		claims.Subject = sub
 	}
@@ -166,6 +170,45 @@ func (v *jwtVerifier) extractClaims(payload map[string]any) (*Claims, error) {
 		return nil, errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "missing audience", nil)
 	}
 
+	if rawRoles, ok := payload["roles"]; ok {
+		switch roles := rawRoles.(type) {
+		case []any:
+			for _, item := range roles {
+				if s, ok := item.(string); ok {
+					s = strings.TrimSpace(s)
+					if s != "" {
+						roleSet[strings.ToLower(s)] = struct{}{}
+					}
+				}
+			}
+		case []string:
+			for _, s := range roles {
+				s = strings.TrimSpace(s)
+				if s != "" {
+					roleSet[strings.ToLower(s)] = struct{}{}
+				}
+			}
+		default:
+			return nil, errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "invalid roles claim", nil)
+		}
+	}
+
+	if rawRole, ok := payload["role"]; ok {
+		if s, ok := rawRole.(string); ok {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				roleSet[strings.ToLower(s)] = struct{}{}
+			}
+		}
+	}
+
+	if len(roleSet) > 0 {
+		claims.Roles = make([]string, 0, len(roleSet))
+		for role := range roleSet {
+			claims.Roles = append(claims.Roles, role)
+		}
+	}
+
 	return claims, nil
 }
 
@@ -201,3 +244,20 @@ func wrapUnauthorized(err error, message string) *errs.AppError {
 
 // Ensure implementation satisfies the interface at compile time.
 var _ TokenVerifier = (*jwtVerifier)(nil)
+
+// HasRole reports whether the claim set includes the requested role (case-insensitive).
+func (c *Claims) HasRole(role string) bool {
+	if c == nil {
+		return false
+	}
+	role = strings.ToLower(strings.TrimSpace(role))
+	if role == "" {
+		return false
+	}
+	for _, r := range c.Roles {
+		if strings.ToLower(r) == role {
+			return true
+		}
+	}
+	return false
+}

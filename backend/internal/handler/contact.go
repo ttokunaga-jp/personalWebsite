@@ -2,6 +2,8 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -11,11 +13,12 @@ import (
 )
 
 type ContactHandler struct {
-	service service.ContactService
+	submission   service.ContactService
+	availability service.AvailabilityService
 }
 
-func NewContactHandler(service service.ContactService) *ContactHandler {
-	return &ContactHandler{service: service}
+func NewContactHandler(submission service.ContactService, availability service.AvailabilityService) *ContactHandler {
+	return &ContactHandler{submission: submission, availability: availability}
 }
 
 func (h *ContactHandler) SubmitContact(c *gin.Context) {
@@ -25,7 +28,7 @@ func (h *ContactHandler) SubmitContact(c *gin.Context) {
 		return
 	}
 
-	submission, err := h.service.SubmitContact(c.Request.Context(), &req)
+	submission, err := h.submission.SubmitContact(c.Request.Context(), &req)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -33,5 +36,37 @@ func (h *ContactHandler) SubmitContact(c *gin.Context) {
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"data": submission,
+	})
+}
+
+func (h *ContactHandler) GetAvailability(c *gin.Context) {
+	var opts service.AvailabilityOptions
+
+	if start := c.Query("startDate"); start != "" {
+		parsed, err := time.Parse("2006-01-02", start)
+		if err != nil {
+			respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "startDate must be in YYYY-MM-DD format", err))
+			return
+		}
+		opts.StartDate = parsed
+	}
+
+	if days := c.Query("days"); days != "" {
+		value, err := strconv.Atoi(days)
+		if err != nil || value <= 0 {
+			respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "days must be a positive integer", err))
+			return
+		}
+		opts.Days = value
+	}
+
+	availability, err := h.availability.GetAvailability(c.Request.Context(), opts)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": availability,
 	})
 }

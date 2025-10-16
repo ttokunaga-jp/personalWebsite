@@ -8,7 +8,18 @@ const resources = {
       "dashboard.subtitle": "Operate the portfolio content and reservations.",
       "dashboard.systemStatus": "System health",
       "dashboard.systemStatusDescription": "Monitor the API and background jobs from here.",
-      "dashboard.apiStatus": "API status"
+      "dashboard.apiStatus": "API status",
+      "summary.title": "Overview",
+      "projects.title": "Projects",
+      "research.title": "Research",
+      "blogs.title": "Blog posts",
+      "meetings.title": "Meetings",
+      "blacklist.title": "Blacklist",
+      "actions.create": "Create",
+      "actions.update": "Update",
+      "actions.delete": "Delete",
+      "status.loading": "Loading data…",
+      "status.error": "Failed to load data"
     }
   },
   ja: {
@@ -17,7 +28,18 @@ const resources = {
       "dashboard.subtitle": "ポートフォリオのコンテンツと予約を管理します。",
       "dashboard.systemStatus": "システムヘルス",
       "dashboard.systemStatusDescription": "API とバックグラウンドジョブを監視します。",
-      "dashboard.apiStatus": "API ステータス"
+      "dashboard.apiStatus": "API ステータス",
+      "summary.title": "サマリー",
+      "projects.title": "プロジェクト",
+      "research.title": "研究",
+      "blogs.title": "ブログ投稿",
+      "meetings.title": "予約",
+      "blacklist.title": "ブラックリスト",
+      "actions.create": "作成",
+      "actions.update": "更新",
+      "actions.delete": "削除",
+      "status.loading": "読込中…",
+      "status.error": "データの取得に失敗しました"
     }
   }
 };

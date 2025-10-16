@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,7 @@ import (
 	"github.com/takumi/personal-website/internal/model"
 	"github.com/takumi/personal-website/internal/repository/inmemory"
 	"github.com/takumi/personal-website/internal/service"
+	adminsvc "github.com/takumi/personal-website/internal/service/admin"
 	"github.com/takumi/personal-website/internal/service/auth"
 )
 
@@ -31,6 +33,23 @@ func TestRegisterRoutes(t *testing.T) {
 	projectSvc := service.NewProjectService(inmemory.NewProjectRepository())
 	researchSvc := service.NewResearchService(inmemory.NewResearchRepository())
 	contactSvc := service.NewContactService(inmemory.NewContactRepository())
+	availabilitySvc := &stubAvailabilityService{
+		response: &model.AvailabilityResponse{
+			Timezone:    "Asia/Tokyo",
+			GeneratedAt: time.Unix(0, 0),
+			Days: []model.AvailabilityDay{
+				{
+					Date: "1970-01-01",
+					Slots: []model.AvailabilitySlot{
+						{
+							Start: time.Unix(0, 0),
+							End:   time.Unix(1800, 0),
+						},
+					},
+				},
+			},
+		},
+	}
 
 	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
 		JWTSecret:        "test-secret",
@@ -40,6 +59,7 @@ func TestRegisterRoutes(t *testing.T) {
 		Disabled:         true,
 	})
 	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier)
+	adminSvc := &stubAdminService{}
 
 	registerRoutes(
 		engine,
@@ -47,9 +67,11 @@ func TestRegisterRoutes(t *testing.T) {
 		handler.NewProfileHandler(profileSvc),
 		handler.NewProjectHandler(projectSvc),
 		handler.NewResearchHandler(researchSvc),
-		handler.NewContactHandler(contactSvc),
+		handler.NewContactHandler(contactSvc, availabilitySvc),
 		handler.NewAuthHandler(&stubAuthService{}),
 		jwtMiddleware,
+		handler.NewAdminHandler(adminSvc),
+		middleware.NewAdminGuard(),
 	)
 
 	t.Run("health route ok", func(t *testing.T) {
@@ -97,6 +119,13 @@ func TestRegisterRoutes(t *testing.T) {
 		rec := performRequest(engine, http.MethodPost, "/api/contact", body)
 		require.Equal(t, http.StatusAccepted, rec.Code)
 		require.Contains(t, rec.Body.String(), `"data"`)
+	})
+
+	t.Run("availability route returns data", func(t *testing.T) {
+		t.Helper()
+		rec := performRequest(engine, http.MethodGet, "/api/contact/availability", nil)
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Contains(t, rec.Body.String(), "Asia/Tokyo")
 	})
 
 	t.Run("auth login route responds", func(t *testing.T) {
@@ -153,4 +182,114 @@ func (s *stubAuthService) HandleCallback(context.Context, string, string) (*auth
 		ExpiresAt:   123,
 		RedirectURI: "/admin",
 	}, nil
+}
+
+type stubAvailabilityService struct {
+	response *model.AvailabilityResponse
+}
+
+func (s *stubAvailabilityService) GetAvailability(context.Context, service.AvailabilityOptions) (*model.AvailabilityResponse, error) {
+	return s.response, nil
+}
+
+type stubAdminService struct{}
+
+func (s *stubAdminService) ListProjects(context.Context) ([]model.AdminProject, error) {
+	return nil, nil
+}
+
+func (s *stubAdminService) GetProject(context.Context, int64) (*model.AdminProject, error) {
+	return &model.AdminProject{}, nil
+}
+
+func (s *stubAdminService) CreateProject(context.Context, adminsvc.ProjectInput) (*model.AdminProject, error) {
+	return &model.AdminProject{}, nil
+}
+
+func (s *stubAdminService) UpdateProject(context.Context, int64, adminsvc.ProjectInput) (*model.AdminProject, error) {
+	return &model.AdminProject{}, nil
+}
+
+func (s *stubAdminService) DeleteProject(context.Context, int64) error {
+	return nil
+}
+
+func (s *stubAdminService) ListResearch(context.Context) ([]model.AdminResearch, error) {
+	return nil, nil
+}
+
+func (s *stubAdminService) GetResearch(context.Context, int64) (*model.AdminResearch, error) {
+	return &model.AdminResearch{}, nil
+}
+
+func (s *stubAdminService) CreateResearch(context.Context, adminsvc.ResearchInput) (*model.AdminResearch, error) {
+	return &model.AdminResearch{}, nil
+}
+
+func (s *stubAdminService) UpdateResearch(context.Context, int64, adminsvc.ResearchInput) (*model.AdminResearch, error) {
+	return &model.AdminResearch{}, nil
+}
+
+func (s *stubAdminService) DeleteResearch(context.Context, int64) error {
+	return nil
+}
+
+func (s *stubAdminService) ListBlogPosts(context.Context) ([]model.BlogPost, error) {
+	return nil, nil
+}
+
+func (s *stubAdminService) GetBlogPost(context.Context, int64) (*model.BlogPost, error) {
+	return &model.BlogPost{}, nil
+}
+
+func (s *stubAdminService) CreateBlogPost(context.Context, adminsvc.BlogPostInput) (*model.BlogPost, error) {
+	return &model.BlogPost{}, nil
+}
+
+func (s *stubAdminService) UpdateBlogPost(context.Context, int64, adminsvc.BlogPostInput) (*model.BlogPost, error) {
+	return &model.BlogPost{}, nil
+}
+
+func (s *stubAdminService) DeleteBlogPost(context.Context, int64) error {
+	return nil
+}
+
+func (s *stubAdminService) ListMeetings(context.Context) ([]model.Meeting, error) {
+	return nil, nil
+}
+
+func (s *stubAdminService) GetMeeting(context.Context, int64) (*model.Meeting, error) {
+	return &model.Meeting{}, nil
+}
+
+func (s *stubAdminService) CreateMeeting(context.Context, adminsvc.MeetingInput) (*model.Meeting, error) {
+	return &model.Meeting{}, nil
+}
+
+func (s *stubAdminService) UpdateMeeting(context.Context, int64, adminsvc.MeetingInput) (*model.Meeting, error) {
+	return &model.Meeting{}, nil
+}
+
+func (s *stubAdminService) DeleteMeeting(context.Context, int64) error {
+	return nil
+}
+
+func (s *stubAdminService) ListBlacklist(context.Context) ([]model.BlacklistEntry, error) {
+	return nil, nil
+}
+
+func (s *stubAdminService) AddBlacklistEntry(context.Context, adminsvc.BlacklistInput) (*model.BlacklistEntry, error) {
+	return &model.BlacklistEntry{}, nil
+}
+
+func (s *stubAdminService) RemoveBlacklistEntry(context.Context, int64) error {
+	return nil
+}
+
+func (s *stubAdminService) IsEmailBlacklisted(context.Context, string) (bool, error) {
+	return false, nil
+}
+
+func (s *stubAdminService) Summary(context.Context) (*model.AdminSummary, error) {
+	return &model.AdminSummary{}, nil
 }

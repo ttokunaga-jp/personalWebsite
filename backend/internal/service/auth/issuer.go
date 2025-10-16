@@ -80,6 +80,8 @@ func (i *jwtIssuer) Issue(_ context.Context, subject, email string) (string, tim
 		"sub":   subject,
 		"email": email,
 		"aud":   i.audience,
+		"role":  "admin",
+		"roles": []string{"admin"},
 		"iat":   now.Unix(),
 		"exp":   expiresAt.Unix(),
 	})

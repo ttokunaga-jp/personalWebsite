@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/takumi/personal-website/internal/model"
 )
@@ -20,4 +21,8 @@ type ResearchRepository interface {
 
 type ContactRepository interface {
 	CreateSubmission(ctx context.Context, payload *model.ContactRequest) (*model.ContactSubmission, error)
+}
+
+type AvailabilityRepository interface {
+	ListBusyWindows(ctx context.Context, from, to time.Time) ([]model.TimeWindow, error)
 }

@@ -66,9 +66,31 @@ pnpm --filter @personal-website/admin dev
 ```
 
 ## Docker Compose メモ
-- バックエンド API: `http://localhost:8080`
+- バックエンド API: `http://localhost:8100`
 - フロントエンド (nginx): `http://localhost:3000` で `/api` をバックエンドにプロキシ
-- MySQL: `localhost:3306`（認証情報は `docker-compose.yml` を参照）
+- MySQL: `localhost:23306`（認証情報は `docker-compose.yml` を参照）
+
+## 管理 API / GUI
+
+認証済みの管理者のみがアクセスできる `/api/admin` 配下のエンドポイントを実装しました。主な REST エンドポイントは次の通りです。
+
+| メソッド | パス | 用途 |
+| --- | --- | --- |
+| `GET` | `/api/admin/summary` | 公開済み/下書き件数や予約状況のサマリー取得 |
+| `GET` / `POST` / `PUT` / `DELETE` | `/api/admin/projects[:id]` | プロジェクトの CRUD |
+| `GET` / `POST` / `PUT` / `DELETE` | `/api/admin/research[:id]` | 研究コンテンツの CRUD |
+| `GET` / `POST` / `PUT` / `DELETE` | `/api/admin/blogs[:id]` | ブログ投稿の CRUD |
+| `GET` / `POST` / `PUT` / `DELETE` | `/api/admin/meetings[:id]` | 予約（面談）情報の CRUD |
+| `GET` / `POST` / `DELETE` | `/api/admin/blacklist[:id]` | ブラックリスト管理 |
+
+管理者 SPA (`frontend/apps/admin`) は上記 API を利用してコンテンツや予約・ブラックリストを操作します。ローカル開発時は次のコマンドで起動できます。
+
+```bash
+cd frontend
+pnpm --filter @personal-website/admin dev
+```
+
+`.env` で `VITE_API_BASE_URL` を指定している場合は、Cloud Run やリバースプロキシ環境に合わせて更新してください。
 
 ## Terraform 初期構成
 最小の Terraform スタックが `terraform/environments/dev` に用意されています。

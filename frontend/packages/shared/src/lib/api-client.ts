@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { AxiosPromise } from "axios";
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "/api",
@@ -14,3 +15,5 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export type ApiClientPromise<T> = AxiosPromise<T>;

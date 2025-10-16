@@ -1,8 +1,8 @@
 server:
-  port: "8080"
+  port: "8100"
   mode: "release"
 database:
-  dsn: "user:password@tcp(localhost:3306)/personal_website?parseTime=true"
+  dsn: "user:password@tcp(localhost:23306)/personal_website?parseTime=true"
   max_open_conns: 10
   max_idle_conns: 5
   conn_max_lifetime: 30m

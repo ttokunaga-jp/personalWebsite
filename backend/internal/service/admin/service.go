@@ -255,6 +255,7 @@ type MeetingInput struct {
 	Datetime        time.Time
 	DurationMinutes int
 	MeetURL         string
+	CalendarEventID string
 	Status          model.MeetingStatus
 	Notes           string
 }
@@ -278,6 +279,7 @@ func (s *service) CreateMeeting(ctx context.Context, input MeetingInput) (*model
 		Datetime:        input.Datetime.UTC(),
 		DurationMinutes: input.DurationMinutes,
 		MeetURL:         strings.TrimSpace(input.MeetURL),
+		CalendarEventID: strings.TrimSpace(input.CalendarEventID),
 		Status:          input.Status,
 		Notes:           strings.TrimSpace(input.Notes),
 	}
@@ -296,6 +298,7 @@ func (s *service) UpdateMeeting(ctx context.Context, id int64, input MeetingInpu
 		Datetime:        input.Datetime.UTC(),
 		DurationMinutes: input.DurationMinutes,
 		MeetURL:         strings.TrimSpace(input.MeetURL),
+		CalendarEventID: strings.TrimSpace(input.CalendarEventID),
 		Status:          input.Status,
 		Notes:           strings.TrimSpace(input.Notes),
 	}

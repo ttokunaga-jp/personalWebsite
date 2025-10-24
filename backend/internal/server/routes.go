@@ -14,6 +14,7 @@ func registerRoutes(
 	projectHandler *handler.ProjectHandler,
 	researchHandler *handler.ResearchHandler,
 	contactHandler *handler.ContactHandler,
+	bookingHandler *handler.BookingHandler,
 	authHandler *handler.AuthHandler,
 	jwtMiddleware *middleware.JWTMiddleware,
 	adminHandler *handler.AdminHandler,
@@ -27,6 +28,7 @@ func registerRoutes(
 		api.GET("/research", researchHandler.ListResearch)
 		api.GET("/contact/availability", contactHandler.GetAvailability)
 		api.POST("/contact", contactHandler.SubmitContact)
+		api.POST("/contact/bookings", bookingHandler.CreateBooking)
 		api.GET("/auth/login", authHandler.Login)
 		api.GET("/auth/callback", authHandler.Callback)
 	}

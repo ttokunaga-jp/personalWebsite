@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	"github.com/takumi/personal-website/internal/config"
@@ -35,6 +36,12 @@ type service struct {
 	googleCfg      config.GoogleOAuthConfig
 	allowedDomains map[string]struct{}
 	allowedEmails  map[string]struct{}
+	tokenSaver     TokenSaver
+}
+
+// TokenSaver persists OAuth tokens for downstream services such as Gmail API integrations.
+type TokenSaver interface {
+	Save(ctx context.Context, token *OAuthToken) error
 }
 
 // NewService assembles the authentication service from its collaborators.
@@ -43,6 +50,7 @@ func NewService(
 	provider OAuthProvider,
 	issuer TokenIssuer,
 	stateManager *StateManager,
+	tokenSaver TokenSaver,
 ) (Service, error) {
 	if cfg == nil {
 		return nil, errs.New(errs.CodeInternal, 500, "auth service: missing config", nil)
@@ -81,6 +89,7 @@ func NewService(
 		googleCfg:      cfg.Google,
 		allowedDomains: domainSet,
 		allowedEmails:  emailSet,
+		tokenSaver:     tokenSaver,
 	}, nil
 }
 
@@ -148,6 +157,15 @@ func (s *service) HandleCallback(ctx context.Context, state, code string) (*Call
 
 	if err := s.ensureAllowed(userInfo); err != nil {
 		return nil, err
+	}
+
+	if s.tokenSaver != nil {
+		if err := s.tokenSaver.Save(ctx, token); err != nil {
+			log.Printf("auth service: failed to persist oauth token: %v", err)
+			return nil, errs.New(errs.CodeInternal, 500, "failed to persist Google authorization; please retry after granting offline access", err)
+		}
+	} else {
+		log.Printf("auth service: token saver not configured; skipping token persistence")
 	}
 
 	appToken, expiresAt, err := s.issuer.Issue(ctx, userInfo.Subject, userInfo.Email)

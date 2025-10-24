@@ -3,7 +3,7 @@ GO ?= go
 PNPM ?= pnpm
 DOCKER_COMPOSE ?= docker compose
 
-.PHONY: deps deps-backend deps-frontend lint lint-backend lint-frontend test test-backend test-frontend build build-backend build-frontend up up-detached stop down clean
+.PHONY: deps deps-backend deps-frontend lint lint-backend lint-frontend test test-backend test-frontend build build-backend build-frontend up up-detached stop down clean smoke-backend
 
 deps: deps-backend deps-frontend
 
@@ -11,6 +11,10 @@ deps-backend:
 	cd backend && $(GO) mod tidy
 
 deps-frontend:
+	cd frontend && { command -v corepack >/dev/null 2>&1 && corepack enable || true; }
+	cd frontend && { command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) install || npx pnpm@8.15.4 install; }
+
+pnpm-install:
 	cd frontend && { command -v corepack >/dev/null 2>&1 && corepack enable || true; }
 	cd frontend && { command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) install || npx pnpm@8.15.4 install; }
 
@@ -38,6 +42,9 @@ test-frontend:
 		(command -v corepack >/dev/null 2>&1 && corepack pnpm test) || \
 		npx pnpm@8.15.4 test; \
 	}
+
+smoke-backend:
+	cd backend && ./scripts/api_smoke.sh
 
 build: build-backend build-frontend
 

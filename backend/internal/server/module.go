@@ -28,12 +28,13 @@ func newHTTPServer(
 	projectHandler *handler.ProjectHandler,
 	researchHandler *handler.ResearchHandler,
 	contactHandler *handler.ContactHandler,
+	bookingHandler *handler.BookingHandler,
 	authHandler *handler.AuthHandler,
 	jwtMiddleware *middleware.JWTMiddleware,
 	adminHandler *handler.AdminHandler,
 	adminGuard *middleware.AdminGuard,
 ) *http.Server {
-	registerRoutes(engine, healthHandler, profileHandler, projectHandler, researchHandler, contactHandler, authHandler, jwtMiddleware, adminHandler, adminGuard)
+	registerRoutes(engine, healthHandler, profileHandler, projectHandler, researchHandler, contactHandler, bookingHandler, authHandler, jwtMiddleware, adminHandler, adminGuard)
 
 	return &http.Server{
 		Addr:              fmt.Sprintf(":%s", cfg.Server.Port),

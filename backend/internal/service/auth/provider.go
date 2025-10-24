@@ -33,9 +33,10 @@ var ErrProviderDisabled = errors.New("oauth provider disabled")
 
 // OAuthToken is the subset of Google token fields required downstream.
 type OAuthToken struct {
-	AccessToken string
-	IDToken     string
-	ExpiresIn   int64
+	AccessToken  string
+	IDToken      string
+	ExpiresIn    int64
+	RefreshToken string
 }
 
 type googleProvider struct {
@@ -120,18 +121,20 @@ func (p *googleProvider) Exchange(ctx context.Context, code string) (*OAuthToken
 	}
 
 	var payload struct {
-		AccessToken string `json:"access_token"`
-		ExpiresIn   int64  `json:"expires_in"`
-		IDToken     string `json:"id_token"`
+		AccessToken  string `json:"access_token"`
+		ExpiresIn    int64  `json:"expires_in"`
+		IDToken      string `json:"id_token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		return nil, fmt.Errorf("google provider: decode token response: %w", err)
 	}
 
 	return &OAuthToken{
-		AccessToken: payload.AccessToken,
-		ExpiresIn:   payload.ExpiresIn,
-		IDToken:     payload.IDToken,
+		AccessToken:  payload.AccessToken,
+		ExpiresIn:    payload.ExpiresIn,
+		IDToken:      payload.IDToken,
+		RefreshToken: payload.RefreshToken,
 	}, nil
 }
 

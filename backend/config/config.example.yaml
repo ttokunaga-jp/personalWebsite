@@ -15,3 +15,22 @@ auth:
     - "personal-website-admin"
   clock_skew_seconds: 30
   disabled: false
+contact:
+  timezone: "Asia/Tokyo"
+  slot_duration_minutes: 30
+  workday_start_hour: 9
+  workday_end_hour: 18
+  horizon_days: 14
+  buffer_minutes: 30
+booking:
+  calendar_id: "primary"
+  meet_template: "Portfolio Intro Session"
+  notification_sender: "noreply@example.com"
+  notification_receiver: "owner@example.com"
+  access_token_env: "GOOGLE_API_ACCESS_TOKEN"
+  request_timeout: 8s
+  max_retries: 3
+  initial_backoff: 750ms
+  backoff_multiplier: 2.0
+  circuit_open_seconds: 60
+  circuit_failure_threshold: 3

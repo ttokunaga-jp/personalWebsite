@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -54,12 +55,27 @@ type ContactConfig struct {
 	BufferMinutes    int    `mapstructure:"buffer_minutes"`
 }
 
+type BookingConfig struct {
+	CalendarID           string        `mapstructure:"calendar_id"`
+	MeetTemplate         string        `mapstructure:"meet_template"`
+	NotificationSender   string        `mapstructure:"notification_sender"`
+	NotificationReceiver string        `mapstructure:"notification_receiver"`
+	AccessTokenEnv       string        `mapstructure:"access_token_env"`
+	RequestTimeout       time.Duration `mapstructure:"request_timeout"`
+	MaxRetries           int           `mapstructure:"max_retries"`
+	InitialBackoff       time.Duration `mapstructure:"initial_backoff"`
+	BackoffMultiplier    float64       `mapstructure:"backoff_multiplier"`
+	CircuitOpenSeconds   int           `mapstructure:"circuit_open_seconds"`
+	CircuitFailureThresh int           `mapstructure:"circuit_failure_threshold"`
+}
+
 type AppConfig struct {
 	Server   ServerConfig      `mapstructure:"server"`
 	Database DatabaseConfig    `mapstructure:"database"`
 	Auth     AuthConfig        `mapstructure:"auth"`
 	Google   GoogleOAuthConfig `mapstructure:"google"`
 	Contact  ContactConfig     `mapstructure:"contact"`
+	Booking  BookingConfig     `mapstructure:"booking"`
 }
 
 var Module = fx.Module("config",
@@ -74,6 +90,7 @@ func load() (*AppConfig, error) {
 
 	v.SetEnvPrefix("APP")
 	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 
 	v.SetDefault("server.port", "8100")
 	v.SetDefault("server.mode", "release")
@@ -94,10 +111,18 @@ func load() (*AppConfig, error) {
 	v.SetDefault("google.auth_url", "https://accounts.google.com/o/oauth2/v2/auth")
 	v.SetDefault("google.token_url", "https://oauth2.googleapis.com/token")
 	v.SetDefault("google.userinfo_url", "https://openidconnect.googleapis.com/v1/userinfo")
+	v.SetDefault("google.client_id", "")
+	v.SetDefault("google.client_secret", "")
+	v.SetDefault("google.redirect_url", "")
 	v.SetDefault("google.scopes", []string{
 		"openid",
 		"email",
 		"profile",
+		"https://www.googleapis.com/auth/userinfo.email",
+		"https://www.googleapis.com/auth/userinfo.profile",
+		"https://www.googleapis.com/auth/gmail.send",
+		"https://www.googleapis.com/auth/calendar.events",
+		"https://www.googleapis.com/auth/calendar.readonly",
 	})
 	v.SetDefault("google.allowed_domains", []string{})
 	v.SetDefault("google.allowed_emails", []string{})
@@ -107,6 +132,13 @@ func load() (*AppConfig, error) {
 	v.SetDefault("contact.workday_end_hour", 18)
 	v.SetDefault("contact.horizon_days", 14)
 	v.SetDefault("contact.buffer_minutes", 30)
+	v.SetDefault("booking.request_timeout", 8*time.Second)
+	v.SetDefault("booking.max_retries", 3)
+	v.SetDefault("booking.initial_backoff", 750*time.Millisecond)
+	v.SetDefault("booking.backoff_multiplier", 2.0)
+	v.SetDefault("booking.circuit_open_seconds", 60)
+	v.SetDefault("booking.circuit_failure_threshold", 3)
+	v.SetDefault("booking.access_token_env", "")
 
 	if err := v.ReadInConfig(); err != nil {
 		// Ignore missing file; rely on defaults/env overrides.

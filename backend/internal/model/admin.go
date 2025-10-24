@@ -58,6 +58,7 @@ type Meeting struct {
 	Datetime        time.Time     `json:"datetime"`
 	DurationMinutes int           `json:"durationMinutes"`
 	MeetURL         string        `json:"meetUrl"`
+	CalendarEventID string        `json:"calendarEventId"`
 	Status          MeetingStatus `json:"status"`
 	Notes           string        `json:"notes"`
 	CreatedAt       time.Time     `json:"createdAt"`

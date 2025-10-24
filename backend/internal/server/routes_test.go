@@ -68,6 +68,7 @@ func TestRegisterRoutes(t *testing.T) {
 		handler.NewProjectHandler(projectSvc),
 		handler.NewResearchHandler(researchSvc),
 		handler.NewContactHandler(contactSvc, availabilitySvc),
+		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
 		jwtMiddleware,
 		handler.NewAdminHandler(adminSvc),
@@ -84,6 +85,23 @@ func TestRegisterRoutes(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		require.Contains(t, rec.Body.String(), `"status":"ok"`)
+	})
+
+	t.Run("booking route schedules meeting", func(t *testing.T) {
+		t.Helper()
+		start := time.Now().Add(2 * time.Hour).UTC()
+		body, err := json.Marshal(model.BookingRequest{
+			Name:            "Alan Turing",
+			Email:           "alan@example.com",
+			StartTime:       start,
+			DurationMinutes: 45,
+			Agenda:          "Discuss computation theory",
+		})
+		require.NoError(t, err)
+
+		rec := performRequest(engine, http.MethodPost, "/api/contact/bookings", body)
+		require.Equal(t, http.StatusCreated, rec.Code)
+		require.Contains(t, rec.Body.String(), `"calendarEventId"`)
 	})
 
 	t.Run("profile route returns data", func(t *testing.T) {
@@ -190,6 +208,27 @@ type stubAvailabilityService struct {
 
 func (s *stubAvailabilityService) GetAvailability(context.Context, service.AvailabilityOptions) (*model.AvailabilityResponse, error) {
 	return s.response, nil
+}
+
+type stubBookingService struct{}
+
+func (s *stubBookingService) Book(context.Context, model.BookingRequest) (*model.BookingResult, error) {
+	now := time.Now().UTC()
+	return &model.BookingResult{
+		Meeting: model.Meeting{
+			ID:              1,
+			Name:            "Alan Turing",
+			Email:           "alan@example.com",
+			Datetime:        now,
+			DurationMinutes: 45,
+			MeetURL:         "https://meet.example.com/test",
+			CalendarEventID: "evt-123",
+			Status:          model.MeetingStatusPending,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		},
+		CalendarEventID: "evt-123",
+	}, nil
 }
 
 type stubAdminService struct{}

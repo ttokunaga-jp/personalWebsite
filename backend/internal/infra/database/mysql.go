@@ -19,8 +19,11 @@ import (
 func NewMySQLClient(lc fx.Lifecycle, cfg *config.AppConfig) (*sqlx.DB, error) {
 	dsn := cfg.Database.DSN
 	if dsn == "" {
+		fmt.Println("mysql client: DSN not provided; database disabled")
 		return nil, nil
 	}
+
+	fmt.Printf("mysql client: connecting to %s\n", dsn)
 
 	db, err := sqlx.Open("mysql", dsn)
 	if err != nil {

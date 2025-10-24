@@ -29,6 +29,7 @@ SELECT
 	m.meeting_at,
 	m.duration_minutes,
 	m.meet_url,
+	m.calendar_event_id,
 	m.status,
 	m.notes,
 	m.created_at,
@@ -44,6 +45,7 @@ SELECT
 	m.meeting_at,
 	m.duration_minutes,
 	m.meet_url,
+	m.calendar_event_id,
 	m.status,
 	m.notes,
 	m.created_at,
@@ -58,12 +60,13 @@ INSERT INTO meetings (
 	meeting_at,
 	duration_minutes,
 	meet_url,
+	calendar_event_id,
 	status,
 	notes,
 	created_at,
 	updated_at
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`
 
 const updateMeetingQuery = `
 UPDATE meetings
@@ -73,6 +76,7 @@ SET
 	meeting_at = ?,
 	duration_minutes = ?,
 	meet_url = ?,
+	calendar_event_id = ?,
 	status = ?,
 	notes = ?,
 	updated_at = NOW()
@@ -87,6 +91,7 @@ type meetingRow struct {
 	MeetingAt       sql.NullTime   `db:"meeting_at"`
 	DurationMinutes sql.NullInt64  `db:"duration_minutes"`
 	MeetURL         sql.NullString `db:"meet_url"`
+	CalendarEventID sql.NullString `db:"calendar_event_id"`
 	Status          sql.NullString `db:"status"`
 	Notes           sql.NullString `db:"notes"`
 	CreatedAt       sql.NullTime   `db:"created_at"`
@@ -130,6 +135,7 @@ func (r *meetingRepository) CreateMeeting(ctx context.Context, meeting *model.Me
 		meeting.Datetime,
 		meeting.DurationMinutes,
 		meeting.MeetURL,
+		meeting.CalendarEventID,
 		meeting.Status,
 		meeting.Notes,
 	)
@@ -160,6 +166,7 @@ func (r *meetingRepository) UpdateMeeting(ctx context.Context, meeting *model.Me
 		meeting.Datetime,
 		meeting.DurationMinutes,
 		meeting.MeetURL,
+		meeting.CalendarEventID,
 		meeting.Status,
 		meeting.Notes,
 		meeting.ID,
@@ -224,6 +231,7 @@ func mapMeetingRow(row meetingRow) model.Meeting {
 		Datetime:        meetingTime,
 		DurationMinutes: duration,
 		MeetURL:         row.MeetURL.String,
+		CalendarEventID: row.CalendarEventID.String,
 		Status:          model.MeetingStatus(row.Status.String),
 		Notes:           row.Notes.String,
 		CreatedAt:       createdAt,

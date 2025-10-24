@@ -70,6 +70,14 @@ pnpm --filter @personal-website/admin dev
 - フロントエンド (nginx): `http://localhost:3000` で `/api` をバックエンドにプロキシ
 - MySQL: `localhost:23306`（認証情報は `docker-compose.yml` を参照）
 
+### 初期データベース
+`deploy/mysql/init` 配下の SQL がコンテナ起動時に順番に実行され、`google_oauth_tokens` や `blacklist` など管理機能で利用するテーブルを自動生成します。すでに `mysql_data` ボリュームがある状態でスキーマを更新したい場合は、以下でボリュームを一度破棄してください（永続化データは消えます）。
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
 ## 管理 API / GUI
 
 認証済みの管理者のみがアクセスできる `/api/admin` 配下のエンドポイントを実装しました。主な REST エンドポイントは次の通りです。
@@ -107,6 +115,7 @@ terraform plan -var="project_id=<your-project>" -var="api_image=<artifact-regist
 - バックエンド: `go test ./...`（Testify ベースのテストを追加可能）
 - フロントエンド: `vitest` + Testing Library (各ワークスペースで設定済み)
 - Lint: Go vet + フォーマッタ整合性、ESLint (React / TypeScript プリセット)
+- API スモークテスト: `make smoke-backend`（`TOKEN` または `ADMIN_TOKEN` を設定すると管理 API も検証）。別コンテナから実行する場合は `BASE_URL=http://backend:8100 make smoke-backend` のように明示的にエンドポイントを指定してください。
 
 ## 次のステップ
 - クリーンアーキテクチャ準拠のユースケース・リポジトリ実装を追加

@@ -2,8 +2,11 @@ services:
   backend:
     build:
       context: ./backend
+    env_file:
+      - ./.env
     environment:
       APP_SERVER_PORT: "8100"
+      APP_DATABASE_DSN: "app:app_password@tcp(mysql:3306)/personal_website?parseTime=true"
     ports:
       - "8100:8100"
     volumes:

@@ -23,13 +23,13 @@ func NewAvailabilityRepository(db *sqlx.DB) repository.AvailabilityRepository {
 const (
 	meetingsBusyQuery = `
 SELECT
-	start_time,
-	end_time
+	meeting_at AS start_time,
+	DATE_ADD(meeting_at, INTERVAL COALESCE(duration_minutes, 0) MINUTE) AS end_time
 FROM meetings
 WHERE status IN ('pending', 'confirmed')
-  AND end_time > ?
-  AND start_time < ?
-ORDER BY start_time`
+  AND DATE_ADD(meeting_at, INTERVAL COALESCE(duration_minutes, 0) MINUTE) > ?
+  AND meeting_at < ?
+ORDER BY meeting_at`
 
 	blackoutBusyQuery = `
 SELECT

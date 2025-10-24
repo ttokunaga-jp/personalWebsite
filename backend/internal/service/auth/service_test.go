@@ -48,7 +48,7 @@ func TestServiceSuccessFlow(t *testing.T) {
 		},
 	}
 
-	service, err := NewService(cfg, provider, issuer, stateMgr)
+	service, err := NewService(cfg, provider, issuer, stateMgr, nil)
 	require.NoError(t, err)
 
 	login, err := service.StartLogin(context.Background(), "/admin/dashboard")
@@ -96,7 +96,7 @@ func TestServiceRejectsUnauthorizedDomain(t *testing.T) {
 		},
 	}
 
-	service, err := NewService(cfg, provider, issuer, stateMgr)
+	service, err := NewService(cfg, provider, issuer, stateMgr, nil)
 	require.NoError(t, err)
 
 	login, err := service.StartLogin(context.Background(), "/admin")
@@ -129,7 +129,7 @@ func TestServiceDisabledBypassesProvider(t *testing.T) {
 		exchangeErr: errors.New("should not be called"),
 	}
 
-	service, err := NewService(cfg, provider, issuer, stateMgr)
+	service, err := NewService(cfg, provider, issuer, stateMgr, nil)
 	require.NoError(t, err)
 
 	login, err := service.StartLogin(context.Background(), "")
@@ -140,6 +140,49 @@ func TestServiceDisabledBypassesProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "/admin", res.RedirectURI)
 	require.NotEmpty(t, res.Token)
+}
+
+func TestServiceCallbackFailsWhenTokenPersistenceFails(t *testing.T) {
+	cfg := &config.AppConfig{
+		Auth: config.AuthConfig{
+			JWTSecret:             "secret",
+			Audience:              []string{"admin"},
+			AccessTokenTTLMinutes: 30,
+			StateSecret:           "state-secret",
+			StateTTLSeconds:       300,
+		},
+	}
+
+	stateMgr, err := NewStateManager(cfg)
+	require.NoError(t, err)
+
+	issuer, err := NewJWTIssuer(cfg)
+	require.NoError(t, err)
+
+	provider := &stubProvider{
+		authBase: "https://accounts.google.com/o/oauth2/v2/auth?state=",
+		token: &OAuthToken{
+			AccessToken:  "access",
+			RefreshToken: "refresh",
+		},
+		user: &UserInfo{
+			Subject:       "google-123",
+			Email:         "admin@example.com",
+			EmailVerified: true,
+		},
+	}
+
+	saver := &stubTokenSaver{err: errors.New("db offline")}
+
+	service, err := NewService(cfg, provider, issuer, stateMgr, saver)
+	require.NoError(t, err)
+
+	login, err := service.StartLogin(context.Background(), "/admin")
+	require.NoError(t, err)
+
+	_, err = service.HandleCallback(context.Background(), login.State, "auth-code")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to persist Google authorization")
 }
 
 type stubProvider struct {
@@ -172,4 +215,12 @@ func (s *stubProvider) FetchUserInfo(context.Context, *OAuthToken) (*UserInfo, e
 		return nil, errors.New("no user configured")
 	}
 	return s.user, nil
+}
+
+type stubTokenSaver struct {
+	err error
+}
+
+func (s *stubTokenSaver) Save(context.Context, *OAuthToken) error {
+	return s.err
 }

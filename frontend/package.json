@@ -13,7 +13,7 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "format": "pnpm -r format",
-    "prepare": "husky install"
+    "prepare": "pnpm exec husky install"
   },
   "devDependencies": {
     "husky": "^9.1.7",

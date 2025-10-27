@@ -65,6 +65,23 @@ pnpm --filter @personal-website/public dev
 pnpm --filter @personal-website/admin dev
 ```
 
+## 公開 SPA 実装メモ
+- **実装済みページ**: Home / Profile / Research / Projects / Contact を詳細化し、バックエンドの `/v1/public/*` API からデータを取得します。`apps/public/src/modules/public-api` に型付きクライアントと `useApiResource` フックを追加しました。
+- **主要機能**:
+  - Home: プロフィール概要・所属・SNS を API から描画しつつ、Go API `/health` のステータスをヘルス表示。
+  - Profile: 所属・研究室・職歴・スキル・コミュニティをカード表示し、ローディング/空データ時のプレースホルダを備えています。
+  - Research: タグフィルタと Markdown/HTML 表示 (`MarkdownRenderer`) を実装し、画像やリンクのサニタイズを実施。
+  - Projects: 技術スタックフィルタとカード UI（期間整形・リンクバッジ付き）でプロジェクトを一覧化。
+  - Contact: 予約枠表示、フォームバリデーション、reCAPTCHA v3 トークン取得、`/v1/public/contact/bookings` 送信までをサポート。
+- **セットアップの注意**:
+  - `.env` に `VITE_API_BASE_URL` と `VITE_RECAPTCHA_SITE_KEY` を設定してください。未設定の場合、Contact ページの送信が失敗します。
+  - 研究コンテンツの HTML を提供する場合でも、`http/https/mailto` 以外のプロトコルは描画されません（`MarkdownRenderer` で制御）。
+- **テスト/ビルド**:
+  - `pnpm --filter @personal-website/public test` で UI テスト（Projects フィルタ、Contact フォーム検証など）を実行。React Router v7 への移行警告（`startTransition`）は既知のものです。
+  - `pnpm --filter @personal-website/public lint` / `pnpm --filter @personal-website/public build` で静的解析・ビルド確認。
+  - Docker でのビルド検証は `docker compose build --no-cache frontend` を推奨します。
+- **UX メモ**: ARIA ラベルとキーボード操作に対応済みです。`pnpm --filter @personal-website/public dev` で起動し、モバイル幅も合わせて確認してください。
+
 ## Docker Compose メモ
 - バックエンド API: `http://localhost:8100`
 - フロントエンド (nginx): `http://localhost:3000` で `/api` をバックエンドにプロキシ

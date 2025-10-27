@@ -19,3 +19,54 @@
     @apply bg-slate-950 text-slate-50;
   }
 }
+
+@layer components {
+  .markdown-content {
+    @apply space-y-4 text-sm leading-relaxed text-slate-700 dark:text-slate-200;
+  }
+
+  .markdown-content h1,
+  .markdown-content h2,
+  .markdown-content h3,
+  .markdown-content h4,
+  .markdown-content h5,
+  .markdown-content h6 {
+    @apply font-semibold text-slate-900 dark:text-slate-100;
+  }
+
+  .markdown-content h2 {
+    @apply text-xl;
+  }
+
+  .markdown-content h3 {
+    @apply text-lg;
+  }
+
+  .markdown-content a {
+    @apply font-medium text-sky-600 underline decoration-sky-200 underline-offset-4 transition hover:text-sky-500 dark:text-sky-400 dark:hover:text-sky-300;
+  }
+
+  .markdown-content ul {
+    @apply list-disc space-y-2 pl-5;
+  }
+
+  .markdown-content ol {
+    @apply list-decimal space-y-2 pl-5;
+  }
+
+  .markdown-content li {
+    @apply text-sm text-slate-700 dark:text-slate-200;
+  }
+
+  .markdown-content blockquote {
+    @apply border-l-4 border-slate-200 pl-4 italic text-slate-600 dark:border-slate-700 dark:text-slate-300;
+  }
+
+  .markdown-content code {
+    @apply rounded bg-slate-100 px-1 py-0.5 text-xs text-slate-800 dark:bg-slate-900/40 dark:text-slate-200;
+  }
+
+  .markdown-content img {
+    @apply rounded-lg shadow;
+  }
+}

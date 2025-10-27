@@ -1,6 +1,7 @@
 import { apiClient } from "@shared/lib/api-client";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { AxiosResponse } from "axios";
 import { act } from "react";
 import { vi } from "vitest";
 
@@ -10,9 +11,44 @@ let user = userEvent.setup();
 
 describe("App", () => {
   beforeEach(() => {
-    vi.spyOn(apiClient, "get").mockResolvedValue({
-      data: { status: "healthy" }
-    } as { data: { status: string } });
+    const profileResponse = {
+      name: "Takumi Asano",
+      headline: "Research Engineer",
+      summary: "Building reliable software around human-centered research.",
+      affiliations: [
+        {
+          id: "aff-1",
+          organization: "Kyoto University",
+          department: "Graduate School of Informatics",
+          role: "Research Fellow",
+          startDate: "2023-04-01",
+          endDate: null,
+          isCurrent: true
+        }
+      ],
+      workHistory: [],
+      skillGroups: [],
+      communities: [],
+      socialLinks: []
+    };
+
+    vi.spyOn(apiClient, "get").mockImplementation((url) => {
+      if (typeof url === "string" && url === "/health") {
+        return Promise.resolve({
+          data: { status: "healthy" }
+        } as AxiosResponse<{ status: string }>);
+      }
+
+      if (typeof url === "string" && url.includes("/v1/public/profile")) {
+        return Promise.resolve({
+          data: profileResponse
+        } as AxiosResponse<typeof profileResponse>);
+      }
+
+      return Promise.resolve({
+        data: {}
+      } as AxiosResponse<Record<string, unknown>>);
+    });
 
     user = userEvent.setup();
   });
@@ -26,9 +62,7 @@ describe("App", () => {
       expect(apiClient.get).toHaveBeenCalledWith("/health");
     });
 
-    expect(
-      await screen.findByText(/Crafting research-driven products/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Research Engineer/i)).toBeInTheDocument();
     expect(await screen.findByText("healthy")).toBeInTheDocument();
   });
 
@@ -62,9 +96,7 @@ describe("App", () => {
       await user.click(japaneseButton);
     });
 
-    expect(
-      await screen.findByText("研究を軸にしたプロダクトと体験を創出します。")
-    ).toBeInTheDocument();
+    expect(await screen.findByText("人を軸にしたイノベーション")).toBeInTheDocument();
   });
 
   it("navigates to the profile page via navigation links", async () => {

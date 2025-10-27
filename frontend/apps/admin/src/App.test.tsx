@@ -142,4 +142,16 @@ describe("Admin App", () => {
       expect(screen.getByRole("heading", { name: /Admin console/i })).toBeInTheDocument();
     });
   });
+
+  it("blocks access when health check returns 401", async () => {
+    healthMock.mockRejectedValueOnce({ response: { status: 401 } });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Sign in required/i)).toBeInTheDocument();
+    });
+
+    expect(summaryMock).not.toHaveBeenCalled();
+  });
 });

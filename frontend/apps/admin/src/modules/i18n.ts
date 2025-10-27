@@ -19,7 +19,10 @@ const resources = {
       "actions.update": "Update",
       "actions.delete": "Delete",
       "status.loading": "Loading data…",
-      "status.error": "Failed to load data"
+      "status.error": "Failed to load data",
+      "auth.requiredTitle": "Sign in required",
+      "auth.requiredDescription": "You need to authenticate with your administrator Google account to view this console.",
+      "auth.signIn": "Continue with Google"
     }
   },
   ja: {
@@ -39,7 +42,10 @@ const resources = {
       "actions.update": "更新",
       "actions.delete": "削除",
       "status.loading": "読込中…",
-      "status.error": "データの取得に失敗しました"
+      "status.error": "データの取得に失敗しました",
+      "auth.requiredTitle": "サインインが必要です",
+      "auth.requiredDescription": "管理者用の Google アカウントで認証すると、このコンソールを表示できます。",
+      "auth.signIn": "Google で続行"
     }
   }
 };

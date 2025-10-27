@@ -64,8 +64,20 @@ const emptyBlacklistForm = {
   reason: ""
 };
 
+type AuthState = "checking" | "authenticated" | "unauthorized";
+
+const isUnauthorizedError = (error: unknown): boolean => {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const response = (error as { response?: { status?: number } }).response;
+  return typeof response?.status === "number" && response.status === 401;
+};
+
 function App() {
   const { t } = useTranslation();
+  const [authState, setAuthState] = useState<AuthState>("checking");
   const [status, setStatus] = useState("unknown");
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [projects, setProjects] = useState<AdminProject[]>([]);
@@ -82,21 +94,45 @@ function App() {
   const [meetingForm, setMeetingForm] = useState({ ...emptyMeetingForm });
   const [blacklistForm, setBlacklistForm] = useState({ ...emptyBlacklistForm });
 
+  const handleUnauthorized = useCallback(() => {
+    setAuthState("unauthorized");
+    setLoading(false);
+    setSummary(null);
+    setProjects([]);
+    setResearch([]);
+    setBlogs([]);
+    setMeetings([]);
+    setBlacklist([]);
+    setError(null);
+  }, []);
+
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [statusRes, summaryRes, projectRes, researchRes, blogRes, meetingRes, blacklistRes] =
-        await Promise.all([
-          adminApi.health(),
-          adminApi.fetchSummary(),
-          adminApi.listProjects(),
-          adminApi.listResearch(),
-          adminApi.listBlogs(),
-          adminApi.listMeetings(),
-          adminApi.listBlacklist()
-        ]);
-
+      const statusRes = await adminApi.health();
       setStatus(statusRes.data.status);
+      setAuthState("authenticated");
+    } catch (err) {
+      if (isUnauthorizedError(err)) {
+        handleUnauthorized();
+      } else {
+        console.error(err);
+        setError("status.error");
+      }
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const [summaryRes, projectRes, researchRes, blogRes, meetingRes, blacklistRes] = await Promise.all([
+        adminApi.fetchSummary(),
+        adminApi.listProjects(),
+        adminApi.listResearch(),
+        adminApi.listBlogs(),
+        adminApi.listMeetings(),
+        adminApi.listBlacklist()
+      ]);
+
       setSummary(summaryRes.data);
       setProjects(projectRes.data);
       setResearch(researchRes.data);
@@ -105,12 +141,16 @@ function App() {
       setBlacklist(blacklistRes.data);
       setError(null);
     } catch (err) {
-      console.error(err);
-      setError("status.error");
+      if (isUnauthorizedError(err)) {
+        handleUnauthorized();
+      } else {
+        console.error(err);
+        setError("status.error");
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [handleUnauthorized]);
 
   useEffect(() => {
     void refreshAll();
@@ -122,11 +162,15 @@ function App() {
         await operation();
         await refreshAll();
       } catch (err) {
-        console.error(err);
-        setError("status.error");
+        if (isUnauthorizedError(err)) {
+          handleUnauthorized();
+        } else {
+          console.error(err);
+          setError("status.error");
+        }
       }
     },
-    [refreshAll]
+    [refreshAll, handleUnauthorized]
   );
 
   const handleCreateProject = async (event: FormEvent<HTMLFormElement>) => {
@@ -266,6 +310,34 @@ function App() {
   const deleteBlog = (id: number) => run(() => adminApi.deleteBlog(id));
   const deleteMeeting = (id: number) => run(() => adminApi.deleteMeeting(id));
   const deleteBlacklistEntry = (id: number) => run(() => adminApi.deleteBlacklist(id));
+
+  if (authState === "checking") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
+        <p className="text-sm text-slate-600">{t("status.loading")}</p>
+      </div>
+    );
+  }
+
+  if (authState === "unauthorized") {
+    const loginUrl = import.meta.env.VITE_ADMIN_LOGIN_URL ?? "/api/admin/auth/login";
+
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
+        <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm">
+          <h1 className="text-xl font-semibold text-slate-900">{t("auth.requiredTitle")}</h1>
+          <p className="mt-2 text-sm text-slate-600">{t("auth.requiredDescription")}</p>
+          <button
+            className="mt-4 inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+            type="button"
+            onClick={() => window.location.assign(loginUrl)}
+          >
+            {t("auth.signIn")}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100">

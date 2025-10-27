@@ -117,6 +117,23 @@ terraform plan -var="project_id=<your-project>" -var="api_image=<artifact-regist
 - Lint: Go vet + フォーマッタ整合性、ESLint (React / TypeScript プリセット)
 - API スモークテスト: `make smoke-backend`（`TOKEN` または `ADMIN_TOKEN` を設定すると管理 API も検証）。別コンテナから実行する場合は `BASE_URL=http://backend:8100 make smoke-backend` のように明示的にエンドポイントを指定してください。
 
+### CSRF トークンの手動確認
+`/api/security/csrf` はダブルサブミットトークン方式を採用しています。Cookie には `ランダム値:有効期限UNIX秒:署名` の形式で保存されるため、手動テスト時は以下の点に注意してください。
+
+```bash
+# 1. トークンと Cookie を取得
+curl -i http://localhost:8100/api/security/csrf
+
+# 2. 応答ヘッダーの Set-Cookie をそのまま利用してリクエストを送る
+curl -X POST http://localhost:8100/api/contact \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-Token: <Set-Cookie の先頭にあるランダム文字列>" \
+  --cookie "ps_csrf=<Set-Cookie の値を完全に貼り付ける>" \
+  -d '{"name":"Tester","email":"tester@example.com","message":"Hello"}'
+```
+
+Cookie 値から署名部分（`:<timestamp>:<signature>`）を削除すると検証に失敗し 403 が返るため、コピー漏れに注意してください。
+
 ## 次のステップ
 - クリーンアーキテクチャ準拠のユースケース・リポジトリ実装を追加
 - Terraform モジュールに Cloud SQL / Secret Manager / IAM 設定を拡張

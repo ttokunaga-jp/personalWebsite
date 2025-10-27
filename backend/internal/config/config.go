@@ -10,8 +10,11 @@ import (
 )
 
 type ServerConfig struct {
-	Port string `mapstructure:"port"`
-	Mode string `mapstructure:"mode"`
+	Port           string   `mapstructure:"port"`
+	Mode           string   `mapstructure:"mode"`
+	TrustedProxies []string `mapstructure:"trusted_proxies"`
+	TLSCertFile    string   `mapstructure:"tls_cert_file"`
+	TLSKeyFile     string   `mapstructure:"tls_key_file"`
 }
 
 type DatabaseConfig struct {
@@ -69,6 +72,38 @@ type BookingConfig struct {
 	CircuitFailureThresh int           `mapstructure:"circuit_failure_threshold"`
 }
 
+type SecurityConfig struct {
+	EnableCSRF                 bool          `mapstructure:"enable_csrf"`
+	CSRFSigningKey             string        `mapstructure:"csrf_signing_key"`
+	CSRFTokenTTL               time.Duration `mapstructure:"csrf_token_ttl"`
+	CSRFCookieName             string        `mapstructure:"csrf_cookie_name"`
+	CSRFCookieDomain           string        `mapstructure:"csrf_cookie_domain"`
+	CSRFCookieSecure           bool          `mapstructure:"csrf_cookie_secure"`
+	CSRFCookieHTTPOnly         bool          `mapstructure:"csrf_cookie_http_only"`
+	CSRFCookieSameSite         string        `mapstructure:"csrf_cookie_same_site"`
+	CSRFHeaderName             string        `mapstructure:"csrf_header_name"`
+	CSRFExemptPaths            []string      `mapstructure:"csrf_exempt_paths"`
+	HTTPSRedirect              bool          `mapstructure:"https_redirect"`
+	HSTSMaxAgeSeconds          int           `mapstructure:"hsts_max_age_seconds"`
+	ContentSecurityPolicy      string        `mapstructure:"content_security_policy"`
+	ReferrerPolicy             string        `mapstructure:"referrer_policy"`
+	RateLimitRequestsPerMinute int           `mapstructure:"rate_limit_requests_per_minute"`
+	RateLimitBurst             int           `mapstructure:"rate_limit_burst"`
+	RateLimitWhitelist         []string      `mapstructure:"rate_limit_whitelist"`
+	AllowedOrigins             []string      `mapstructure:"allowed_origins"`
+	AllowCredentials           bool          `mapstructure:"allow_credentials"`
+}
+
+type MetricsConfig struct {
+	Enabled   bool   `mapstructure:"enabled"`
+	Endpoint  string `mapstructure:"endpoint"`
+	Namespace string `mapstructure:"namespace"`
+}
+
+type LoggingConfig struct {
+	Level string `mapstructure:"level"`
+}
+
 type AppConfig struct {
 	Server   ServerConfig      `mapstructure:"server"`
 	Database DatabaseConfig    `mapstructure:"database"`
@@ -76,6 +111,9 @@ type AppConfig struct {
 	Google   GoogleOAuthConfig `mapstructure:"google"`
 	Contact  ContactConfig     `mapstructure:"contact"`
 	Booking  BookingConfig     `mapstructure:"booking"`
+	Security SecurityConfig    `mapstructure:"security"`
+	Metrics  MetricsConfig     `mapstructure:"metrics"`
+	Logging  LoggingConfig     `mapstructure:"logging"`
 }
 
 var Module = fx.Module("config",
@@ -94,6 +132,9 @@ func load() (*AppConfig, error) {
 
 	v.SetDefault("server.port", "8100")
 	v.SetDefault("server.mode", "release")
+	v.SetDefault("server.trusted_proxies", []string{})
+	v.SetDefault("server.tls_cert_file", "")
+	v.SetDefault("server.tls_key_file", "")
 	v.SetDefault("database.dsn", "")
 	v.SetDefault("database.max_open_conns", 10)
 	v.SetDefault("database.max_idle_conns", 5)
@@ -139,6 +180,29 @@ func load() (*AppConfig, error) {
 	v.SetDefault("booking.circuit_open_seconds", 60)
 	v.SetDefault("booking.circuit_failure_threshold", 3)
 	v.SetDefault("booking.access_token_env", "")
+	v.SetDefault("security.enable_csrf", true)
+	v.SetDefault("security.csrf_signing_key", "local-dev-csrf-secret-change-me")
+	v.SetDefault("security.csrf_token_ttl", 3600*time.Second)
+	v.SetDefault("security.csrf_cookie_name", "ps_csrf")
+	v.SetDefault("security.csrf_cookie_domain", "")
+	v.SetDefault("security.csrf_cookie_secure", true)
+	v.SetDefault("security.csrf_cookie_http_only", true)
+	v.SetDefault("security.csrf_cookie_same_site", "strict")
+	v.SetDefault("security.csrf_header_name", "X-CSRF-Token")
+	v.SetDefault("security.csrf_exempt_paths", []string{"/api/auth/callback"})
+	v.SetDefault("security.https_redirect", true)
+	v.SetDefault("security.hsts_max_age_seconds", 63072000)
+	v.SetDefault("security.content_security_policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'")
+	v.SetDefault("security.referrer_policy", "strict-origin-when-cross-origin")
+	v.SetDefault("security.rate_limit_requests_per_minute", 120)
+	v.SetDefault("security.rate_limit_burst", 20)
+	v.SetDefault("security.rate_limit_whitelist", []string{})
+	v.SetDefault("security.allowed_origins", []string{})
+	v.SetDefault("security.allow_credentials", true)
+	v.SetDefault("metrics.enabled", true)
+	v.SetDefault("metrics.endpoint", "/metrics")
+	v.SetDefault("metrics.namespace", "personal_website")
+	v.SetDefault("logging.level", "info")
 
 	if err := v.ReadInConfig(); err != nil {
 		// Ignore missing file; rely on defaults/env overrides.

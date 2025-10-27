@@ -12,8 +12,12 @@ func respondError(c *gin.Context, err error) {
 	}
 
 	appErr := errs.From(err)
-	c.JSON(appErr.Status, gin.H{
+	response := gin.H{
 		"error":   appErr.Code,
 		"message": appErr.Message,
-	})
+	}
+	if requestID := c.Writer.Header().Get("X-Request-ID"); requestID != "" {
+		response["request_id"] = requestID
+	}
+	c.JSON(appErr.Status, response)
 }

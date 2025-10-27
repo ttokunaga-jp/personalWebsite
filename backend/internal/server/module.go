@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/handler"
 	"github.com/takumi/personal-website/internal/middleware"
+	"github.com/takumi/personal-website/internal/telemetry"
 )
 
 var Module = fx.Module("http",
@@ -33,21 +35,48 @@ func newHTTPServer(
 	jwtMiddleware *middleware.JWTMiddleware,
 	adminHandler *handler.AdminHandler,
 	adminGuard *middleware.AdminGuard,
+	securityHandler *handler.SecurityHandler,
+	metrics *telemetry.Metrics,
 ) *http.Server {
-	registerRoutes(engine, healthHandler, profileHandler, projectHandler, researchHandler, contactHandler, bookingHandler, authHandler, jwtMiddleware, adminHandler, adminGuard)
+	registerRoutes(engine, healthHandler, profileHandler, projectHandler, researchHandler, contactHandler, bookingHandler, authHandler, jwtMiddleware, adminHandler, adminGuard, securityHandler)
+	if metrics != nil {
+		metrics.Register(engine)
+	}
 
-	return &http.Server{
+	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%s", cfg.Server.Port),
 		Handler:           engine,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       120 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+
+	if cfg != nil && cfg.Server.TLSCertFile != "" && cfg.Server.TLSKeyFile != "" {
+		certificate, err := tls.LoadX509KeyPair(cfg.Server.TLSCertFile, cfg.Server.TLSKeyFile)
+		if err != nil {
+			panic(fmt.Errorf("load tls certificate: %w", err))
+		}
+		srv.TLSConfig = &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			Certificates: []tls.Certificate{certificate},
+		}
+	}
+
+	return srv
 }
 
 func Register(lc fx.Lifecycle, srv *http.Server) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			go func() {
-				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				var err error
+				if srv.TLSConfig != nil {
+					err = srv.ListenAndServeTLS("", "")
+				} else {
+					err = srv.ListenAndServe()
+				}
+				if err != nil && err != http.ErrServerClosed {
 					panic(fmt.Errorf("listen and serve: %w", err))
 				}
 			}()

@@ -19,10 +19,12 @@ func registerRoutes(
 	jwtMiddleware *middleware.JWTMiddleware,
 	adminHandler *handler.AdminHandler,
 	adminGuard *middleware.AdminGuard,
+	securityHandler *handler.SecurityHandler,
 ) {
 	api := r.Group("/api")
 	{
 		api.GET("/health", healthHandler.Ping)
+		api.HEAD("/health", healthHandler.Ping)
 		api.GET("/profile", profileHandler.GetProfile)
 		api.GET("/projects", projectHandler.ListProjects)
 		api.GET("/research", researchHandler.ListResearch)
@@ -31,6 +33,9 @@ func registerRoutes(
 		api.POST("/contact/bookings", bookingHandler.CreateBooking)
 		api.GET("/auth/login", authHandler.Login)
 		api.GET("/auth/callback", authHandler.Callback)
+		if securityHandler != nil {
+			api.GET("/security/csrf", securityHandler.IssueCSRFToken)
+		}
 	}
 
 	admin := api.Group("/admin")

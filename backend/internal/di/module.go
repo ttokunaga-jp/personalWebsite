@@ -14,12 +14,15 @@ import (
 	"github.com/takumi/personal-website/internal/handler"
 	"github.com/takumi/personal-website/internal/infra/database"
 	"github.com/takumi/personal-website/internal/infra/google"
+	"github.com/takumi/personal-website/internal/logging"
 	"github.com/takumi/personal-website/internal/mail"
 	"github.com/takumi/personal-website/internal/middleware"
 	"github.com/takumi/personal-website/internal/repository/provider"
+	csrfmgr "github.com/takumi/personal-website/internal/security/csrf"
 	"github.com/takumi/personal-website/internal/service"
 	adminservice "github.com/takumi/personal-website/internal/service/admin"
 	"github.com/takumi/personal-website/internal/service/auth"
+	"github.com/takumi/personal-website/internal/telemetry"
 )
 
 var Module = fx.Module("di",
@@ -62,8 +65,19 @@ var Module = fx.Module("di",
 		handler.NewBookingHandler,
 		handler.NewAuthHandler,
 		handler.NewAdminHandler,
+		handler.NewSecurityHandler,
+		logging.NewLogger,
+		middleware.NewRequestID,
+		middleware.NewRequestLogger,
+		middleware.NewSecurityHeaders,
+		middleware.NewHTTPSRedirect,
+		middleware.NewCORSMiddleware,
+		middleware.NewRateLimiter,
 		middleware.NewJWTMiddleware,
 		middleware.NewAdminGuard,
+		middleware.NewCSRFMiddleware,
+		provideCSRFManager,
+		telemetry.NewMetrics,
 	),
 )
 
@@ -126,4 +140,11 @@ func provideCalendarClient(client *http.Client, provider google.TokenProvider, c
 
 func provideGmailClient(client *http.Client, provider google.TokenProvider) mail.Client {
 	return google.NewGmailAPIClient(client, provider)
+}
+
+func provideCSRFManager(cfg *config.AppConfig) *csrfmgr.Manager {
+	if cfg == nil || !cfg.Security.EnableCSRF {
+		return nil
+	}
+	return csrfmgr.NewManager(cfg.Security.CSRFSigningKey, cfg.Security.CSRFTokenTTL)
 }

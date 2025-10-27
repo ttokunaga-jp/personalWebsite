@@ -6,20 +6,25 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
 
 	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/handler"
+	"github.com/takumi/personal-website/internal/logging"
 	"github.com/takumi/personal-website/internal/middleware"
 	"github.com/takumi/personal-website/internal/model"
 	"github.com/takumi/personal-website/internal/repository/inmemory"
+	csrfmgr "github.com/takumi/personal-website/internal/security/csrf"
 	"github.com/takumi/personal-website/internal/service"
 	adminsvc "github.com/takumi/personal-website/internal/service/admin"
 	"github.com/takumi/personal-website/internal/service/auth"
+	"github.com/takumi/personal-website/internal/telemetry"
 )
 
 func TestRegisterRoutes(t *testing.T) {
@@ -73,6 +78,7 @@ func TestRegisterRoutes(t *testing.T) {
 		jwtMiddleware,
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
+		nil,
 	)
 
 	t.Run("health route ok", func(t *testing.T) {
@@ -85,6 +91,12 @@ func TestRegisterRoutes(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, rec.Code)
 		require.Contains(t, rec.Body.String(), `"status":"ok"`)
+	})
+
+	t.Run("health head route ok", func(t *testing.T) {
+		rec := performRequest(engine, http.MethodHead, "/api/health", nil)
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Empty(t, rec.Body.String())
 	})
 
 	t.Run("booking route schedules meeting", func(t *testing.T) {
@@ -166,6 +178,111 @@ func TestRegisterRoutes(t *testing.T) {
 	})
 }
 
+func TestSecurityAndObservabilityFlow(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("csrf issuance and validation", func(t *testing.T) {
+		cfg := newSecurityTestConfig()
+		cfg.Security.RateLimitRequestsPerMinute = 0
+		cfg.Security.RateLimitBurst = 0
+
+		srv := newSecurityTestEngine(t, cfg)
+
+		csrfRec := httptest.NewRecorder()
+		csrfReq := httptest.NewRequest(http.MethodGet, "/api/security/csrf", nil)
+		srv.ServeHTTP(csrfRec, csrfReq)
+
+		require.Equal(t, http.StatusOK, csrfRec.Code)
+
+		var payload struct {
+			Data struct {
+				Token     string `json:"token"`
+				ExpiresAt string `json:"expires_at"`
+			}
+		}
+		require.NoError(t, json.Unmarshal(csrfRec.Body.Bytes(), &payload))
+		require.NotEmpty(t, payload.Data.Token)
+
+		var csrfCookie *http.Cookie
+		for _, c := range csrfRec.Result().Cookies() {
+			if c.Name == cfg.Security.CSRFCookieName {
+				csrfCookie = c
+				break
+			}
+		}
+		require.NotNil(t, csrfCookie)
+
+		parts := strings.Split(csrfCookie.Value, ":")
+		require.GreaterOrEqual(t, len(parts), 3)
+		require.Equal(t, payload.Data.Token, parts[0])
+
+		body := []byte(`{"name":"Tester","email":"tester@example.com","message":"hello"}`)
+
+		// Missing header should be rejected.
+		failRec := httptest.NewRecorder()
+		failReq := httptest.NewRequest(http.MethodPost, "/api/contact", bytes.NewReader(body))
+		failReq.Header.Set("Content-Type", "application/json")
+		failReq.AddCookie(csrfCookie)
+		srv.ServeHTTP(failRec, failReq)
+		require.Equal(t, http.StatusForbidden, failRec.Code)
+
+		// Proper header + cookie should be accepted.
+		successRec := httptest.NewRecorder()
+		successReq := httptest.NewRequest(http.MethodPost, "/api/contact", bytes.NewReader(body))
+		successReq.Header.Set("Content-Type", "application/json")
+		successReq.Header.Set(cfg.Security.CSRFHeaderName, payload.Data.Token)
+		successReq.AddCookie(csrfCookie)
+		srv.ServeHTTP(successRec, successReq)
+
+		require.Equal(t, http.StatusAccepted, successRec.Code)
+	})
+
+	t.Run("rate limiter returns 429 after threshold", func(t *testing.T) {
+		cfg := newSecurityTestConfig()
+		cfg.Security.RateLimitRequestsPerMinute = 2
+		cfg.Security.RateLimitBurst = 1
+
+		srv := newSecurityTestEngine(t, cfg)
+
+		rec1 := performRequest(srv, http.MethodGet, "/api/contact/availability", nil)
+		require.Equal(t, http.StatusOK, rec1.Code)
+
+		rec2 := performRequest(srv, http.MethodGet, "/api/contact/availability", nil)
+		require.Equal(t, http.StatusTooManyRequests, rec2.Code)
+	})
+
+	t.Run("metrics endpoint exposes prometheus data", func(t *testing.T) {
+		cfg := newSecurityTestConfig()
+		cfg.Security.RateLimitRequestsPerMinute = 0
+		cfg.Security.RateLimitBurst = 0
+
+		srv := newSecurityTestEngine(t, cfg)
+
+		healthRec := performRequest(srv, http.MethodGet, "/api/health", nil)
+		require.Equal(t, http.StatusOK, healthRec.Code)
+
+		rec := performRequest(srv, http.MethodGet, "/metrics", nil)
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Contains(t, rec.Body.String(), "personal_website_http_request_duration_seconds")
+	})
+
+	t.Run("http requests redirect to https when enabled", func(t *testing.T) {
+		cfg := newSecurityTestConfig()
+		cfg.Security.HTTPSRedirect = true
+		cfg.Security.RateLimitRequestsPerMinute = 0
+		cfg.Security.RateLimitBurst = 0
+
+		srv := newSecurityTestEngine(t, cfg)
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusPermanentRedirect, rec.Code)
+		require.Equal(t, "https://example.com/api/health", rec.Header().Get("Location"))
+	})
+}
+
 func performRequest(engine *gin.Engine, method, path string, body []byte) *httptest.ResponseRecorder {
 	var reader *bytes.Reader
 	if body == nil {
@@ -183,6 +300,133 @@ func performRequest(engine *gin.Engine, method, path string, body []byte) *httpt
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)
 	return rec
+}
+
+func newSecurityTestConfig() *config.AppConfig {
+	return &config.AppConfig{
+		Server: config.ServerConfig{
+			Mode: gin.TestMode,
+		},
+		Security: config.SecurityConfig{
+			EnableCSRF:                 true,
+			CSRFSigningKey:             "test-signing-key",
+			CSRFTokenTTL:               time.Hour,
+			CSRFCookieName:             "ps_csrf",
+			CSRFCookieHTTPOnly:         true,
+			CSRFCookieSecure:           false,
+			CSRFCookieSameSite:         "lax",
+			CSRFHeaderName:             "X-CSRF-Token",
+			CSRFExemptPaths:            []string{"/api/auth/callback"},
+			ContentSecurityPolicy:      "default-src 'self'",
+			ReferrerPolicy:             "no-referrer",
+			HTTPSRedirect:              false,
+			RateLimitRequestsPerMinute: 0,
+			RateLimitBurst:             0,
+		},
+		Metrics: config.MetricsConfig{
+			Enabled:   true,
+			Endpoint:  "/metrics",
+			Namespace: "personal_website",
+		},
+		Logging: config.LoggingConfig{Level: "info"},
+	}
+}
+
+type noopLifecycle struct{}
+
+func (noopLifecycle) Append(fx.Hook) {}
+
+func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
+	t.Helper()
+
+	engine := gin.New()
+	engine.Use(gin.Recovery())
+
+	requestID := middleware.NewRequestID()
+	logger := logging.NewLogger(cfg)
+	requestLogger := middleware.NewRequestLogger(logger)
+	securityHeaders := middleware.NewSecurityHeaders(cfg)
+	httpsRedirect := middleware.NewHTTPSRedirect(cfg)
+	cors := middleware.NewCORSMiddleware(cfg)
+	rateLimiter := middleware.NewRateLimiter(noopLifecycle{}, cfg)
+	csrfManager := csrfmgr.NewManager(cfg.Security.CSRFSigningKey, cfg.Security.CSRFTokenTTL)
+	csrfMiddleware := middleware.NewCSRFMiddleware(cfg, csrfManager)
+	metrics := telemetry.NewMetrics(cfg)
+
+	if httpsRedirect != nil {
+		engine.Use(httpsRedirect.Handler())
+	}
+	if requestID != nil {
+		engine.Use(requestID.Handler())
+	}
+	if metrics != nil {
+		engine.Use(metrics.Handler())
+	}
+	if requestLogger != nil {
+		engine.Use(requestLogger.Handler())
+	}
+	if cors != nil {
+		engine.Use(cors.Handler())
+	}
+	if rateLimiter != nil {
+		engine.Use(rateLimiter.Handler())
+	}
+	if securityHeaders != nil {
+		engine.Use(securityHeaders.Handler())
+	}
+	if csrfMiddleware != nil {
+		engine.Use(csrfMiddleware.Handler())
+	}
+
+	profileSvc := service.NewProfileService(inmemory.NewProfileRepository())
+	projectSvc := service.NewProjectService(inmemory.NewProjectRepository())
+	researchSvc := service.NewResearchService(inmemory.NewResearchRepository())
+	contactSvc := service.NewContactService(inmemory.NewContactRepository())
+	availabilitySvc := &stubAvailabilityService{
+		response: &model.AvailabilityResponse{
+			Timezone:    "Asia/Tokyo",
+			GeneratedAt: time.Unix(0, 0),
+			Days: []model.AvailabilityDay{{
+				Date: "1970-01-01",
+				Slots: []model.AvailabilitySlot{{
+					Start: time.Unix(0, 0),
+					End:   time.Unix(1800, 0),
+				}},
+			}},
+		},
+	}
+
+	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
+		JWTSecret:        "test-jwt-secret",
+		Issuer:           "personal-website",
+		Audience:         []string{"personal-website-admin"},
+		ClockSkewSeconds: 30,
+		Disabled:         true,
+	})
+	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier)
+	adminSvc := &stubAdminService{}
+	securityHandler := handler.NewSecurityHandler(csrfManager, cfg)
+
+	registerRoutes(
+		engine,
+		handler.NewHealthHandler(),
+		handler.NewProfileHandler(profileSvc),
+		handler.NewProjectHandler(projectSvc),
+		handler.NewResearchHandler(researchSvc),
+		handler.NewContactHandler(contactSvc, availabilitySvc),
+		handler.NewBookingHandler(&stubBookingService{}),
+		handler.NewAuthHandler(&stubAuthService{}),
+		jwtMiddleware,
+		handler.NewAdminHandler(adminSvc),
+		middleware.NewAdminGuard(),
+		securityHandler,
+	)
+
+	if metrics != nil {
+		metrics.Register(engine)
+	}
+
+	return engine
 }
 
 type stubAuthService struct{}

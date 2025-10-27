@@ -1,6 +1,9 @@
 server:
   port: "8100"
   mode: "release"
+  trusted_proxies: []
+  tls_cert_file: ""
+  tls_key_file: ""
 database:
   dsn: "user:password@tcp(localhost:23306)/personal_website?parseTime=true"
   max_open_conns: 10
@@ -34,3 +37,32 @@ booking:
   backoff_multiplier: 2.0
   circuit_open_seconds: 60
   circuit_failure_threshold: 3
+security:
+  enable_csrf: true
+  csrf_signing_key: "local-dev-csrf-secret-change-me"
+  csrf_token_ttl: 1h
+  csrf_cookie_name: "ps_csrf"
+  csrf_cookie_domain: ""
+  csrf_cookie_secure: false
+  csrf_cookie_http_only: true
+  csrf_cookie_same_site: "lax"
+  csrf_header_name: "X-CSRF-Token"
+  csrf_exempt_paths:
+    - "/api/auth/callback"
+  https_redirect: false
+  hsts_max_age_seconds: 63072000
+  content_security_policy: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'"
+  referrer_policy: "strict-origin-when-cross-origin"
+  rate_limit_requests_per_minute: 120
+  rate_limit_burst: 20
+  rate_limit_whitelist: []
+  allowed_origins:
+    - "http://localhost:5173"
+    - "http://localhost:5174"
+  allow_credentials: true
+metrics:
+  enabled: true
+  endpoint: "/metrics"
+  namespace: "personal_website"
+logging:
+  level: "info"

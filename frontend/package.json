@@ -12,12 +12,17 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:perf": "pnpm --filter @personal-website/public build && NODE_OPTIONS=--experimental-json-modules pnpm exec lhci autorun",
     "format": "pnpm -r format",
     "prepare": "pnpm exec husky install"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@lhci/cli": "^0.15.1",
     "husky": "^9.1.7",
-    "lint-staged": "^15.5.2",
+    "lint-staged": "^15.5.1",
     "typescript": "5.3.3"
   },
   "lint-staged": {

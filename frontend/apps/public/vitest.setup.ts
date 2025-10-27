@@ -1,7 +1,9 @@
 import "@testing-library/jest-dom/vitest";
 import { act } from "react";
-import { afterEach, beforeAll, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, vi } from "vitest";
+
 import i18n from "./src/modules/i18n";
+import { server } from "./src/test-utils/server";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -61,12 +63,21 @@ if (typeof window !== "undefined" && !window.matchMedia) {
 }
 
 beforeAll(async () => {
+  server.listen({ onUnhandledRequest: "error" });
+  server.events.on("request:unhandled", (request) => {
+    console.error(`[MSW] Unhandled ${request.method} ${request.url.href}`);
+  });
   await i18n.changeLanguage("en");
 });
 
 afterEach(async () => {
+  server.resetHandlers();
   vi.restoreAllMocks();
   window.localStorage.clear();
   document.documentElement.classList.remove("dark");
   await i18n.changeLanguage("en");
+});
+
+afterAll(() => {
+  server.close();
 });

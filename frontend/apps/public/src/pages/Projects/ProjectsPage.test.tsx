@@ -1,101 +1,58 @@
-import { apiClient } from "@shared/lib/api-client";
-import { screen, waitFor } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AxiosResponse } from "axios";
-import { vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { describe, expect, it } from "vitest";
 
-import type { Project } from "../../modules/public-api";
 import { renderWithRouter } from "../../test-utils/renderWithRouter";
-
-const createAxiosResponse = <T,>(data: T): AxiosResponse<T> =>
-  ({
-    data,
-    status: 200,
-    statusText: "OK",
-    headers: {},
-    config: {}
-  }) as AxiosResponse<T>;
+import { projectsFixture, server } from "../../test-utils/server";
 
 describe("ProjectsPage", () => {
-  it("filters projects by tech stack selection", async () => {
+  it("filters projects by selected tech stacks", async () => {
     const user = userEvent.setup();
-    const projects: Project[] = [
-      {
-        id: "proj-1",
-        title: "AI Research Dashboard",
-        subtitle: "Observability for experiments",
-        description: "A dashboard aligning experiment metadata with AI lab metrics.",
-        techStack: ["React", "TypeScript", "Go"],
-        category: "Research",
-        period: {
-          start: "2023-01-01",
-          end: null
-        },
-        links: [
-          { label: "Repository", url: "https://example.com/repo", type: "repo" },
-          { label: "Demo", url: "https://example.com/demo", type: "demo" }
-        ]
-      },
-      {
-        id: "proj-2",
-        title: "Cloud IaC Platform",
-        description: "Composable Terraform modules for data-intensive workloads.",
-        techStack: ["Terraform", "Go"],
-        category: "Platform",
-        period: {
-          start: "2022-05-01",
-          end: "2023-06-01"
-        },
-        links: [{ label: "Docs", url: "https://example.com/docs", type: "article" }]
-      }
-    ];
+    await renderWithRouter({ initialEntries: ["/projects"] });
 
-    const getSpy = vi.spyOn(apiClient, "get").mockImplementation((url) => {
-      if (typeof url === "string" && url.includes("/v1/public/projects")) {
-        return Promise.resolve(createAxiosResponse(projects));
-      }
+    const allButton = await screen.findByRole("button", { name: /all stacks/i });
+    const typeScriptButton = await screen.findByRole("button", { name: "TypeScript" });
+    const reactButton = await screen.findByRole("button", { name: "React" });
 
-      if (typeof url === "string" && url === "/health") {
-        return Promise.resolve(createAxiosResponse({ status: "ok" }));
-      }
+    // Initially both projects should be visible.
+    for (const project of projectsFixture) {
+      expect(
+        await screen.findByRole("heading", { name: new RegExp(project.title, "i") })
+      ).toBeInTheDocument();
+    }
 
-      return Promise.resolve(createAxiosResponse({}));
-    });
+    await user.click(typeScriptButton);
+
+    expect(
+      await screen.findByRole("heading", { name: new RegExp(projectsFixture[0]?.title ?? "", "i") })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: new RegExp(projectsFixture[1]?.title ?? "", "i") })
+    ).not.toBeInTheDocument();
+
+    await user.click(reactButton);
+
+    expect(
+      await screen.findByRole("heading", { name: new RegExp(projectsFixture[1]?.title ?? "", "i") })
+    ).toBeInTheDocument();
+
+    await user.click(allButton);
+    expect(
+      screen.getByRole("heading", { name: new RegExp(projectsFixture[1]?.title ?? "", "i") })
+    ).toBeInTheDocument();
+  });
+
+  it("shows an error banner when the projects endpoint fails", async () => {
+    server.use(
+      http.get("/api/v1/public/projects", () =>
+        HttpResponse.json({ message: "boom" }, { status: 500 })
+      )
+    );
 
     await renderWithRouter({ initialEntries: ["/projects"] });
 
-    await waitFor(() => {
-      expect(getSpy).toHaveBeenCalledWith(
-        "/v1/public/projects",
-        expect.objectContaining({ signal: expect.any(AbortSignal) })
-      );
-    });
-
-    expect(
-      await screen.findByRole("heading", { name: /AI Research Dashboard/i })
-    ).toBeInTheDocument();
-    expect(
-      await screen.findByRole("heading", { name: /Cloud IaC Platform/i })
-    ).toBeInTheDocument();
-
-    const terraformFilter = await screen.findByRole("button", { name: "Terraform" });
-    await user.click(terraformFilter);
-
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("heading", { name: /AI Research Dashboard/i })
-      ).not.toBeInTheDocument();
-    });
-
-    expect(
-      screen.getByRole("heading", { name: /Cloud IaC Platform/i })
-    ).toBeInTheDocument();
-
-    const allStacksButton = await screen.findByRole("button", { name: /All stacks/i });
-    await user.click(allStacksButton);
-
-    expect(
-      await screen.findByRole("heading", { name: /AI Research Dashboard/i })
-    ).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Projects could not be retrieved from the API.");
   });
 });

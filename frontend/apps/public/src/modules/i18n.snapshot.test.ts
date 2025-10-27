@@ -1,7 +1,8 @@
-import i18n from "i18next";
-import { initReactI18next } from "react-i18next";
+import { describe, expect, it } from "vitest";
 
-export const resources = {
+import { resources } from "./i18n";
+
+const expectedResources = {
   en: {
     translation: {
       branding: {
@@ -382,18 +383,16 @@ export const resources = {
       }
     }
   }
-};
+} as const;
 
-void i18n.use(initReactI18next).init({
-  resources,
-  fallbackLng: "en",
-  react: {
-    useSuspense: false
-  },
-  initImmediate: false,
-  interpolation: {
-    escapeValue: false
-  }
+describe("i18n resources", () => {
+  it("matches the curated translation snapshot", () => {
+    expect(resources).toStrictEqual(expectedResources);
+  });
+
+  it("keeps language keys aligned", () => {
+    const enKeys = Object.keys(resources.en.translation);
+    const jaKeys = Object.keys(resources.ja.translation);
+    expect(enKeys).toEqual(jaKeys);
+  });
 });
-
-export default i18n;

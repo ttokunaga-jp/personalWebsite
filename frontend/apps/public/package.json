@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts",
+    "dev:e2e": "vite --config vite.config.ts --host 0.0.0.0 --port 4173",
     "build": "tsc -p tsconfig.json && vite build --config vite.config.ts",
     "preview": "vite preview --config vite.config.ts",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
@@ -30,6 +31,7 @@
     "@typescript-eslint/parser": "^6.21.0",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "msw": "^2.7.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-import": "^2.32.0",

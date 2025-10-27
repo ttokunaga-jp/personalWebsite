@@ -1,141 +1,101 @@
-import { apiClient } from "@shared/lib/api-client";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AxiosResponse } from "axios";
-import { afterEach, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import type {
-  ContactAvailabilityResponse,
-  ContactConfigResponse,
-  CreateBookingResponse
-} from "../../modules/public-api";
+import { publicApi } from "../../modules/public-api";
 import { renderWithRouter } from "../../test-utils/renderWithRouter";
+import { contactAvailabilityFixture, contactConfigFixture } from "../../test-utils/server";
 
-const createAxiosResponse = <T,>(data: T): AxiosResponse<T> =>
-  ({
-    data,
-    status: 200,
-    statusText: "OK",
-    headers: {},
-    config: {}
-  }) as AxiosResponse<T>;
+declare global {
+  interface Window {
+    grecaptcha?: {
+      ready: (callback: () => void) => void;
+      execute: (siteKey: string, options: { action: string }) => Promise<string>;
+    };
+  }
+}
+
+async function getFirstAvailableSlotButton() {
+  const slotGroup = await screen.findByRole("group", { name: /available time slots/i });
+  const buttons = within(slotGroup).getAllByRole("button");
+  const enabledButton = buttons.find((button) => !button.hasAttribute("disabled"));
+  if (!enabledButton) {
+    throw new Error("No bookable slot button found");
+  }
+  return enabledButton;
+}
 
 describe("ContactPage", () => {
-  beforeEach(() => {
-    window.grecaptcha = {
-      ready: (callback: () => void) => callback(),
-      execute: vi.fn().mockResolvedValue("recaptcha-token")
-    };
-  });
-
-  afterEach(() => {
-    delete window.grecaptcha;
-  });
-
-  it("validates form input and submits booking request", async () => {
+  it("enforces client-side validation", async () => {
     const user = userEvent.setup();
+    await renderWithRouter({ initialEntries: ["/contact"] });
 
-    const availability: ContactAvailabilityResponse = {
-      timezone: "Asia/Tokyo",
-      generatedAt: "2024-01-01T00:00:00Z",
-      slots: [
-        {
-          id: "slot-1",
-          start: "2025-01-05T09:00:00+09:00",
-          end: "2025-01-05T09:30:00+09:00",
-          isBookable: true
-        }
-      ]
+    const submitButton = await screen.findByRole("button", { name: /request booking/i });
+
+    await user.click(submitButton);
+
+    expect(await screen.findByText("Please provide your name.")).toBeInTheDocument();
+    expect(screen.getByText("An email address is required.")).toBeInTheDocument();
+    expect(screen.getByText("Select a topic to help us route your request.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Share at least 20 characters so we can prepare effectively.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Select an available time slot.")).toBeInTheDocument();
+  });
+
+  it("submits a booking request after collecting a Recaptcha token", async () => {
+    const user = userEvent.setup();
+    const createBookingMock = vi
+      .spyOn(publicApi, "createBooking")
+      .mockResolvedValue({ bookingId: "bk-slot-1", status: "pending" });
+
+    window.grecaptcha = {
+      ready: (callback: () => void) => {
+        callback();
+      },
+      execute: vi.fn().mockResolvedValue("recaptcha-token-123")
     };
-
-    const config: ContactConfigResponse = {
-      topics: ["General"],
-      recaptchaSiteKey: "test-site-key",
-      minimumLeadHours: 24,
-      consentText: "We will respond within 2 business days."
-    };
-
-    const bookingResponse: CreateBookingResponse = {
-      bookingId: "booking-123",
-      status: "pending"
-    };
-
-    const getSpy = vi.spyOn(apiClient, "get").mockImplementation((url) => {
-      if (typeof url === "string" && url.includes("/v1/public/contact/availability")) {
-        return Promise.resolve(createAxiosResponse(availability));
-      }
-
-      if (typeof url === "string" && url.includes("/v1/public/contact/config")) {
-        return Promise.resolve(createAxiosResponse(config));
-      }
-
-      if (typeof url === "string" && url === "/health") {
-        return Promise.resolve(createAxiosResponse({ status: "ok" }));
-      }
-
-      return Promise.resolve(createAxiosResponse({}));
-    });
-
-    const postSpy = vi
-      .spyOn(apiClient, "post")
-      .mockResolvedValue(createAxiosResponse(bookingResponse));
 
     await renderWithRouter({ initialEntries: ["/contact"] });
 
-    await waitFor(() => {
-      expect(getSpy).toHaveBeenCalledWith(
-        "/v1/public/contact/availability",
-        expect.objectContaining({ signal: expect.any(AbortSignal) })
-      );
-    });
+    const nameInput = await screen.findByLabelText("Your name");
+    const emailInput = await screen.findByLabelText("Email address");
+    const topicSelect = await screen.findByLabelText("Topic");
+    const textboxes = await screen.findAllByRole("textbox");
+    const messageTextarea = textboxes.find((element) => element.getAttribute("name") === "message");
+    if (!messageTextarea) {
+      throw new Error("Message textarea not found");
+    }
 
-    const submitButton = await screen.findByRole("button", { name: /request booking/i });
-    const topicSelect = await screen.findByLabelText(/topic/i);
+    await user.type(nameInput, "  Jane Doe  ");
+    await user.type(emailInput, "jane.doe@example.com");
+    await user.selectOptions(topicSelect, contactConfigFixture.topics[0] ?? "");
+    await user.type(
+      messageTextarea,
+      "I would like to discuss possibilities for joint research in HRI."
+    );
 
-    await waitFor(() => {
-      expect(topicSelect).not.toBeDisabled();
-      expect(submitButton).not.toBeDisabled();
-    });
-
-    await user.click(submitButton);
-
-    expect(await screen.findByText(/please provide your name/i)).toBeInTheDocument();
-    expect(await screen.findByText(/an email address is required/i)).toBeInTheDocument();
-    expect(await screen.findByText(/share at least 20 characters/i)).toBeInTheDocument();
-    expect(await screen.findByText(/select an available time slot/i)).toBeInTheDocument();
-    expect(topicSelect).toHaveAttribute("aria-invalid", "true");
-
-    const slotButton = await screen.findByRole("button", { name: /Ends/i });
+    const slotButton = await getFirstAvailableSlotButton();
     await user.click(slotButton);
 
-    const nameInput = await screen.findByLabelText(/your name/i);
-    await user.type(nameInput, "Jane Doe");
+    await user.click(screen.getByRole("button", { name: /request booking/i }));
 
-    const emailInput = await screen.findByLabelText(/email address/i);
-    await user.type(emailInput, "jane@example.com");
+    expect(await screen.findByText(/Your request \(ID: bk-slot-1\)/)).toBeInTheDocument();
 
-    await user.selectOptions(topicSelect, "General");
-
-    const messageInput = await screen.findByLabelText(/message/i);
-    await user.type(messageInput, "I'd like to discuss collaboration opportunities.");
-
-    await user.click(submitButton);
-
-    await waitFor(() => {
-      expect(postSpy).toHaveBeenCalledWith(
-        "/v1/public/contact/bookings",
-        expect.objectContaining({
-          name: "Jane Doe",
-          email: "jane@example.com",
-          topic: "General",
-          slotId: "slot-1",
-          recaptchaToken: "recaptcha-token"
-        })
-      );
+    expect(createBookingMock).toHaveBeenCalledWith({
+      name: "Jane Doe",
+      email: "jane.doe@example.com",
+      topic: contactConfigFixture.topics[0] ?? "",
+      message: "I would like to discuss possibilities for joint research in HRI.",
+      slotId: contactAvailabilityFixture.slots[0]?.id ?? "",
+      recaptchaToken: "recaptcha-token-123"
     });
 
-    expect(
-      await screen.findByText(/Thank you! Your request \(ID: booking-123\)/i)
-    ).toBeInTheDocument();
+    expect(window.grecaptcha?.execute).toHaveBeenCalledWith(
+      contactConfigFixture.recaptchaSiteKey,
+      { action: "submit" }
+    );
+
+    delete window.grecaptcha;
   });
 });

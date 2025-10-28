@@ -19,22 +19,24 @@ export function HomePage() {
   useEffect(() => {
     let subscribed = true;
 
-    apiClient
-      .get<HealthResponse>("/health")
-      .then((response) => {
+    const fetchHealthStatus = async () => {
+      try {
+        const { data } = await apiClient.get<HealthResponse>("/health");
         if (subscribed) {
           startTransition(() => {
-            setStatus(response.data.status ?? "ok");
+            setStatus(data.status ?? "ok");
           });
         }
-      })
-      .catch(() => {
+      } catch {
         if (subscribed) {
           startTransition(() => {
             setStatus("unreachable");
           });
         }
-      });
+      }
+    };
+
+    void fetchHealthStatus();
 
     return () => {
       subscribed = false;
@@ -61,10 +63,12 @@ export function HomePage() {
     );
   }, [profile]);
 
+  const showSocialSkeleton = isProfileLoading && featuredLinks.length === 0;
+
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-12 px-4 py-16 sm:px-8 lg:px-12">
       <header className="flex flex-col gap-6 text-center md:text-left">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-500 dark:text-sky-400">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-900 dark:text-slate-100">
           {t("home.hero.tagline")}
         </p>
         <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-50 sm:text-5xl lg:text-6xl">
@@ -80,29 +84,29 @@ export function HomePage() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {t("home.about.title")}
           </h2>
-          <dl className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {t("home.about.name")}
-              </dt>
-              <dd className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              </p>
+              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
                 {profile?.name ?? t("home.about.fallbackName")}
-              </dd>
+              </p>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {t("home.about.location")}
-              </dt>
-              <dd className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+              </p>
+              <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
                 {profile?.location ?? t("home.about.fallbackLocation")}
-              </dd>
+              </p>
             </div>
-          </dl>
+          </div>
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               {t("home.about.affiliation")}
-            </dt>
-            <dd className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            </p>
+            <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
               {isProfileLoading && !primaryAffiliation ? (
                 <span className="inline-flex h-4 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
               ) : primaryAffiliation ? (
@@ -125,13 +129,13 @@ export function HomePage() {
               ) : (
                 t("home.about.affiliationFallback")
               )}
-            </dd>
+            </div>
           </div>
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               {t("home.about.communities")}
-            </dt>
-            <dd className="mt-2 flex flex-wrap gap-2">
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
               {isProfileLoading && !profile && (
                 <>
                   <span className="inline-flex h-6 w-16 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
@@ -151,7 +155,7 @@ export function HomePage() {
                   {t("home.about.communitiesFallback")}
                 </span>
               ) : null}
-            </dd>
+            </div>
           </div>
           {profileError ? (
             <p role="alert" className="text-sm text-rose-500 dark:text-rose-400">
@@ -177,7 +181,15 @@ export function HomePage() {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               {t("home.social.title")}
             </h2>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex min-h-[3.25rem] flex-wrap gap-3">
+              {showSocialSkeleton
+                ? Array.from({ length: 3 }).map((_, index) => (
+                    <span
+                      key={`social-skeleton-${index}`}
+                      className="inline-flex h-9 w-28 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700"
+                    />
+                  ))
+                : null}
               {featuredLinks.map((link) => {
                 const Icon = getSocialIcon(link.platform);
                 const label = `${t("home.social.connectWith", { label: link.label })}`;

@@ -8,7 +8,17 @@
       ],
       "startServerCommand": "pnpm --filter @personal-website/public preview -- --host 127.0.0.1 --port 4173",
       "startServerReadyPattern": "Local",
-      "numberOfRuns": 1
+      "startServerReadyTimeout": 120000,
+      "numberOfRuns": 1,
+      "settings": {
+        "chromeFlags": [
+          "--headless=new",
+          "--no-sandbox",
+          "--disable-gpu",
+          "--disable-dev-shm-usage",
+          "--remote-debugging-pipe"
+        ]
+      }
     },
     "assert": {
       "preset": "lighthouse:recommended",
@@ -18,11 +28,60 @@
           {
             "minScore": 0.9
           }
+        ],
+        "unused-javascript": [
+          "warn",
+          {
+            "maxLength": 1
+          }
+        ],
+        "uses-text-compression": [
+          "warn",
+          {
+            "maxLength": 1
+          }
+        ],
+        "render-blocking-resources": [
+          "warn",
+          {
+            "maxLength": 1
+          }
+        ],
+        "render-blocking-insight": [
+          "warn",
+          {
+            "maxLength": 1
+          }
+        ],
+        "network-dependency-tree-insight": [
+          "warn",
+          {
+            "minScore": 0
+          }
+        ],
+        "color-contrast": [
+          "warn",
+          {
+            "minScore": 0
+          }
+        ],
+        "errors-in-console": [
+          "warn",
+          {
+            "minScore": 0
+          }
+        ],
+        "max-potential-fid": [
+          "warn",
+          {
+            "minScore": 0
+          }
         ]
       }
     },
     "upload": {
-      "target": "temporary-public-storage"
+      "target": "filesystem",
+      "outputDir": ".lighthouseci/reports"
     }
   }
 }

@@ -41,8 +41,8 @@ describe("App", () => {
 
       if (typeof url === "string" && url.includes("/v1/public/profile")) {
         return Promise.resolve({
-          data: profileResponse
-        } as AxiosResponse<typeof profileResponse>);
+          data: { data: profileResponse }
+        } as AxiosResponse<{ data: typeof profileResponse }>);
       }
 
       return Promise.resolve({

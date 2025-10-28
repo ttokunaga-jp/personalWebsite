@@ -50,12 +50,16 @@ type GoogleOAuthConfig struct {
 }
 
 type ContactConfig struct {
-	Timezone         string `mapstructure:"timezone"`
-	SlotDurationMin  int    `mapstructure:"slot_duration_minutes"`
-	WorkdayStartHour int    `mapstructure:"workday_start_hour"`
-	WorkdayEndHour   int    `mapstructure:"workday_end_hour"`
-	HorizonDays      int    `mapstructure:"horizon_days"`
-	BufferMinutes    int    `mapstructure:"buffer_minutes"`
+	Timezone         string   `mapstructure:"timezone"`
+	SlotDurationMin  int      `mapstructure:"slot_duration_minutes"`
+	WorkdayStartHour int      `mapstructure:"workday_start_hour"`
+	WorkdayEndHour   int      `mapstructure:"workday_end_hour"`
+	HorizonDays      int      `mapstructure:"horizon_days"`
+	BufferMinutes    int      `mapstructure:"buffer_minutes"`
+	Topics           []string `mapstructure:"topics"`
+	RecaptchaSiteKey string   `mapstructure:"recaptcha_site_key"`
+	MinimumLeadHours int      `mapstructure:"minimum_lead_hours"`
+	ConsentText      string   `mapstructure:"consent_text"`
 }
 
 type BookingConfig struct {
@@ -173,6 +177,10 @@ func load() (*AppConfig, error) {
 	v.SetDefault("contact.workday_end_hour", 18)
 	v.SetDefault("contact.horizon_days", 14)
 	v.SetDefault("contact.buffer_minutes", 30)
+	v.SetDefault("contact.topics", []string{})
+	v.SetDefault("contact.recaptcha_site_key", "")
+	v.SetDefault("contact.minimum_lead_hours", 24)
+	v.SetDefault("contact.consent_text", "")
 	v.SetDefault("booking.request_timeout", 8*time.Second)
 	v.SetDefault("booking.max_retries", 3)
 	v.SetDefault("booking.initial_backoff", 750*time.Millisecond)

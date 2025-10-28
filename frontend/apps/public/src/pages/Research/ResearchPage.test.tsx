@@ -20,7 +20,7 @@ describe("ResearchPage", () => {
 
     server.use(
       http.get("/api/v1/public/research", () =>
-        HttpResponse.json([researchEntriesFixture[0], additionalEntry])
+        HttpResponse.json({ data: [researchEntriesFixture[0], additionalEntry] })
       )
     );
 

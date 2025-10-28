@@ -14,7 +14,7 @@
     "test": "pnpm -r test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:perf": "pnpm --filter @personal-website/public build && NODE_OPTIONS=--experimental-json-modules pnpm exec lhci autorun",
+    "test:perf": "pnpm --filter @personal-website/public build && node ./scripts/run-lhci.mjs",
     "format": "pnpm -r format",
     "prepare": "pnpm exec husky install"
   },

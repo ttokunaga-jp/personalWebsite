@@ -5,6 +5,49 @@ import { useProjectsResource } from "../../modules/public-api";
 import type { Project } from "../../modules/public-api";
 import { formatDateRange } from "../../utils/date";
 
+const PROJECT_SKELETON_COUNT = 3;
+
+function ProjectCardSkeleton() {
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <span className="block h-6 w-56 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+          <span className="block h-4 w-40 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+          <span className="block h-5 w-24 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
+        </div>
+        <span className="block h-4 w-28 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+      </header>
+      <span className="mt-4 block h-48 w-full animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
+      <div className="mt-4 space-y-2">
+        <span className="block h-4 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+        <span className="block h-4 w-5/6 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+        <span className="block h-4 w-4/6 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {Array.from({ length: 4 }).map((_, index) => (
+          // index is stable for skeleton placeholders
+          // eslint-disable-next-line react/no-array-index-key
+          <span
+            key={index}
+            className="inline-flex h-7 w-24 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700"
+          />
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {Array.from({ length: 3 }).map((_, index) => (
+          // index is stable for skeleton placeholders
+          // eslint-disable-next-line react/no-array-index-key
+          <span
+            key={index}
+            className="inline-flex h-6 w-20 animate-pulse rounded-full border border-dashed border-slate-200 bg-transparent dark:border-slate-700"
+          />
+        ))}
+      </div>
+    </article>
+  );
+}
+
 export function ProjectsPage() {
   const { t } = useTranslation();
   const { data: projects, isLoading, error } = useProjectsResource();
@@ -69,7 +112,7 @@ export function ProjectsPage() {
       className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-12 sm:px-8"
     >
       <header className="space-y-3">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-500 dark:text-sky-400">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-900 dark:text-slate-100">
           {t("projects.tagline")}
         </p>
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50 sm:text-4xl">
@@ -114,15 +157,13 @@ export function ProjectsPage() {
       ) : null}
 
       <div className="grid gap-4">
-        {isLoading && (
-          <article className="rounded-xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-            <div className="space-y-3">
-              <span className="block h-6 w-48 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-              <span className="block h-4 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-              <span className="block h-4 w-4/5 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-            </div>
-          </article>
-        )}
+        {isLoading
+          ? Array.from({ length: PROJECT_SKELETON_COUNT }).map((_, index) => (
+              // index is stable for skeleton placeholders
+              // eslint-disable-next-line react/no-array-index-key
+              <ProjectCardSkeleton key={index} />
+            ))
+          : null}
         {!isLoading && !filteredProjects.length ? (
           <article className="rounded-xl border border-slate-200 bg-white/80 p-6 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
             {selectedStacks.size

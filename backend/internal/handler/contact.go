@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/errs"
 	"github.com/takumi/personal-website/internal/model"
 	"github.com/takumi/personal-website/internal/service"
@@ -15,10 +16,18 @@ import (
 type ContactHandler struct {
 	submission   service.ContactService
 	availability service.AvailabilityService
+	cfg          config.ContactConfig
 }
 
-func NewContactHandler(submission service.ContactService, availability service.AvailabilityService) *ContactHandler {
-	return &ContactHandler{submission: submission, availability: availability}
+func NewContactHandler(submission service.ContactService, availability service.AvailabilityService, cfg *config.AppConfig) *ContactHandler {
+	handler := &ContactHandler{
+		submission:   submission,
+		availability: availability,
+	}
+	if cfg != nil {
+		handler.cfg = cfg.Contact
+	}
+	return handler
 }
 
 func (h *ContactHandler) SubmitContact(c *gin.Context) {
@@ -68,5 +77,21 @@ func (h *ContactHandler) GetAvailability(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"data": availability,
+	})
+}
+
+func (h *ContactHandler) GetConfig(c *gin.Context) {
+	response := model.ContactConfigResponse{
+		Topics:           append([]string(nil), h.cfg.Topics...),
+		RecaptchaSiteKey: h.cfg.RecaptchaSiteKey,
+		MinimumLeadHours: h.cfg.MinimumLeadHours,
+		ConsentText:      h.cfg.ConsentText,
+	}
+	if response.MinimumLeadHours <= 0 {
+		response.MinimumLeadHours = 24
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": response,
 	})
 }

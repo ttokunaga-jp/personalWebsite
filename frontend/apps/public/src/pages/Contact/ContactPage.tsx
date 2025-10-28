@@ -36,6 +36,8 @@ export function ContactPage() {
   const { data: availability, isLoading: isAvailabilityLoading, error: availabilityError } =
     useContactAvailability();
   const { data: config, isLoading: isConfigLoading, error: configError } = useContactConfig();
+  const slots = availability?.slots ?? [];
+  const topics = config?.topics ?? [];
 
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -142,7 +144,9 @@ export function ContactPage() {
       setFormState(initialFormState);
       setFormErrors({});
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) {
+        console.error(error);
+      }
       setStatusMessage(t("contact.form.error"));
     } finally {
       setIsSubmitting(false);
@@ -189,12 +193,12 @@ export function ContactPage() {
               <span className="inline-block h-10 w-28 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
             </>
           )}
-          {!isAvailabilityLoading && !availability?.slots.length ? (
+          {!isAvailabilityLoading && slots.length === 0 ? (
             <span className="text-sm text-slate-500 dark:text-slate-400">
               {t("contact.availability.unavailable")}
             </span>
           ) : null}
-          {availability?.slots.map((slot) => {
+          {slots.map((slot) => {
             const isSelected = formState.slotId === slot.id;
             const isEnabled = slot.isBookable;
             return (
@@ -290,12 +294,12 @@ export function ContactPage() {
               name="topic"
               value={formState.topic}
               onChange={handleInputChange("topic")}
-              disabled={!config?.topics.length}
+              disabled={topics.length === 0}
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm transition focus-visible:border-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:disabled:bg-slate-900/20 dark:focus-visible:border-sky-400 dark:focus-visible:ring-sky-900/60"
               aria-invalid={Boolean(formErrors.topic)}
             >
               <option value="">{t("contact.form.topicPlaceholder")}</option>
-              {config?.topics.map((topic) => (
+              {topics.map((topic) => (
                 <option key={topic} value={topic}>
                   {topic}
                 </option>

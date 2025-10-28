@@ -25,6 +25,12 @@ contact:
   workday_end_hour: 18
   horizon_days: 14
   buffer_minutes: 30
+  topics:
+    - "Research collaboration"
+    - "Speaking engagement"
+  recaptcha_site_key: ""
+  minimum_lead_hours: 48
+  consent_text: "We only use your information for scheduling purposes."
 booking:
   calendar_id: "primary"
   meet_template: "Portfolio Intro Session"

@@ -29,6 +29,7 @@ func registerRoutes(
 		api.GET("/projects", projectHandler.ListProjects)
 		api.GET("/research", researchHandler.ListResearch)
 		api.GET("/contact/availability", contactHandler.GetAvailability)
+		api.GET("/contact/config", contactHandler.GetConfig)
 		api.POST("/contact", contactHandler.SubmitContact)
 		api.POST("/contact/bookings", bookingHandler.CreateBooking)
 		api.GET("/auth/login", authHandler.Login)
@@ -36,6 +37,17 @@ func registerRoutes(
 		if securityHandler != nil {
 			api.GET("/security/csrf", securityHandler.IssueCSRFToken)
 		}
+	}
+
+	publicV1 := api.Group("/v1/public")
+	{
+		publicV1.GET("/profile", profileHandler.GetProfile)
+		publicV1.GET("/projects", projectHandler.ListProjects)
+		publicV1.GET("/research", researchHandler.ListResearch)
+		publicV1.GET("/contact/availability", contactHandler.GetAvailability)
+		publicV1.GET("/contact/config", contactHandler.GetConfig)
+		publicV1.POST("/contact", contactHandler.SubmitContact)
+		publicV1.POST("/contact/bookings", bookingHandler.CreateBooking)
 	}
 
 	admin := api.Group("/admin")

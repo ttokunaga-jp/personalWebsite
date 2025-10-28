@@ -8,7 +8,7 @@
   },
   "types": "src/index.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "build": "tsc -b tsconfig.json",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
     "test": "vitest run",
     "format": "prettier \"src/**/*.{ts,tsx}\" --write"

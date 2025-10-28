@@ -17,5 +17,13 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  preview: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:8100",
+        changeOrigin: true
+      }
+    }
   }
 });

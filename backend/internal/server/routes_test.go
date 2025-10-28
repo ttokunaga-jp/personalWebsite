@@ -66,13 +66,22 @@ func TestRegisterRoutes(t *testing.T) {
 	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier)
 	adminSvc := &stubAdminService{}
 
+	appCfg := &config.AppConfig{
+		Contact: config.ContactConfig{
+			Topics:           []string{"Research collaboration"},
+			RecaptchaSiteKey: "test-site-key",
+			MinimumLeadHours: 48,
+			ConsentText:      "Testing purposes only.",
+		},
+	}
+
 	registerRoutes(
 		engine,
 		handler.NewHealthHandler(),
 		handler.NewProfileHandler(profileSvc),
 		handler.NewProjectHandler(projectSvc),
 		handler.NewResearchHandler(researchSvc),
-		handler.NewContactHandler(contactSvc, availabilitySvc),
+		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
 		jwtMiddleware,
@@ -407,13 +416,22 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 	adminSvc := &stubAdminService{}
 	securityHandler := handler.NewSecurityHandler(csrfManager, cfg)
 
+	appCfg := &config.AppConfig{
+		Contact: config.ContactConfig{
+			Topics:           []string{"Research collaboration"},
+			RecaptchaSiteKey: "test-site-key",
+			MinimumLeadHours: 48,
+			ConsentText:      "Testing purposes only.",
+		},
+	}
+
 	registerRoutes(
 		engine,
 		handler.NewHealthHandler(),
 		handler.NewProfileHandler(profileSvc),
 		handler.NewProjectHandler(projectSvc),
 		handler.NewResearchHandler(researchSvc),
-		handler.NewContactHandler(contactSvc, availabilitySvc),
+		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
 		jwtMiddleware,

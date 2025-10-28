@@ -4,6 +4,7 @@ import { act } from "react";
 
 import { App, type AppThemeOverrides } from "../App";
 import { createAppMemoryRouter } from "../app/router";
+import { preloadRouteModules } from "../app/routes/routeConfig";
 
 type RenderWithRouterOptions = {
   initialEntries?: string[];
@@ -16,6 +17,8 @@ export async function renderWithRouter({
   router,
   themeOverrides
 }: RenderWithRouterOptions = {}) {
+  await preloadRouteModules();
+
   const testRouter = router ?? createAppMemoryRouter(initialEntries);
 
   let renderResult: ReturnType<typeof render> | null = null;

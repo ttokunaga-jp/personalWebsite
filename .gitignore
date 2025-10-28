@@ -11,6 +11,8 @@ coverage/
 frontend/.next/
 frontend/out/
 frontend/.turbo/
+frontend/.lighthouseci/
+frontend/C:*/
 
 # Logs
 npm-debug.log*

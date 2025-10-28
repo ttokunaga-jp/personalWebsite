@@ -40,7 +40,7 @@ export function ResearchPage() {
       className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-12 sm:px-8"
     >
       <header className="space-y-3">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-500 dark:text-sky-400">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-900 dark:text-slate-100">
           {t("research.tagline")}
         </p>
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50 sm:text-4xl">

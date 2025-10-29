@@ -6,7 +6,7 @@
         "http://127.0.0.1:4173/projects",
         "http://127.0.0.1:4173/contact"
       ],
-      "startServerCommand": "pnpm --filter @personal-website/public preview -- --host 127.0.0.1 --port 4173",
+      "startServerCommand": "node ./scripts/start-preview.mjs",
       "startServerReadyPattern": "Local",
       "startServerReadyTimeout": 120000,
       "numberOfRuns": 1,

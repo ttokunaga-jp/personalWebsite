@@ -1,9 +1,9 @@
 import i18next from "i18next";
 
 import {
-  canonicalProfile,
-  canonicalProjects,
-  canonicalResearchEntries,
+  getCanonicalProfile,
+  getCanonicalProjects,
+  getCanonicalResearchEntries,
 } from "../profile-content";
 
 import type {
@@ -50,13 +50,18 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function resolveLanguage(): "en" | "ja" {
+  const language = i18next.language ?? "en";
+  return language.toLowerCase().startsWith("ja") ? "ja" : "en";
+}
+
 function selectLocalizedText(text?: LocalizedText | null): string | undefined {
   if (!text) {
     return undefined;
   }
 
-  const language = i18next.language ?? "en";
-  if (language.startsWith("ja") && text.ja) {
+  const language = resolveLanguage();
+  if (language === "ja" && text.ja) {
     return text.ja;
   }
 
@@ -70,7 +75,8 @@ export function transformProfile(
     return clone(raw as unknown as ProfileResponse);
   }
 
-  const profile = clone(canonicalProfile);
+  const canonical = getCanonicalProfile(resolveLanguage());
+  const profile = clone(canonical);
 
   if (!raw) {
     return profile;
@@ -138,14 +144,6 @@ export function transformProfile(
   return profile;
 }
 
-const projectFallbackByTitle = new Map(
-  canonicalProjects.map((project) => [project.title.toLowerCase(), project]),
-);
-
-const projectFallbackById = new Map(
-  canonicalProjects.map((project, index) => [String(index + 1), project]),
-);
-
 export function transformProjects(
   projects: RawProject[] | undefined,
 ): Project[] {
@@ -156,9 +154,19 @@ export function transformProjects(
     return clone(projects as unknown as Project[]);
   }
 
+  const canonicalProjects = getCanonicalProjects(resolveLanguage());
+
   if (!projects?.length) {
     return canonicalProjects.map(clone);
   }
+
+  const projectFallbackByTitle = new Map(
+    canonicalProjects.map((project) => [project.title.toLowerCase(), project]),
+  );
+
+  const projectFallbackById = new Map(
+    canonicalProjects.map((project, index) => [String(index + 1), project]),
+  );
 
   return projects.map((project) => {
     const localizedTitle = selectLocalizedText(project.title);
@@ -205,14 +213,6 @@ export function transformProjects(
   });
 }
 
-const researchFallbackByTitle = new Map(
-  canonicalResearchEntries.map((entry) => [entry.title.toLowerCase(), entry]),
-);
-
-const researchFallbackById = new Map(
-  canonicalResearchEntries.map((entry, index) => [String(index + 1), entry]),
-);
-
 export function transformResearchEntries(
   entries: RawResearchEntry[] | undefined,
 ): ResearchEntry[] {
@@ -223,9 +223,24 @@ export function transformResearchEntries(
     return clone(entries as unknown as ResearchEntry[]);
   }
 
+  const canonicalResearchEntries = getCanonicalResearchEntries(
+    resolveLanguage(),
+  );
+
   if (!entries?.length) {
     return canonicalResearchEntries.map(clone);
   }
+
+  const researchFallbackByTitle = new Map(
+    canonicalResearchEntries.map((entry) => [entry.title.toLowerCase(), entry]),
+  );
+
+  const researchFallbackById = new Map(
+    canonicalResearchEntries.map((entry, index) => [
+      String(index + 1),
+      entry,
+    ]),
+  );
 
   return entries.map((entry) => {
     const localizedTitle = selectLocalizedText(entry.title);

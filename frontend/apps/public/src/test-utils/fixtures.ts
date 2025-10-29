@@ -1,4 +1,8 @@
-import { canonicalProfile, canonicalProjects, canonicalResearchEntries } from "../modules/profile-content";
+import {
+  canonicalProfileEn,
+  canonicalProjectsEn,
+  canonicalResearchEntriesEn,
+} from "../modules/profile-content";
 import type {
   ContactAvailabilityResponse,
   ContactConfigResponse,
@@ -20,14 +24,14 @@ export function cloneFixture<T>(fixture: T): T {
 }
 
 export const profileFixture: ProfileResponse =
-  cloneFixture(canonicalProfile);
+  cloneFixture(canonicalProfileEn);
 
 export const researchEntriesFixture: ResearchEntry[] = cloneFixture(
-  canonicalResearchEntries,
+  canonicalResearchEntriesEn,
 );
 
 export const projectsFixture: Project[] =
-  cloneFixture(canonicalProjects);
+  cloneFixture(canonicalProjectsEn);
 
 export const contactAvailabilityFixture: ContactAvailabilityResponse = {
   timezone: "Asia/Tokyo",

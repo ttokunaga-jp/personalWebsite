@@ -1,157 +1,290 @@
 # Personal Website
 
 ## 概要
-このリポジトリは Go (Gin) 製バックエンド API、React + TypeScript + Tailwind による SPA（公開用・管理用）および GCP（Cloud Run / Cloud SQL / VPC）向け Terraform 構成を含む環境セットアップ用テンプレートです。品質・可観測性・セキュリティで妥当な初期設定を整え、すぐに開発を開始できる状態を提供します。
+Go (Gin) 製の API と React + TypeScript 製 SPA（公開サイト / 管理画面）を中心に、MySQL・Google Calendar / Gmail・Terraform・GCP（Cloud Run / Cloud Build）までを一貫して扱う個人ポートフォリオサイトの基盤です。ローカル開発から CI/CD、自動デプロイ、セキュリティ／可観測性までを含むプロダクション志向のテンプレートとして利用できます。
+
+## 目次
+- [実装ステータス](#実装ステータス)
+- [技術スタック](#技術スタック)
+- [リポジトリ構成](#リポジトリ構成)
+- [セットアップ](#セットアップ)
+  - [前提条件](#前提条件)
+  - [環境変数](#環境変数)
+  - [初期セットアップ手順](#初期セットアップ手順)
+- [ローカル開発](#ローカル開発)
+- [フロントエンド](#フロントエンド)
+- [バックエンド API](#バックエンド-api)
+- [データ永続化](#データ永続化)
+- [テストと品質保証](#テストと品質保証)
+- [CI/CD](#cicd)
+- [インフラ / Terraform](#インフラ--terraform)
+- [セキュリティと可観測性](#セキュリティと可観測性)
+- [ドキュメント](#ドキュメント)
+- [トラブルシューティング](#トラブルシューティング)
+- [今後の改善アイデア](#今後の改善アイデア)
+
+## 実装ステータス
+| 領域 | 実装状況 | 補足 |
+| --- | --- | --- |
+| フロントエンド（公開 SPA） | 完了 | Home / Profile / Research / Projects / Contact を実装。i18n、フォーム検証、予約枠表示、reCAPTCHA 連携を含む。|
+| フロントエンド（管理 SPA） | MVP | プロジェクト・研究・ブログ・予約・ブラックリスト CRUD を提供。UI/UX と e2e 自動テストは今後拡充予定。|
+| バックエンド API | 完了 | 公開 / 管理エンドポイント、Google OAuth + JWT、予約（カレンダー・通知）処理、Clean Architecture 風レイヤ分離済み。|
+| 認証・権限 | MVP | Google OAuth, ドメイン/メール許可リスト, JWT, Admin Guard を実装。Secret 管理と本番向け WIF 設定は環境依存。|
+| 予約・外部連携 | MVP | Google Calendar への予定挿入、Gmail API 経由の通知をサポート。トークン更新やバックアップ導線は継続改善対象。|
+| テスト | 進行中 | Go/Vitest 単体テストと ESLint を整備。Playwright など E2E、自動ビジュアル回帰は未導入。|
+| CI/CD | 完了 | GitHub Actions → Cloud Build → Cloud Run で lint/test/build/deploy を自動化。Workload Identity Federation を使用。|
+| インフラ (Terraform) | ベース構築済み | `terraform/environments/dev` で VPC / Cloud Run モジュールを提供。Cloud SQL や本番環境差分は追加実装の余地あり。|
+
+## 技術スタック
+- **バックエンド**: Go 1.22, Gin, Uber Fx, sqlx, Viper, Google API (OAuth / Calendar / Gmail), Prometheus instrumentation
+- **フロントエンド**: React 18, TypeScript, Vite, pnpm ワークスペース, Tailwind CSS, React Router, React Query, i18next
+- **テスト / 品質**: Go test, Vitest, Jest DOM, ESLint, Prettier, Husky + lint-staged, Playwright（E2E 準備済み）
+- **データベース**: MySQL 8, golang-migrate（リポジトリ初期化用 SQL スクリプト）
+- **インフラ**: Docker Compose, Terraform 1.5+, GCP（Cloud Run, Cloud Build, Artifact Registry, Secret Manager, Cloud SQL, VPC Connector）
 
 ## リポジトリ構成
 ```
 .
-├── backend/                 # Go API スケルトン (Gin + Fx + Viper)
-│   ├── cmd/server           # アプリケーションエントリポイント
-│   ├── internal             # ハンドラや DI を含む内部レイヤ
-│   ├── config               # 設定ファイル例
-│   ├── Dockerfile           # バックエンド用 Dockerfile
-│   └── .env.example         # 環境変数テンプレート
-├── frontend/                # React ワークスペース (公開 SPA + 管理 SPA)
-│   ├── apps/public          # 公開向け SPA
-│   ├── apps/admin           # 管理者向け SPA
-│   ├── packages/shared      # 共有 UI / API クライアント
-│   ├── package.json         # pnpm ワークスペース定義
-│   ├── pnpm-workspace.yaml  # ワークスペースマッピング
-│   └── Dockerfile           # フロントエンドビルド用 Dockerfile
+├── backend/                  # Go API
+│   ├── cmd/server            # エントリポイント
+│   ├── internal              # ハンドラ／サービス／リポジトリ／ミドルウェアなど
+│   ├── config                # 設定ファイル (config.yaml / example)
+│   ├── scripts               # 補助スクリプト
+│   └── Dockerfile
+├── frontend/                 # React + Vite ワークスペース
+│   ├── apps/public           # 公開 SPA
+│   ├── apps/admin            # 管理者 SPA
+│   ├── packages/shared       # 共有 UI / API クライアント
+│   ├── package.json / pnpm-workspace.yaml
+│   └── Dockerfile
 ├── deploy/
-│   └── docker/nginx         # ローカル用 nginx リバースプロキシ設定
-├── terraform/               # Terraform 初期構成 (ネットワーク + Cloud Run)
-│   ├── environments/dev     # 環境別コンポジション
-│   └── modules              # Cloud Run / Network モジュール
-├── docker-compose.yml       # ローカル開発用 (API + SPA + MySQL)
-└── Makefile                 # lint/test/build/up/down 用のタスク定義
+│   ├── cloudbuild/           # Cloud Build 設定
+│   └── docker/nginx          # ローカル用 nginx 設定
+├── terraform/                # IaC (環境別構成 / modules)
+├── docker-compose.yml        # ローカル開発 (API + SPA + MySQL)
+├── Makefile                  # lint/test/build 等のコマンド
+└── docs/architecture-design.md
 ```
 
-## 前提条件
-- Go 1.22 以上
-- Node.js 20 以上（Corepack / pnpm 利用）
-- Docker & Docker Compose v2
-- Terraform 1.5 以上
+## セットアップ
 
-## 初期設定手順
-1. 環境変数テンプレートをコピーして秘密情報を設定します。
+### 前提条件
+- Go 1.22 以上
+- Node.js 20 以上（Corepack 利用可）
+- pnpm 8.x（`corepack enable` で自動インストール可能）
+- Docker / Docker Compose v2
+- Terraform 1.5 以上
+- GCP プロジェクト（Cloud Run / Artifact Registry / Secret Manager / Cloud Build を有効化済み）
+
+### 環境変数
+
+#### `backend/.env`
+| 変数 | 説明 |
+| --- | --- |
+| `APP_SERVER_PORT` | ローカル起動時のポート。Docker Compose では 8100 を使用。 |
+| `APP_SERVER_MODE` | Gin のモード (`debug`/`release`)。 |
+| `DATABASE_DSN` | MySQL 接続文字列。Docker Compose では `mysql` サービスに向ける。 |
+| `JWT_SIGNING_KEY` | 管理者 JWT 用のシークレット。 |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth クライアント情報。 |
+| `GOOGLE_API_CREDENTIALS_PATH` | Google API 用サービスアカウント JSON のパス（コンテナ内 `/secrets` など）。 |
+
+追加の詳細設定は `backend/config/config.yaml` または環境変数 `APP_*` で上書きします（例: `APP_SECURITY_ENABLE_CSRF=false`）。
+
+#### `frontend/.env`
+| 変数 | 説明 |
+| --- | --- |
+| `VITE_API_BASE_URL` | フロントエンドからの API ベース URL（ローカルは `/api`、本番は Cloud Run の公開 URL）。 |
+| `VITE_I18N_FALLBACK` | i18next のフォールバック言語。 |
+
+reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_RECAPTCHA_SITE_KEY` / `VITE_RECAPTCHA_SECRET` をシークレットとして設定します。
+
+#### その他
+- Terraform 変数は `terraform/environments/<env>/terraform.tfvars` で管理。
+- Cloud Build は Secret Manager に保管した DSN / JWT / reCAPTCHA シークレットを参照します（後述）。
+
+### 初期セットアップ手順
+1. `.env` を作成:
    ```bash
    cp backend/.env.example backend/.env
    cp frontend/.env.example frontend/.env
    ```
-2. 依存関係をインストールします。
+2. 依存関係を取得:
    ```bash
    make deps
    ```
-   - `make deps-backend`: `go mod tidy` を実行し `go.sum` を生成します。
-   - `make deps-frontend`: Corepack が利用可能なら有効化し、無い場合は `npx pnpm@8.15.4 install` を自動利用します (`pnpm-lock.yaml` を生成)。
-3. (任意) Husky のフックを初期化します。
+   - `make deps-backend`: `go mod tidy`
+   - `make deps-frontend`: `pnpm install`（corepack 未導入の場合は `npx pnpm@8.15.4 install`）
+3. 必要に応じてフックを初期化:
    ```bash
    cd frontend && pnpm prepare
    ```
 
-## 開発フロー
-- **Lint**: `make lint`
-- **Test**: `make test`
-- **Build**: `make build`
-- **Docker compose up**: `make up` または `make up-detached`
-- **Docker compose down**: `make down`
+## ローカル開発
+- **バックエンドのみ起動**: `cd backend && go run ./cmd/server`
+- **フロントエンド（公開）**: `cd frontend && pnpm --filter @personal-website/public dev`
+- **フロントエンド（管理）**: `cd frontend && pnpm --filter @personal-website/admin dev`
+- **フルスタック（Docker Compose）**:
+  ```bash
+  make up           # フォアグラウンド
+  make up-detached  # バックグラウンド
+  make down         # 停止 & 後片付け
+  ```
+  - API: http://localhost:8100
+  - フロント (nginx): http://localhost:3000
+  - MySQL: localhost:23306 (`app` / `app_password`)
+- **ユーティリティ**:
+  - `make build`: バックエンドバイナリ / フロント dist を生成
+  - `make fmt`: Go / TypeScript のフォーマッタ実行
+  - `make smoke-backend`: API スモークテスト（`BASE_URL` や `TOKEN` でカスタマイズ可）
 
-フロントエンドの開発サーバーを個別に立ち上げる場合:
-```bash
-cd frontend
-pnpm --filter @personal-website/public dev
-pnpm --filter @personal-website/admin dev
-```
+## フロントエンド
 
-## 公開 SPA 実装メモ
-- **実装済みページ**: Home / Profile / Research / Projects / Contact を詳細化し、バックエンドの `/v1/public/*` API からデータを取得します。`apps/public/src/modules/public-api` に型付きクライアントと `useApiResource` フックを追加しました。
-- **主要機能**:
-  - Home: プロフィール概要・所属・SNS を API から描画しつつ、Go API `/health` のステータスをヘルス表示。
-  - Profile: 所属・研究室・職歴・スキル・コミュニティをカード表示し、ローディング/空データ時のプレースホルダを備えています。
-  - Research: タグフィルタと Markdown/HTML 表示 (`MarkdownRenderer`) を実装し、画像やリンクのサニタイズを実施。
-  - Projects: 技術スタックフィルタとカード UI（期間整形・リンクバッジ付き）でプロジェクトを一覧化。
-  - Contact: 予約枠表示、フォームバリデーション、reCAPTCHA v3 トークン取得、`/v1/public/contact/bookings` 送信までをサポート。
-- **セットアップの注意**:
-  - `.env` に `VITE_API_BASE_URL` と `VITE_RECAPTCHA_SITE_KEY` を設定してください。未設定の場合、Contact ページの送信が失敗します。
-  - 研究コンテンツの HTML を提供する場合でも、`http/https/mailto` 以外のプロトコルは描画されません（`MarkdownRenderer` で制御）。
-- **テスト/ビルド**:
-  - `pnpm --filter @personal-website/public test` で UI テスト（Projects フィルタ、Contact フォーム検証など）を実行。React Router v7 への移行警告（`startTransition`）は既知のものです。
-  - `pnpm --filter @personal-website/public lint` / `pnpm --filter @personal-website/public build` で静的解析・ビルド確認。
-  - Docker でのビルド検証は `docker compose build --no-cache frontend` を推奨します。
-- **UX メモ**: ARIA ラベルとキーボード操作に対応済みです。`pnpm --filter @personal-website/public dev` で起動し、モバイル幅も合わせて確認してください。
+### 公開 SPA (`frontend/apps/public`)
+- ルーティング: Home / Profile / Research / Projects / Contact。React Router v6.30 を使用。
+- データ取得: `packages/shared` の API クライアント経由で `/api/v1/public/*` エンドポイントを叩く。
+- 予約・問い合わせ: reCAPTCHA v3 トークンを取得し、`/v1/public/contact/bookings` へ送信。レスポンス検証＆エラーハンドリングを実装。
+- 国際化: `packages/shared/src/i18n` の設定で ja/en をサポート。
+- テスト: `pnpm --filter @personal-website/public test`。React Router の v7 transition 警告は既知（React Router ドキュメント参照）。
+- ビルド: `pnpm --filter @personal-website/public build`。
 
-## Docker Compose メモ
-- バックエンド API: `http://localhost:8100`
-- フロントエンド (nginx): `http://localhost:3000` で `/api` をバックエンドにプロキシ
-- MySQL: `localhost:23306`（認証情報は `docker-compose.yml` を参照）
+### 管理 SPA (`frontend/apps/admin`)
+- 認証済み管理者向けの CRUD UI。ダッシュボードサマリ、プロジェクト / 研究 / ブログ / 予約 / ブラックリスト管理を実装。
+- API: `/api/admin/*`。JWT を `Authorization: Bearer` ヘッダで付与。
+- テスト: `pnpm --filter @personal-website/admin test`。現状はユニットレベル中心で、E2E は今後 Playwright 導入予定。
+- スタイル: Tailwind + Headless UI コンポーネントをベース。
 
-### 初期データベース
-`deploy/mysql/init` 配下の SQL がコンテナ起動時に順番に実行され、`google_oauth_tokens` や `blacklist` など管理機能で利用するテーブルを自動生成します。すでに `mysql_data` ボリュームがある状態でスキーマを更新したい場合は、以下でボリュームを一度破棄してください（永続化データは消えます）。
+## バックエンド API
 
-```bash
-docker compose down -v
-docker compose up -d
-```
-
-## 管理 API / GUI
-
-認証済みの管理者のみがアクセスできる `/api/admin` 配下のエンドポイントを実装しました。主な REST エンドポイントは次の通りです。
-
-| メソッド | パス | 用途 |
+### 公開エンドポイント（`/api` および `/api/v1/public`）
+| メソッド | パス | 説明 |
 | --- | --- | --- |
-| `GET` | `/api/admin/summary` | 公開済み/下書き件数や予約状況のサマリー取得 |
-| `GET` / `POST` / `PUT` / `DELETE` | `/api/admin/projects[:id]` | プロジェクトの CRUD |
-| `GET` / `POST` / `PUT` / `DELETE` | `/api/admin/research[:id]` | 研究コンテンツの CRUD |
-| `GET` / `POST` / `PUT` / `DELETE` | `/api/admin/blogs[:id]` | ブログ投稿の CRUD |
-| `GET` / `POST` / `PUT` / `DELETE` | `/api/admin/meetings[:id]` | 予約（面談）情報の CRUD |
-| `GET` / `POST` / `DELETE` | `/api/admin/blacklist[:id]` | ブラックリスト管理 |
+| GET /api/health | ヘルスチェック。HEAD も対応。 |
+| GET /api/profile | プロフィール情報の取得。 |
+| GET /api/projects | 公開プロジェクト一覧。 |
+| GET /api/research | 研究コンテンツ一覧。 |
+| GET /api/contact/availability | 予約可能枠の一覧（Google Calendar + DB を考慮）。 |
+| GET /api/contact/config | フォーム設定（トピック、リードタイム等）。 |
+| POST /api/contact | お問い合わせ送信（メール通知を想定）。 |
+| POST /api/contact/bookings | 予約作成（Calendar イベント作成、メール通知、DB 永続化）。 |
+| GET /api/auth/login | Google OAuth URL を発行。 |
+| GET /api/auth/callback | OAuth コールバックで JWT を発行。 |
+| GET /api/security/csrf | CSRF トークン / ダブルサブミット Cookie を発行。 |
 
-管理者 SPA (`frontend/apps/admin`) は上記 API を利用してコンテンツや予約・ブラックリストを操作します。ローカル開発時は次のコマンドで起動できます。
+### 管理エンドポイント（`/api/admin/*`、JWT + AdminGuard 必須）
+- サマリ: `GET /summary`
+- プロジェクト: `GET/POST/PUT/DELETE /projects` (+ `/projects/:id`)
+- 研究: 同上（`/research`）
+- ブログ: `GET/POST/PUT/DELETE /blogs`
+- 予約: `GET/POST/PUT/DELETE /meetings`
+- ブラックリスト: `GET/POST /blacklist`, `DELETE /blacklist/:id`
+- ヘルス: `GET /health`
 
-```bash
-cd frontend
-pnpm --filter @personal-website/admin dev
-```
+### 認証・セキュリティ
+- Google OAuth 2.0 + JWT（HS256）。ドメイン / メールの許可リストを設定可能。
+- CSRF: ダブルサブミットトークン（`ps_csrf` Cookie + `X-CSRF-Token` ヘッダ）。
+- レートリミット: デフォルト 120req/min（`APP_SECURITY_RATE_LIMIT_*` で調整）。
+- セキュリティヘッダ: CSP / HSTS / Referrer-Policy / X-Content-Type-Options / X-Frame-Options。
+- HTTPS リダイレクト、CORS 設定、リクエスト ID、構造化ログ、Prometheus メトリクス (`/metrics`)。
+- 予約時: Google Calendar API への挿入、Gmail API 経由のメール送信。Circuit Breaker + Retry + Timeout を実装。
 
-`.env` で `VITE_API_BASE_URL` を指定している場合は、Cloud Run やリバースプロキシ環境に合わせて更新してください。
+## データ永続化
+- DB スキーマは `deploy/mysql/init` の SQL で初期化（コンテナ起動時に自動適用）。
+- エンティティ例:
+  - `profile`: プロフィール情報
+  - `projects`, `research`: 公開コンテンツ
+  - `meetings`: 予約（`status`, `calendar_event_id` を保持）
+  - `blacklist`: 予約を拒否するメールアドレス
+  - `google_oauth_tokens`: Google API 用トークンの暗号化保存
+- リポジトリ実装: MySQL / In-memory の両方を実装し、テスト容易性を確保。
 
-## Terraform 初期構成
-最小の Terraform スタックが `terraform/environments/dev` に用意されています。
-```bash
-cd terraform/environments/dev
-terraform init
-terraform plan -var="project_id=<your-project>" -var="api_image=<artifact-registry-image>" -var="frontend_image=<artifact-registry-image>"
-```
-モジュール内容:
-- 専用 VPC / サブネット / VPC Connector (`modules/network`)
-- API とフロントエンド用 Cloud Run サービス (`modules/cloudrun/*`)
+## テストと品質保証
+- `make lint`: gofmt チェック + `go vet` + ESLint
+- `make test`: `go test ./...` + `pnpm -r test`
+- `pnpm --filter @personal-website/public test --watch`: 公開 SPA のウォッチモード
+- `pnpm test:e2e`: Playwright（セットアップ後に有効。CI には未組み込み）
+- `pnpm test:perf`: Lighthouse CI（ビルド後に実行。Node 18+ が必要）
+- `make ci`: lint / test / build を一括実行（CI と同構成）
+- 目標: Go カバレッジ 80% 以上・Playwright E2E・負荷テスト（k6）を今後整備
 
-## テスト戦略スナップショット
-- バックエンド: `go test ./...`（Testify ベースのテストを追加可能）
-- フロントエンド: `vitest` + Testing Library (各ワークスペースで設定済み)
-- Lint: Go vet + フォーマッタ整合性、ESLint (React / TypeScript プリセット)
-- API スモークテスト: `make smoke-backend`（`TOKEN` または `ADMIN_TOKEN` を設定すると管理 API も検証）。別コンテナから実行する場合は `BASE_URL=http://backend:8100 make smoke-backend` のように明示的にエンドポイントを指定してください。
+## CI/CD
 
-### CSRF トークンの手動確認
-`/api/security/csrf` はダブルサブミットトークン方式を採用しています。Cookie には `ランダム値:有効期限UNIX秒:署名` の形式で保存されるため、手動テスト時は以下の点に注意してください。
+### GitHub Actions (`.github/workflows/ci.yml`)
+- トリガ: PR（main / develop）、push（main / develop）、手動 (`workflow_dispatch`)
+- quality ジョブ: `make deps` → `make lint` → `make test` → `make build`
+- deploy ジョブ: main への push または `workflow_dispatch`。Workload Identity Federation で GCP 認証後、Cloud Build を起動。
 
-```bash
-# 1. トークンと Cookie を取得
-curl -i http://localhost:8100/api/security/csrf
+### Cloud Build (`deploy/cloudbuild/cloudbuild.yaml`)
+1. Backend / Frontend の Docker イメージをビルドし、Artifact Registry に `:${SHORT_SHA}` で push。
+2. Cloud Run (`<service>-<env>`) へデプロイ。VPC Connector や Cloud SQL アタッチ、Secret Manager の環境変数バインドを一元管理。
+3. トラフィック割合（`_BACKEND_TRAFFIC`, `_FRONTEND_TRAFFIC`）で段階的リリースが可能。
 
-# 2. 応答ヘッダーの Set-Cookie をそのまま利用してリクエストを送る
-curl -X POST http://localhost:8100/api/contact \
-  -H "Content-Type: application/json" \
-  -H "X-CSRF-Token: <Set-Cookie の先頭にあるランダム文字列>" \
-  --cookie "ps_csrf=<Set-Cookie の値を完全に貼り付ける>" \
-  -d '{"name":"Tester","email":"tester@example.com","message":"Hello"}'
-```
+### GitHub Environments / Secrets
+1. `staging`, `production` 環境を作成し、下記を Environment Variables に登録:
+   - `CLOUD_RUN_REGION`, `CLOUD_BUILD_ARTIFACT_REPO`
+   - `CLOUD_RUN_BACKEND_SERVICE`, `CLOUD_RUN_FRONTEND_SERVICE`
+   - `CLOUDSQL_INSTANCE`（必要な場合のみ）
+   - `CLOUD_RUN_VPC_CONNECTOR`（必要な場合のみ）
+   - `BACKEND_SERVICE_ACCOUNT_EMAIL`, `FRONTEND_SERVICE_ACCOUNT_EMAIL`
+   - `FRONTEND_API_BASE_URL`
+   - `BACKEND_TRAFFIC_PERCENT`, `FRONTEND_TRAFFIC_PERCENT`
+2. 同環境の Secrets:
+   - `BACKEND_SECRET_DB_DSN`（`projects/<id>/secrets/...:latest`）
+   - `BACKEND_SECRET_JWT`
+   - `BACKEND_SECRET_RECAPTCHA`（任意）
+   - `FRONTEND_SECRET_RECAPTCHA`（任意）
+3. リポジトリ全体の Actions Secrets:
+   - `GCP_PROJECT_ID`
+   - `GCP_WORKLOAD_IDENTITY_PROVIDER`
+   - `GCP_SERVICE_ACCOUNT_EMAIL`
+4. 上記サービスアカウントに必要なロールを付与:
+   - Cloud Build Editor / Cloud Run Admin / Artifact Registry Administrator
+   - Service Account User / Secret Manager Secret Accessor
 
-Cookie 値から署名部分（`:<timestamp>:<signature>`）を削除すると検証に失敗し 403 が返るため、コピー漏れに注意してください。
+### デプロイ検証
+- `workflow_dispatch` で `environment=staging` を指定 → Cloud Build 実行
+- Cloud Build ログでイメージ push や Cloud Run デプロイを確認
+- Cloud Run のリビジョン / トラフィック配分をチェックし、ステージング URL で動作確認
+- 本番リリース時は `environment=production` を選択し、必要であれば段階的トラフィック配分を設定
 
-## 次のステップ
-- クリーンアーキテクチャ準拠のユースケース・リポジトリ実装を追加
-- Terraform モジュールに Cloud SQL / Secret Manager / IAM 設定を拡張
-- CI (GitHub Actions / Cloud Build) を整備し make タスク・Terraform plan を自動実行
+## インフラ / Terraform
+- `terraform/environments/dev`: 開発環境向け構成（VPC, Subnet, Cloud Run サービスなど）
+- `terraform/modules/*`:
+  - `network`: VPC / サブネット / VPC Connector
+  - `cloudrun`: デフォルトサービス設定（CPU/メモリ、最小/最大インスタンス、IAM 付与など）
+- 初回実行例:
+  ```bash
+  cd terraform/environments/dev
+  terraform init
+  terraform plan \
+    -var="project_id=<your-gcp-project>" \
+    -var="region=asia-northeast1" \
+    -var="api_image=asia-northeast1-docker.pkg.dev/<project>/<repo>/backend:latest" \
+    -var="frontend_image=asia-northeast1-docker.pkg.dev/<project>/<repo>/frontend:latest"
+  ```
+- Cloud SQL や Secret Manager、モニタリングの IaC 化は拡張予定です。
+
+## セキュリティと可観測性
+- Secrets: GitHub Actions → Secret Manager → Cloud Run 環境変数で運用。コードへの直書きは禁止。
+- ミドルウェア: CSRF / JWT / 管理者ガード / HTTPS リダイレクト / Security Headers / Rate Limiter / Request ID / 構造化ログ。
+- 可観測性: Prometheus メトリクス (`/metrics`)、構造化ログ（`internal/logging`）、Google Calendar / Gmail API の障害を Circuit Breaker で緩和。
+- リトライ / バックオフ: 予約処理で指数バックオフ + Circuit Breaker。カレンダー API 障害時も即座に失敗せず再試行。
+- 監視連携: Cloud Monitoring / Logging と組み合わせてダッシュボードやアラートを設定することを推奨。
+
+## ドキュメント
+- アーキテクチャ全体の意図や設計判断: `docs/architecture-design.md`
+- API 仕様（今後）: OpenAPI 化を計画
+- 運用 Runbook や Terraform 拡張は `docs/` 以下に追記予定
+
+## トラブルシューティング
+- **OAuth コールバックが失敗する**: `GOOGLE_OAUTH_CLIENT_ID/SECRET` と Redirect URI を再確認。許可ドメイン / メールリストも要チェック。
+- **予約作成時に 500**: `GOOGLE_GMAIL_TOKEN`（または Secret Manager で指定したトークン）が Cloud Build / Cloud Run に伝搬しているか確認。
+- **CSRF 403**: `GET /api/security/csrf` で取得した Cookie を変更せずに送信しているかを確認。ダブルサブミット方式のため Cookie とヘッダが一致している必要があります。
+- **React Router の `startTransition` 警告**: ランタイムには影響なし。React Router v7 移行時に `future` フラグを有効化予定。
+- **Docker Compose で DB スキーマを更新したい**: `docker compose down -v` でボリュームを破棄して再起動。
+
+## 今後の改善アイデア
+1. Go / React 双方で統合テスト・E2E テスト（Playwright）を CI に組み込み、カバレッジ 80% 以上を目指す。
+2. Terraform に Cloud SQL / Secret Manager / Monitoring リソースを追加し、環境差分を完全 IaC 化する。
+3. Cloud Build 後に自動でライトウェイトな Smoke テスト（`make smoke-backend`）や Lighthouse CI を走らせる。
+4. Cloud Monitoring にダッシュボード・アラートポリシーを定義し、インシデント対応の基盤を整える。
+5. 管理 SPA の UX 改善（並列編集、ドラフト機能）とアクセス制御細分化（ロールベース）を検討する。

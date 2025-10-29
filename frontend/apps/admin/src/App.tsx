@@ -9,7 +9,7 @@ import type {
   BlogPost,
   BlacklistEntry,
   Meeting,
-  MeetingStatus
+  MeetingStatus,
 } from "./types";
 
 const currentYear = new Date().getFullYear();
@@ -23,7 +23,7 @@ const emptyProjectForm = {
   linkUrl: "",
   year: String(currentYear),
   published: false,
-  sortOrder: ""
+  sortOrder: "",
 };
 
 const emptyResearchForm = {
@@ -34,7 +34,7 @@ const emptyResearchForm = {
   contentJa: "",
   contentEn: "",
   year: String(currentYear),
-  published: false
+  published: false,
 };
 
 const emptyBlogForm = {
@@ -46,7 +46,7 @@ const emptyBlogForm = {
   contentEn: "",
   tags: "",
   published: false,
-  publishedAt: ""
+  publishedAt: "",
 };
 
 const emptyMeetingForm = {
@@ -56,12 +56,12 @@ const emptyMeetingForm = {
   durationMinutes: "30",
   meetUrl: "",
   status: "pending" as MeetingStatus,
-  notes: ""
+  notes: "",
 };
 
 const emptyBlacklistForm = {
   email: "",
-  reason: ""
+  reason: "",
 };
 
 type AuthState = "checking" | "authenticated" | "unauthorized";
@@ -124,13 +124,20 @@ function App() {
     }
 
     try {
-      const [summaryRes, projectRes, researchRes, blogRes, meetingRes, blacklistRes] = await Promise.all([
+      const [
+        summaryRes,
+        projectRes,
+        researchRes,
+        blogRes,
+        meetingRes,
+        blacklistRes,
+      ] = await Promise.all([
         adminApi.fetchSummary(),
         adminApi.listProjects(),
         adminApi.listResearch(),
         adminApi.listBlogs(),
         adminApi.listMeetings(),
-        adminApi.listBlacklist()
+        adminApi.listBlacklist(),
       ]);
 
       setSummary(summaryRes.data);
@@ -170,19 +177,26 @@ function App() {
         }
       }
     },
-    [refreshAll, handleUnauthorized]
+    [refreshAll, handleUnauthorized],
   );
 
   const handleCreateProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const payload = {
       title: { ja: projectForm.titleJa, en: projectForm.titleEn },
-      description: { ja: projectForm.descriptionJa, en: projectForm.descriptionEn },
-      techStack: projectForm.techStack.split(",").map((item) => item.trim()).filter(Boolean),
+      description: {
+        ja: projectForm.descriptionJa,
+        en: projectForm.descriptionEn,
+      },
+      techStack: projectForm.techStack
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
       linkUrl: projectForm.linkUrl.trim(),
       year: Number(projectForm.year) || currentYear,
       published: projectForm.published,
-      sortOrder: projectForm.sortOrder === "" ? null : Number(projectForm.sortOrder)
+      sortOrder:
+        projectForm.sortOrder === "" ? null : Number(projectForm.sortOrder),
     };
 
     await run(async () => {
@@ -198,7 +212,7 @@ function App() {
       summary: { ja: researchForm.summaryJa, en: researchForm.summaryEn },
       contentMd: { ja: researchForm.contentJa, en: researchForm.contentEn },
       year: Number(researchForm.year) || currentYear,
-      published: researchForm.published
+      published: researchForm.published,
     };
 
     await run(async () => {
@@ -209,14 +223,19 @@ function App() {
 
   const handleCreateBlog = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const publishedAt = blogForm.publishedAt ? new Date(blogForm.publishedAt).toISOString() : null;
+    const publishedAt = blogForm.publishedAt
+      ? new Date(blogForm.publishedAt).toISOString()
+      : null;
     const payload = {
       title: { ja: blogForm.titleJa, en: blogForm.titleEn },
       summary: { ja: blogForm.summaryJa, en: blogForm.summaryEn },
       contentMd: { ja: blogForm.contentJa, en: blogForm.contentEn },
-      tags: blogForm.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+      tags: blogForm.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
       published: blogForm.published,
-      publishedAt
+      publishedAt,
     };
 
     await run(async () => {
@@ -234,12 +253,15 @@ function App() {
       durationMinutes: Number(meetingForm.durationMinutes) || 30,
       meetUrl: meetingForm.meetUrl,
       status: meetingForm.status,
-      notes: meetingForm.notes
+      notes: meetingForm.notes,
     };
 
     await run(async () => {
       await adminApi.createMeeting(payload);
-      setMeetingForm({ ...emptyMeetingForm, datetime: new Date().toISOString().slice(0, 16) });
+      setMeetingForm({
+        ...emptyMeetingForm,
+        datetime: new Date().toISOString().slice(0, 16),
+      });
     });
   };
 
@@ -247,7 +269,7 @@ function App() {
     event.preventDefault();
     const payload = {
       email: blacklistForm.email.trim(),
-      reason: blacklistForm.reason.trim()
+      reason: blacklistForm.reason.trim(),
     };
 
     await run(async () => {
@@ -265,7 +287,7 @@ function App() {
         linkUrl: project.linkUrl,
         year: project.year,
         published: !project.published,
-        sortOrder: project.sortOrder ?? null
+        sortOrder: project.sortOrder ?? null,
       });
     });
 
@@ -276,7 +298,7 @@ function App() {
         summary: item.summary,
         contentMd: item.contentMd,
         year: item.year,
-        published: !item.published
+        published: !item.published,
       });
     });
 
@@ -288,7 +310,7 @@ function App() {
         contentMd: post.contentMd,
         tags: post.tags,
         published: !post.published,
-        publishedAt: post.publishedAt ?? null
+        publishedAt: post.publishedAt ?? null,
       });
     });
 
@@ -301,7 +323,7 @@ function App() {
         durationMinutes: meeting.durationMinutes,
         meetUrl: meeting.meetUrl,
         status,
-        notes: meeting.notes
+        notes: meeting.notes,
       });
     });
 
@@ -309,7 +331,8 @@ function App() {
   const deleteResearch = (id: number) => run(() => adminApi.deleteResearch(id));
   const deleteBlog = (id: number) => run(() => adminApi.deleteBlog(id));
   const deleteMeeting = (id: number) => run(() => adminApi.deleteMeeting(id));
-  const deleteBlacklistEntry = (id: number) => run(() => adminApi.deleteBlacklist(id));
+  const deleteBlacklistEntry = (id: number) =>
+    run(() => adminApi.deleteBlacklist(id));
 
   if (authState === "checking") {
     return (
@@ -320,13 +343,18 @@ function App() {
   }
 
   if (authState === "unauthorized") {
-    const loginUrl = import.meta.env.VITE_ADMIN_LOGIN_URL ?? "/api/admin/auth/login";
+    const loginUrl =
+      import.meta.env.VITE_ADMIN_LOGIN_URL ?? "/api/admin/auth/login";
 
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
         <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm">
-          <h1 className="text-xl font-semibold text-slate-900">{t("auth.requiredTitle")}</h1>
-          <p className="mt-2 text-sm text-slate-600">{t("auth.requiredDescription")}</p>
+          <h1 className="text-xl font-semibold text-slate-900">
+            {t("auth.requiredTitle")}
+          </h1>
+          <p className="mt-2 text-sm text-slate-600">
+            {t("auth.requiredDescription")}
+          </p>
           <button
             className="mt-4 inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             type="button"
@@ -347,7 +375,9 @@ function App() {
       </header>
       <main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-800">{t("dashboard.systemStatus")}</h2>
+          <h2 className="text-lg font-semibold text-slate-800">
+            {t("dashboard.systemStatus")}
+          </h2>
           <div className="mt-4 flex flex-wrap gap-6">
             <div className="flex-1 min-w-[220px] rounded-md bg-slate-900 p-4 text-white">
               <span className="font-mono uppercase tracking-wide text-slate-400">
@@ -361,9 +391,18 @@ function App() {
                   {t("summary.title")}
                 </h3>
                 <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                  <li>Projects: {summary.publishedProjects} published / {summary.draftProjects} draft</li>
-                  <li>Research: {summary.publishedResearch} published / {summary.draftResearch} draft</li>
-                  <li>Blogs: {summary.publishedBlogs} published / {summary.draftBlogs} draft</li>
+                  <li>
+                    Projects: {summary.publishedProjects} published /{" "}
+                    {summary.draftProjects} draft
+                  </li>
+                  <li>
+                    Research: {summary.publishedResearch} published /{" "}
+                    {summary.draftResearch} draft
+                  </li>
+                  <li>
+                    Blogs: {summary.publishedBlogs} published /{" "}
+                    {summary.draftBlogs} draft
+                  </li>
                   <li>Pending meetings: {summary.pendingMeetings}</li>
                   <li>Blacklist entries: {summary.blacklistEntries}</li>
                 </ul>
@@ -388,76 +427,134 @@ function App() {
           <>
             <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <header className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">{t("projects.title")}</h2>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  {t("projects.title")}
+                </h2>
               </header>
-              <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreateProject}>
+              <form
+                className="grid gap-3 md:grid-cols-2"
+                onSubmit={handleCreateProject}
+              >
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Title (ja)"
                   value={projectForm.titleJa}
-                  onChange={(event) => setProjectForm((prev) => ({ ...prev, titleJa: event.target.value }))}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      titleJa: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Title (en)"
                   value={projectForm.titleEn}
-                  onChange={(event) => setProjectForm((prev) => ({ ...prev, titleEn: event.target.value }))}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      titleEn: event.target.value,
+                    }))
+                  }
                 />
                 <textarea
                   className="rounded border border-slate-300 p-2 md:col-span-2"
                   placeholder="Description (ja)"
                   value={projectForm.descriptionJa}
-                  onChange={(event) => setProjectForm((prev) => ({ ...prev, descriptionJa: event.target.value }))}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      descriptionJa: event.target.value,
+                    }))
+                  }
                 />
                 <textarea
                   className="rounded border border-slate-300 p-2 md:col-span-2"
                   placeholder="Description (en)"
                   value={projectForm.descriptionEn}
-                  onChange={(event) => setProjectForm((prev) => ({ ...prev, descriptionEn: event.target.value }))}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      descriptionEn: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Tech stack (comma separated)"
                   value={projectForm.techStack}
-                  onChange={(event) => setProjectForm((prev) => ({ ...prev, techStack: event.target.value }))}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      techStack: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Link URL"
                   value={projectForm.linkUrl}
-                  onChange={(event) => setProjectForm((prev) => ({ ...prev, linkUrl: event.target.value }))}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      linkUrl: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Year"
                   value={projectForm.year}
-                  onChange={(event) => setProjectForm((prev) => ({ ...prev, year: event.target.value }))}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      year: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Sort order"
                   value={projectForm.sortOrder}
-                  onChange={(event) => setProjectForm((prev) => ({ ...prev, sortOrder: event.target.value }))}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      sortOrder: event.target.value,
+                    }))
+                  }
                 />
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input
                     checked={projectForm.published}
-                    onChange={(event) => setProjectForm((prev) => ({ ...prev, published: event.target.checked }))}
+                    onChange={(event) =>
+                      setProjectForm((prev) => ({
+                        ...prev,
+                        published: event.target.checked,
+                      }))
+                    }
                     type="checkbox"
                   />
                   Published
                 </label>
-                <button className="rounded bg-slate-900 px-4 py-2 text-white" type="submit">
+                <button
+                  className="rounded bg-slate-900 px-4 py-2 text-white"
+                  type="submit"
+                >
                   {t("actions.create")}
                 </button>
               </form>
 
               <div className="mt-6 space-y-4">
                 {projects.map((project) => (
-                  <div key={project.id} className="rounded border border-slate-200 p-4">
+                  <div
+                    key={project.id}
+                    className="rounded border border-slate-200 p-4"
+                  >
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold text-slate-800">{project.title.ja || project.title.en}</h3>
+                        <h3 className="font-semibold text-slate-800">
+                          {project.title.ja || project.title.en}
+                        </h3>
                         <p className="text-sm text-slate-500">{project.year}</p>
                       </div>
                       <div className="flex gap-2">
@@ -477,8 +574,12 @@ function App() {
                         </button>
                       </div>
                     </div>
-                    <p className="mt-2 text-sm text-slate-600">{project.description.ja || project.description.en}</p>
-                    <p className="mt-1 text-xs text-slate-500">Stack: {project.techStack.join(", ")}</p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {project.description.ja || project.description.en}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Stack: {project.techStack.join(", ")}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -486,69 +587,122 @@ function App() {
 
             <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <header className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">{t("research.title")}</h2>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  {t("research.title")}
+                </h2>
               </header>
-              <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreateResearch}>
+              <form
+                className="grid gap-3 md:grid-cols-2"
+                onSubmit={handleCreateResearch}
+              >
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Title (ja)"
                   value={researchForm.titleJa}
-                  onChange={(event) => setResearchForm((prev) => ({ ...prev, titleJa: event.target.value }))}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      titleJa: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Title (en)"
                   value={researchForm.titleEn}
-                  onChange={(event) => setResearchForm((prev) => ({ ...prev, titleEn: event.target.value }))}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      titleEn: event.target.value,
+                    }))
+                  }
                 />
                 <textarea
                   className="rounded border border-slate-300 p-2 md:col-span-2"
                   placeholder="Summary (ja)"
                   value={researchForm.summaryJa}
-                  onChange={(event) => setResearchForm((prev) => ({ ...prev, summaryJa: event.target.value }))}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      summaryJa: event.target.value,
+                    }))
+                  }
                 />
                 <textarea
                   className="rounded border border-slate-300 p-2 md:col-span-2"
                   placeholder="Summary (en)"
                   value={researchForm.summaryEn}
-                  onChange={(event) => setResearchForm((prev) => ({ ...prev, summaryEn: event.target.value }))}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      summaryEn: event.target.value,
+                    }))
+                  }
                 />
                 <textarea
                   className="rounded border border-slate-300 p-2 md:col-span-2"
                   placeholder="Content (ja)"
                   value={researchForm.contentJa}
-                  onChange={(event) => setResearchForm((prev) => ({ ...prev, contentJa: event.target.value }))}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      contentJa: event.target.value,
+                    }))
+                  }
                 />
                 <textarea
                   className="rounded border border-slate-300 p-2 md:col-span-2"
                   placeholder="Content (en)"
                   value={researchForm.contentEn}
-                  onChange={(event) => setResearchForm((prev) => ({ ...prev, contentEn: event.target.value }))}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      contentEn: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Year"
                   value={researchForm.year}
-                  onChange={(event) => setResearchForm((prev) => ({ ...prev, year: event.target.value }))}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      year: event.target.value,
+                    }))
+                  }
                 />
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input
                     checked={researchForm.published}
-                    onChange={(event) => setResearchForm((prev) => ({ ...prev, published: event.target.checked }))}
+                    onChange={(event) =>
+                      setResearchForm((prev) => ({
+                        ...prev,
+                        published: event.target.checked,
+                      }))
+                    }
                     type="checkbox"
                   />
                   Published
                 </label>
-                <button className="rounded bg-slate-900 px-4 py-2 text-white" type="submit">
+                <button
+                  className="rounded bg-slate-900 px-4 py-2 text-white"
+                  type="submit"
+                >
                   {t("actions.create")}
                 </button>
               </form>
               <div className="mt-6 space-y-4">
                 {research.map((item) => (
-                  <div key={item.id} className="rounded border border-slate-200 p-4">
+                  <div
+                    key={item.id}
+                    className="rounded border border-slate-200 p-4"
+                  >
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold text-slate-800">{item.title.ja || item.title.en}</h3>
+                        <h3 className="font-semibold text-slate-800">
+                          {item.title.ja || item.title.en}
+                        </h3>
                         <p className="text-sm text-slate-500">{item.year}</p>
                       </div>
                       <div className="flex gap-2">
@@ -568,7 +722,9 @@ function App() {
                         </button>
                       </div>
                     </div>
-                    <p className="mt-2 text-sm text-slate-600">{item.summary.ja || item.summary.en}</p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {item.summary.ja || item.summary.en}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -576,78 +732,139 @@ function App() {
 
             <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <header className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">{t("blogs.title")}</h2>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  {t("blogs.title")}
+                </h2>
               </header>
-              <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreateBlog}>
+              <form
+                className="grid gap-3 md:grid-cols-2"
+                onSubmit={handleCreateBlog}
+              >
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Title (ja)"
                   value={blogForm.titleJa}
-                  onChange={(event) => setBlogForm((prev) => ({ ...prev, titleJa: event.target.value }))}
+                  onChange={(event) =>
+                    setBlogForm((prev) => ({
+                      ...prev,
+                      titleJa: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Title (en)"
                   value={blogForm.titleEn}
-                  onChange={(event) => setBlogForm((prev) => ({ ...prev, titleEn: event.target.value }))}
+                  onChange={(event) =>
+                    setBlogForm((prev) => ({
+                      ...prev,
+                      titleEn: event.target.value,
+                    }))
+                  }
                 />
                 <textarea
                   className="rounded border border-slate-300 p-2 md:col-span-2"
                   placeholder="Summary (ja)"
                   value={blogForm.summaryJa}
-                  onChange={(event) => setBlogForm((prev) => ({ ...prev, summaryJa: event.target.value }))}
+                  onChange={(event) =>
+                    setBlogForm((prev) => ({
+                      ...prev,
+                      summaryJa: event.target.value,
+                    }))
+                  }
                 />
                 <textarea
                   className="rounded border border-slate-300 p-2 md:col-span-2"
                   placeholder="Summary (en)"
                   value={blogForm.summaryEn}
-                  onChange={(event) => setBlogForm((prev) => ({ ...prev, summaryEn: event.target.value }))}
+                  onChange={(event) =>
+                    setBlogForm((prev) => ({
+                      ...prev,
+                      summaryEn: event.target.value,
+                    }))
+                  }
                 />
                 <textarea
                   className="rounded border border-slate-300 p-2 md:col-span-2"
                   placeholder="Content (ja)"
                   value={blogForm.contentJa}
-                  onChange={(event) => setBlogForm((prev) => ({ ...prev, contentJa: event.target.value }))}
+                  onChange={(event) =>
+                    setBlogForm((prev) => ({
+                      ...prev,
+                      contentJa: event.target.value,
+                    }))
+                  }
                 />
                 <textarea
                   className="rounded border border-slate-300 p-2 md:col-span-2"
                   placeholder="Content (en)"
                   value={blogForm.contentEn}
-                  onChange={(event) => setBlogForm((prev) => ({ ...prev, contentEn: event.target.value }))}
+                  onChange={(event) =>
+                    setBlogForm((prev) => ({
+                      ...prev,
+                      contentEn: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Tags (comma separated)"
                   value={blogForm.tags}
-                  onChange={(event) => setBlogForm((prev) => ({ ...prev, tags: event.target.value }))}
+                  onChange={(event) =>
+                    setBlogForm((prev) => ({
+                      ...prev,
+                      tags: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   type="datetime-local"
                   value={blogForm.publishedAt}
-                  onChange={(event) => setBlogForm((prev) => ({ ...prev, publishedAt: event.target.value }))}
+                  onChange={(event) =>
+                    setBlogForm((prev) => ({
+                      ...prev,
+                      publishedAt: event.target.value,
+                    }))
+                  }
                 />
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input
                     checked={blogForm.published}
-                    onChange={(event) => setBlogForm((prev) => ({ ...prev, published: event.target.checked }))}
+                    onChange={(event) =>
+                      setBlogForm((prev) => ({
+                        ...prev,
+                        published: event.target.checked,
+                      }))
+                    }
                     type="checkbox"
                   />
                   Published
                 </label>
-                <button className="rounded bg-slate-900 px-4 py-2 text-white" type="submit">
+                <button
+                  className="rounded bg-slate-900 px-4 py-2 text-white"
+                  type="submit"
+                >
                   {t("actions.create")}
                 </button>
               </form>
 
               <div className="mt-6 space-y-4">
                 {blogs.map((post) => (
-                  <div key={post.id} className="rounded border border-slate-200 p-4">
+                  <div
+                    key={post.id}
+                    className="rounded border border-slate-200 p-4"
+                  >
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold text-slate-800">{post.title.ja || post.title.en}</h3>
+                        <h3 className="font-semibold text-slate-800">
+                          {post.title.ja || post.title.en}
+                        </h3>
                         {post.publishedAt && (
-                          <p className="text-xs text-slate-500">Published at {new Date(post.publishedAt).toLocaleString()}</p>
+                          <p className="text-xs text-slate-500">
+                            Published at{" "}
+                            {new Date(post.publishedAt).toLocaleString()}
+                          </p>
                         )}
                       </div>
                       <div className="flex gap-2">
@@ -667,8 +884,12 @@ function App() {
                         </button>
                       </div>
                     </div>
-                    <p className="mt-2 text-sm text-slate-600">{post.summary.ja || post.summary.en}</p>
-                    <p className="mt-1 text-xs text-slate-500">Tags: {post.tags.join(", ")}</p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {post.summary.ja || post.summary.en}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Tags: {post.tags.join(", ")}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -676,43 +897,78 @@ function App() {
 
             <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <header className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">{t("meetings.title")}</h2>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  {t("meetings.title")}
+                </h2>
               </header>
-              <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreateMeeting}>
+              <form
+                className="grid gap-3 md:grid-cols-2"
+                onSubmit={handleCreateMeeting}
+              >
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Name"
                   value={meetingForm.name}
-                  onChange={(event) => setMeetingForm((prev) => ({ ...prev, name: event.target.value }))}
+                  onChange={(event) =>
+                    setMeetingForm((prev) => ({
+                      ...prev,
+                      name: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Email"
                   value={meetingForm.email}
-                  onChange={(event) => setMeetingForm((prev) => ({ ...prev, email: event.target.value }))}
+                  onChange={(event) =>
+                    setMeetingForm((prev) => ({
+                      ...prev,
+                      email: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   type="datetime-local"
                   value={meetingForm.datetime}
-                  onChange={(event) => setMeetingForm((prev) => ({ ...prev, datetime: event.target.value }))}
+                  onChange={(event) =>
+                    setMeetingForm((prev) => ({
+                      ...prev,
+                      datetime: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Duration (minutes)"
                   value={meetingForm.durationMinutes}
-                  onChange={(event) => setMeetingForm((prev) => ({ ...prev, durationMinutes: event.target.value }))}
+                  onChange={(event) =>
+                    setMeetingForm((prev) => ({
+                      ...prev,
+                      durationMinutes: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="rounded border border-slate-300 p-2"
                   placeholder="Meet URL"
                   value={meetingForm.meetUrl}
-                  onChange={(event) => setMeetingForm((prev) => ({ ...prev, meetUrl: event.target.value }))}
+                  onChange={(event) =>
+                    setMeetingForm((prev) => ({
+                      ...prev,
+                      meetUrl: event.target.value,
+                    }))
+                  }
                 />
                 <select
                   className="rounded border border-slate-300 p-2"
                   value={meetingForm.status}
-                  onChange={(event) => setMeetingForm((prev) => ({ ...prev, status: event.target.value as MeetingStatus }))}
+                  onChange={(event) =>
+                    setMeetingForm((prev) => ({
+                      ...prev,
+                      status: event.target.value as MeetingStatus,
+                    }))
+                  }
                 >
                   <option value="pending">Pending</option>
                   <option value="confirmed">Confirmed</option>
@@ -722,27 +978,49 @@ function App() {
                   className="rounded border border-slate-300 p-2 md:col-span-2"
                   placeholder="Notes"
                   value={meetingForm.notes}
-                  onChange={(event) => setMeetingForm((prev) => ({ ...prev, notes: event.target.value }))}
+                  onChange={(event) =>
+                    setMeetingForm((prev) => ({
+                      ...prev,
+                      notes: event.target.value,
+                    }))
+                  }
                 />
-                <button className="rounded bg-slate-900 px-4 py-2 text-white" type="submit">
+                <button
+                  className="rounded bg-slate-900 px-4 py-2 text-white"
+                  type="submit"
+                >
                   {t("actions.create")}
                 </button>
               </form>
 
               <div className="mt-6 space-y-4">
                 {meetings.map((meeting) => (
-                  <div key={meeting.id} className="rounded border border-slate-200 p-4">
+                  <div
+                    key={meeting.id}
+                    className="rounded border border-slate-200 p-4"
+                  >
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold text-slate-800">{meeting.name}</h3>
-                        <p className="text-sm text-slate-500">{meeting.email}</p>
-                        <p className="text-xs text-slate-500">{new Date(meeting.datetime).toLocaleString()}</p>
+                        <h3 className="font-semibold text-slate-800">
+                          {meeting.name}
+                        </h3>
+                        <p className="text-sm text-slate-500">
+                          {meeting.email}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {new Date(meeting.datetime).toLocaleString()}
+                        </p>
                       </div>
                       <div className="flex gap-2">
                         <select
                           className="rounded border border-slate-300 p-1 text-sm"
                           value={meeting.status}
-                          onChange={(event) => updateMeetingStatus(meeting, event.target.value as MeetingStatus)}
+                          onChange={(event) =>
+                            updateMeetingStatus(
+                              meeting,
+                              event.target.value as MeetingStatus,
+                            )
+                          }
                         >
                           <option value="pending">Pending</option>
                           <option value="confirmed">Confirmed</option>
@@ -757,7 +1035,11 @@ function App() {
                         </button>
                       </div>
                     </div>
-                    {meeting.notes && <p className="mt-2 text-sm text-slate-600">{meeting.notes}</p>}
+                    {meeting.notes && (
+                      <p className="mt-2 text-sm text-slate-600">
+                        {meeting.notes}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -765,32 +1047,57 @@ function App() {
 
             <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
               <header className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">{t("blacklist.title")}</h2>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  {t("blacklist.title")}
+                </h2>
               </header>
-              <form className="flex flex-col gap-3 md:flex-row" onSubmit={handleCreateBlacklist}>
+              <form
+                className="flex flex-col gap-3 md:flex-row"
+                onSubmit={handleCreateBlacklist}
+              >
                 <input
                   className="flex-1 rounded border border-slate-300 p-2"
                   placeholder="Email"
                   value={blacklistForm.email}
-                  onChange={(event) => setBlacklistForm((prev) => ({ ...prev, email: event.target.value }))}
+                  onChange={(event) =>
+                    setBlacklistForm((prev) => ({
+                      ...prev,
+                      email: event.target.value,
+                    }))
+                  }
                 />
                 <input
                   className="flex-1 rounded border border-slate-300 p-2"
                   placeholder="Reason"
                   value={blacklistForm.reason}
-                  onChange={(event) => setBlacklistForm((prev) => ({ ...prev, reason: event.target.value }))}
+                  onChange={(event) =>
+                    setBlacklistForm((prev) => ({
+                      ...prev,
+                      reason: event.target.value,
+                    }))
+                  }
                 />
-                <button className="rounded bg-slate-900 px-4 py-2 text-white" type="submit">
+                <button
+                  className="rounded bg-slate-900 px-4 py-2 text-white"
+                  type="submit"
+                >
                   {t("actions.create")}
                 </button>
               </form>
 
               <div className="mt-6 space-y-3">
                 {blacklist.map((entry) => (
-                  <div key={entry.id} className="flex items-center justify-between rounded border border-slate-200 p-3">
+                  <div
+                    key={entry.id}
+                    className="flex items-center justify-between rounded border border-slate-200 p-3"
+                  >
                     <div>
-                      <p className="font-medium text-slate-800">{entry.email}</p>
-                      {entry.reason && <p className="text-sm text-slate-500">{entry.reason}</p>}
+                      <p className="font-medium text-slate-800">
+                        {entry.email}
+                      </p>
+                      {entry.reason && (
+                        <p className="text-sm text-slate-500">{entry.reason}</p>
+                      )}
                     </div>
                     <button
                       className="rounded border border-rose-200 bg-rose-50 px-3 py-1 text-sm text-rose-600"

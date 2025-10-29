@@ -59,6 +59,7 @@ func newEngine(
 	cfg *config.AppConfig,
 	requestID *middleware.RequestID,
 	requestLogger *middleware.RequestLogger,
+	charset *middleware.Charset,
 	securityHeaders *middleware.SecurityHeaders,
 	httpsRedirect *middleware.HTTPSRedirect,
 	cors *middleware.CORSMiddleware,
@@ -97,6 +98,9 @@ func newEngine(
 	}
 	if rateLimiter != nil {
 		engine.Use(rateLimiter.Handler())
+	}
+	if charset != nil {
+		engine.Use(charset.Handler())
 	}
 	if securityHeaders != nil {
 		engine.Use(securityHeaders.Handler())

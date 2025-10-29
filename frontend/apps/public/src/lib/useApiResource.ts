@@ -11,12 +11,12 @@ export type UseApiResourceResult<T> = UseApiResourceState<T> & {
 };
 
 export function useApiResource<T>(
-  fetcher: (signal: AbortSignal) => Promise<T>
+  fetcher: (signal: AbortSignal) => Promise<T>,
 ): UseApiResourceResult<T> {
   const [state, setState] = useState<UseApiResourceState<T>>({
     data: null,
     isLoading: true,
-    error: null
+    error: null,
   });
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -28,7 +28,7 @@ export function useApiResource<T>(
     setState((previous) => ({
       data: previous.data,
       isLoading: true,
-      error: null
+      error: null,
     }));
 
     try {
@@ -37,7 +37,7 @@ export function useApiResource<T>(
         setState({
           data: response,
           isLoading: false,
-          error: null
+          error: null,
         });
       }
     } catch (error) {
@@ -45,7 +45,7 @@ export function useApiResource<T>(
         setState({
           data: null,
           isLoading: false,
-          error: error instanceof Error ? error : new Error("Unknown error")
+          error: error instanceof Error ? error : new Error("Unknown error"),
         });
       }
     }
@@ -65,6 +65,6 @@ export function useApiResource<T>(
 
   return {
     ...state,
-    refetch
+    refetch,
   };
 }

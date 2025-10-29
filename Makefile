@@ -2,8 +2,10 @@ SHELL := /bin/bash
 GO ?= go
 PNPM ?= pnpm
 DOCKER_COMPOSE ?= docker compose
+GCLOUD ?= gcloud
+CLOUD_BUILD_CONFIG ?= deploy/cloudbuild/cloudbuild.yaml
 
-.PHONY: deps deps-backend deps-frontend lint lint-backend lint-frontend test test-backend test-frontend build build-backend build-frontend up up-detached stop down clean smoke-backend
+.PHONY: deps deps-backend deps-frontend lint lint-backend lint-frontend test test-backend test-frontend build build-backend build-frontend fmt fmt-backend fmt-frontend ci cloudbuild up up-detached stop down clean smoke-backend
 
 deps: deps-backend deps-frontend
 
@@ -57,6 +59,26 @@ build-frontend:
 		(command -v corepack >/dev/null 2>&1 && corepack pnpm build) || \
 		npx pnpm@8.15.4 build; \
 	}
+
+fmt: fmt-backend fmt-frontend
+
+fmt-backend:
+	cd backend && $(GO) fmt ./...
+
+fmt-frontend:
+	cd frontend && { \
+		command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) format || \
+		(command -v corepack >/dev/null 2>&1 && corepack pnpm format) || \
+		npx pnpm@8.15.4 format; \
+	}
+
+ci: lint test build
+
+cloudbuild:
+ifndef CLOUD_BUILD_SUBSTITUTIONS
+	$(error CLOUD_BUILD_SUBSTITUTIONS is not set. Provide substitutions string, e.g. CLOUD_BUILD_SUBSTITUTIONS="_ENV=staging,_REGION=asia-northeast1,_ARTIFACT_REPO=personal-website,_BACKEND_SERVICE=personal-website-api,_FRONTEND_SERVICE=personal-website-frontend")
+endif
+	$(GCLOUD) builds submit --config $(CLOUD_BUILD_CONFIG) --substitutions $(CLOUD_BUILD_SUBSTITUTIONS)
 
 up:
 	$(DOCKER_COMPOSE) up --build

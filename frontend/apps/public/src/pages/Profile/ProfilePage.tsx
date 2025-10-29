@@ -26,7 +26,8 @@ export function ProfilePage() {
       return [];
     }
     return [...profile.workHistory].sort(
-      (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+      (a, b) =>
+        new Date(b.startDate).getTime() - new Date(a.startDate).getTime(),
     );
   }, [profile]);
 
@@ -64,7 +65,10 @@ export function ProfilePage() {
               </li>
             ) : null}
             {sortedAffiliations.map((affiliation) => (
-              <li key={affiliation.id} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+              <li
+                key={affiliation.id}
+                className="rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+              >
                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {affiliation.organization}
                   {affiliation.department ? (
@@ -74,16 +78,20 @@ export function ProfilePage() {
                     </span>
                   ) : null}
                 </p>
-                <p className="text-sm text-slate-600 dark:text-slate-300">{affiliation.role}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {affiliation.role}
+                </p>
                 <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   {formatDateRange(
                     affiliation.startDate,
                     affiliation.endDate,
-                    t("common.presentLabel")
+                    t("common.presentLabel"),
                   )}
                 </p>
                 {affiliation.location ? (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{affiliation.location}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {affiliation.location}
+                  </p>
                 ) : null}
               </li>
             ))}
@@ -113,7 +121,9 @@ export function ProfilePage() {
             ) : null}
             {profile?.skillGroups?.map((group) => (
               <div key={group.id}>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{group.category}</h3>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {group.category}
+                </h3>
                 <ul className="mt-2 flex flex-wrap gap-2">
                   {group.items.map((item) => (
                     <li
@@ -122,7 +132,9 @@ export function ProfilePage() {
                     >
                       <span>{item.name}</span>
                       <span className="text-[10px] uppercase text-slate-500 dark:text-slate-400">
-                        {t(`profile.sections.skills.level.${item.level}` as const)}
+                        {t(
+                          `profile.sections.skills.level.${item.level}` as const,
+                        )}
                       </span>
                     </li>
                   ))}
@@ -171,14 +183,18 @@ export function ProfilePage() {
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   {t("profile.sections.lab.name")}
                 </dt>
-                <dd className="mt-1 text-sm text-slate-700 dark:text-slate-200">{profile.lab.name}</dd>
+                <dd className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                  {profile.lab.name}
+                </dd>
               </div>
               {profile.lab.advisor ? (
                 <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     {t("profile.sections.lab.advisor")}
                   </dt>
-                  <dd className="mt-1 text-sm text-slate-700 dark:text-slate-200">{profile.lab.advisor}</dd>
+                  <dd className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                    {profile.lab.advisor}
+                  </dd>
                 </div>
               ) : null}
               {profile.lab.researchFocus ? (
@@ -230,17 +246,27 @@ export function ProfilePage() {
                   <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                     {item.role}
                   </p>
-                  <p className="text-sm text-slate-600 dark:text-slate-300">{item.organization}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    {item.organization}
+                  </p>
                 </div>
                 <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  {formatDateRange(item.startDate, item.endDate, t("common.presentLabel"))}
+                  {formatDateRange(
+                    item.startDate,
+                    item.endDate,
+                    t("common.presentLabel"),
+                  )}
                 </p>
               </div>
               {item.location ? (
-                <p className="text-xs text-slate-500 dark:text-slate-400">{item.location}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {item.location}
+                </p>
               ) : null}
               {item.description ? (
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{item.description}</p>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  {item.description}
+                </p>
               ) : null}
               {item.achievements?.length ? (
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-300">
@@ -285,7 +311,10 @@ export function ProfilePage() {
       </article>
 
       {error ? (
-        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+        >
           {t("profile.error")}
         </div>
       ) : null}

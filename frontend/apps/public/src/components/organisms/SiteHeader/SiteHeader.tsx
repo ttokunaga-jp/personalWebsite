@@ -56,7 +56,10 @@ export function SiteHeader() {
           </button>
         </div>
 
-        <nav className="hidden items-center gap-6 md:flex" aria-label={t("navigation.label")}>
+        <nav
+          className="hidden items-center gap-6 md:flex"
+          aria-label={t("navigation.label")}
+        >
           {navigationItems.map((item) => (
             <NavLink
               key={item.path}
@@ -64,7 +67,7 @@ export function SiteHeader() {
               className={({ isActive }) =>
                 classNames(
                   "text-sm font-medium text-slate-600 transition hover:text-sky-600 dark:text-slate-300 dark:hover:text-sky-300",
-                  isActive && "text-slate-900 dark:text-white"
+                  isActive && "text-slate-900 dark:text-white",
                 )
               }
             >
@@ -77,10 +80,7 @@ export function SiteHeader() {
       </div>
 
       <div
-        className={classNames(
-          "md:hidden",
-          isMobileOpen ? "block" : "hidden"
-        )}
+        className={classNames("md:hidden", isMobileOpen ? "block" : "hidden")}
       >
         <nav
           className="flex flex-col gap-2 border-t border-slate-200 bg-white px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
@@ -93,7 +93,8 @@ export function SiteHeader() {
               className={({ isActive }) =>
                 classNames(
                   "rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800",
-                  isActive && "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
+                  isActive &&
+                    "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white",
                 )
               }
               onClick={() => setIsMobileOpen(false)}

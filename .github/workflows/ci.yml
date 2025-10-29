@@ -1,0 +1,161 @@
+name: CI / CD
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment for manual deployment
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint / Test / Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GO_VERSION: '1.22'
+      NODE_VERSION: '20.11.1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8.15.4
+          run_install: false
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store/v3
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Run lint
+        run: make lint
+
+      - name: Run tests
+        run: make test
+
+      - name: Run build
+        run: make build
+
+  deploy:
+    name: Deploy via Cloud Build
+    needs: quality
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'staging' }}
+    env:
+      CLOUD_BUILD_CONFIG: deploy/cloudbuild/cloudbuild.yaml
+      CLOUD_RUN_REGION: ${{ vars.CLOUD_RUN_REGION }}
+      ARTIFACT_REPO: ${{ vars.CLOUD_BUILD_ARTIFACT_REPO }}
+      BACKEND_SERVICE: ${{ vars.CLOUD_RUN_BACKEND_SERVICE }}
+      FRONTEND_SERVICE: ${{ vars.CLOUD_RUN_FRONTEND_SERVICE }}
+      CLOUDSQL_INSTANCE: ${{ vars.CLOUDSQL_INSTANCE }}
+      VPC_CONNECTOR: ${{ vars.CLOUD_RUN_VPC_CONNECTOR }}
+      BACKEND_SERVICE_ACCOUNT: ${{ vars.BACKEND_SERVICE_ACCOUNT_EMAIL }}
+      FRONTEND_SERVICE_ACCOUNT: ${{ vars.FRONTEND_SERVICE_ACCOUNT_EMAIL }}
+      FRONTEND_API_BASE_URL: ${{ vars.FRONTEND_API_BASE_URL }}
+      BACKEND_TRAFFIC_PERCENT: ${{ vars.BACKEND_TRAFFIC_PERCENT }}
+      FRONTEND_TRAFFIC_PERCENT: ${{ vars.FRONTEND_TRAFFIC_PERCENT }}
+      BACKEND_SECRET_DB_DSN: ${{ secrets.BACKEND_SECRET_DB_DSN }}
+      BACKEND_SECRET_JWT: ${{ secrets.BACKEND_SECRET_JWT }}
+      BACKEND_SECRET_RECAPTCHA: ${{ secrets.BACKEND_SECRET_RECAPTCHA }}
+      FRONTEND_SECRET_RECAPTCHA: ${{ secrets.FRONTEND_SECRET_RECAPTCHA }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Install gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Submit Cloud Build
+        env:
+          DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'staging' }}
+        run: |
+          set -euo pipefail
+
+          : "${CLOUD_RUN_REGION:?Missing CLOUD_RUN_REGION var}"
+          : "${ARTIFACT_REPO:?Missing CLOUD_BUILD_ARTIFACT_REPO var}"
+          : "${BACKEND_SERVICE:?Missing CLOUD_RUN_BACKEND_SERVICE var}"
+          : "${FRONTEND_SERVICE:?Missing CLOUD_RUN_FRONTEND_SERVICE var}"
+          : "${CLOUDSQL_INSTANCE:?Missing CLOUDSQL_INSTANCE var}"
+          : "${BACKEND_SERVICE_ACCOUNT:?Missing BACKEND_SERVICE_ACCOUNT_EMAIL var}"
+          : "${FRONTEND_SERVICE_ACCOUNT:?Missing FRONTEND_SERVICE_ACCOUNT_EMAIL var}"
+          : "${BACKEND_SECRET_DB_DSN:?Missing BACKEND_SECRET_DB_DSN secret}"
+          : "${BACKEND_SECRET_JWT:?Missing BACKEND_SECRET_JWT secret}"
+          : "${FRONTEND_API_BASE_URL:?Missing FRONTEND_API_BASE_URL var}"
+
+          BACKEND_TRAFFIC="${BACKEND_TRAFFIC_PERCENT:-100}"
+          FRONTEND_TRAFFIC="${FRONTEND_TRAFFIC_PERCENT:-100}"
+          BACKEND_RECAPTCHA="${BACKEND_SECRET_RECAPTCHA:-}"
+          FRONTEND_RECAPTCHA="${FRONTEND_SECRET_RECAPTCHA:-}"
+          VPC="${VPC_CONNECTOR:-}"
+
+          SUBSTITUTIONS="_ENV=${DEPLOY_ENV},_REGION=${CLOUD_RUN_REGION},_ARTIFACT_REPO=${ARTIFACT_REPO},_BACKEND_SERVICE=${BACKEND_SERVICE},_FRONTEND_SERVICE=${FRONTEND_SERVICE},_CLOUDSQL_INSTANCE=${CLOUDSQL_INSTANCE},_VPC_CONNECTOR=${VPC},_BACKEND_SERVICE_ACCOUNT=${BACKEND_SERVICE_ACCOUNT},_FRONTEND_SERVICE_ACCOUNT=${FRONTEND_SERVICE_ACCOUNT},_BACKEND_SECRET_DB_DSN=${BACKEND_SECRET_DB_DSN},_BACKEND_SECRET_JWT=${BACKEND_SECRET_JWT},_FRONTEND_API_BASE_URL=${FRONTEND_API_BASE_URL},_BACKEND_TRAFFIC=${BACKEND_TRAFFIC},_FRONTEND_TRAFFIC=${FRONTEND_TRAFFIC}"
+
+          if [[ -n "${BACKEND_RECAPTCHA}" ]]; then
+            SUBSTITUTIONS="${SUBSTITUTIONS},_BACKEND_SECRET_RECAPTCHA=${BACKEND_RECAPTCHA}"
+          fi
+
+          if [[ -n "${FRONTEND_RECAPTCHA}" ]]; then
+            SUBSTITUTIONS="${SUBSTITUTIONS},_FRONTEND_SECRET_RECAPTCHA=${FRONTEND_RECAPTCHA}"
+          fi
+
+          gcloud builds submit \
+            --config "${CLOUD_BUILD_CONFIG}" \
+            --substitutions "${SUBSTITUTIONS}"

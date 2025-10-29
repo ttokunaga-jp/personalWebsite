@@ -18,7 +18,7 @@ async function fetchToken(): Promise<void> {
   const client = axios.create({
     baseURL,
     timeout: 5_000,
-    withCredentials: true
+    withCredentials: true,
   });
 
   const response = await client.get<CsrfResponse>("/security/csrf");
@@ -26,7 +26,9 @@ async function fetchToken(): Promise<void> {
 
   cachedToken = payload.token;
   const parsed = Date.parse(payload.expires_at ?? "");
-  expiresAt = Number.isNaN(parsed) ? Date.now() + SAFE_MARGIN_MS : parsed - SAFE_MARGIN_MS;
+  expiresAt = Number.isNaN(parsed)
+    ? Date.now() + SAFE_MARGIN_MS
+    : parsed - SAFE_MARGIN_MS;
 }
 
 export async function getCsrfToken(): Promise<string | null> {

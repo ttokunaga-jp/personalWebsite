@@ -12,7 +12,10 @@ type AppProps = {
   themeOverrides?: AppThemeOverrides;
 };
 
-export function App({ router = appBrowserRouter, themeOverrides }: AppProps = {}) {
+export function App({
+  router = appBrowserRouter,
+  themeOverrides,
+}: AppProps = {}) {
   const providerProps = themeOverrides ?? {};
 
   return (

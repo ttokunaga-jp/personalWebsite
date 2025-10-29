@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	mysqlDriver "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/fx"
-
-	// mysql driver
-	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/takumi/personal-website/internal/config"
 )
@@ -25,7 +23,12 @@ func NewMySQLClient(lc fx.Lifecycle, cfg *config.AppConfig) (*sqlx.DB, error) {
 
 	fmt.Printf("mysql client: connecting to %s\n", dsn)
 
-	db, err := sqlx.Open("mysql", dsn)
+	normalizedDSN, err := normalizeDSN(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("normalize mysql dsn: %w", err)
+	}
+
+	db, err := sqlx.Open("mysql", normalizedDSN)
 	if err != nil {
 		return nil, fmt.Errorf("open mysql connection: %w", err)
 	}
@@ -56,4 +59,29 @@ func NewMySQLClient(lc fx.Lifecycle, cfg *config.AppConfig) (*sqlx.DB, error) {
 	})
 
 	return db, nil
+}
+
+func normalizeDSN(dsn string) (string, error) {
+	cfg, err := mysqlDriver.ParseDSN(dsn)
+	if err != nil {
+		return "", err
+	}
+
+	if cfg.Params == nil {
+		cfg.Params = make(map[string]string)
+	}
+
+	if _, ok := cfg.Params["charset"]; !ok {
+		cfg.Params["charset"] = "utf8mb4"
+	}
+
+	if cfg.Collation == "" {
+		cfg.Collation = "utf8mb4_unicode_ci"
+	}
+
+	if !cfg.ParseTime {
+		cfg.ParseTime = true
+	}
+
+	return cfg.FormatDSN(), nil
 }

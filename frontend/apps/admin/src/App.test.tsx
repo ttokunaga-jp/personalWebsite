@@ -24,11 +24,11 @@ const apiMocks = vi.hoisted(() => ({
   deleteResearch: vi.fn(),
   deleteBlog: vi.fn(),
   deleteMeeting: vi.fn(),
-  deleteBlacklist: vi.fn()
+  deleteBlacklist: vi.fn(),
 }));
 
 vi.mock("./modules/admin-api", () => ({
-  adminApi: apiMocks
+  adminApi: apiMocks,
 }));
 
 const {
@@ -38,7 +38,7 @@ const {
   listResearch: researchMock,
   listBlogs: blogsMock,
   listMeetings: meetingsMock,
-  listBlacklist: blacklistMock
+  listBlacklist: blacklistMock,
 } = apiMocks;
 
 describe("Admin App", () => {
@@ -53,8 +53,8 @@ describe("Admin App", () => {
         publishedBlogs: 3,
         draftBlogs: 0,
         pendingMeetings: 1,
-        blacklistEntries: 1
-      }
+        blacklistEntries: 1,
+      },
     });
     projectsMock.mockResolvedValue({
       data: [
@@ -68,9 +68,9 @@ describe("Admin App", () => {
           published: true,
           sortOrder: null,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ]
+          updatedAt: new Date().toISOString(),
+        },
+      ],
     });
     researchMock.mockResolvedValue({
       data: [
@@ -82,9 +82,9 @@ describe("Admin App", () => {
           year: 2023,
           published: true,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ]
+          updatedAt: new Date().toISOString(),
+        },
+      ],
     });
     blogsMock.mockResolvedValue({
       data: [
@@ -97,9 +97,9 @@ describe("Admin App", () => {
           published: true,
           publishedAt: new Date().toISOString(),
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ]
+          updatedAt: new Date().toISOString(),
+        },
+      ],
     });
     meetingsMock.mockResolvedValue({
       data: [
@@ -113,9 +113,9 @@ describe("Admin App", () => {
           status: "pending",
           notes: "",
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ]
+          updatedAt: new Date().toISOString(),
+        },
+      ],
     });
     blacklistMock.mockResolvedValue({
       data: [
@@ -123,9 +123,9 @@ describe("Admin App", () => {
           id: 1,
           email: "blocked@example.com",
           reason: "test",
-          createdAt: new Date().toISOString()
-        }
-      ]
+          createdAt: new Date().toISOString(),
+        },
+      ],
     });
   });
 
@@ -139,7 +139,9 @@ describe("Admin App", () => {
     await waitFor(() => {
       expect(healthMock).toHaveBeenCalled();
       expect(summaryMock).toHaveBeenCalled();
-      expect(screen.getByRole("heading", { name: /Admin console/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: /Admin console/i }),
+      ).toBeInTheDocument();
     });
   });
 

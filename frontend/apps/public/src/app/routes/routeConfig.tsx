@@ -3,24 +3,34 @@ import { lazy, Suspense, type ReactElement } from "react";
 import type { NavigationItem } from "../../types/navigation";
 
 const HomePage = lazy(() =>
-  import("../../pages/Home/HomePage").then((module) => ({ default: module.HomePage }))
+  import("../../pages/Home/HomePage").then((module) => ({
+    default: module.HomePage,
+  })),
 );
 const ProfilePage = lazy(() =>
-  import("../../pages/Profile/ProfilePage").then((module) => ({ default: module.ProfilePage }))
+  import("../../pages/Profile/ProfilePage").then((module) => ({
+    default: module.ProfilePage,
+  })),
 );
 const ResearchPage = lazy(() =>
-  import("../../pages/Research/ResearchPage").then((module) => ({ default: module.ResearchPage }))
+  import("../../pages/Research/ResearchPage").then((module) => ({
+    default: module.ResearchPage,
+  })),
 );
 const ProjectsPage = lazy(() =>
-  import("../../pages/Projects/ProjectsPage").then((module) => ({ default: module.ProjectsPage }))
+  import("../../pages/Projects/ProjectsPage").then((module) => ({
+    default: module.ProjectsPage,
+  })),
 );
 const ContactPage = lazy(() =>
-  import("../../pages/Contact/ContactPage").then((module) => ({ default: module.ContactPage }))
+  import("../../pages/Contact/ContactPage").then((module) => ({
+    default: module.ContactPage,
+  })),
 );
 const AdminLandingPage = lazy(() =>
   import("../../pages/Admin/AdminLandingPage").then((module) => ({
-    default: module.AdminLandingPage
-  }))
+    default: module.AdminLandingPage,
+  })),
 );
 
 const routeFallback = (
@@ -111,7 +121,7 @@ export async function preloadRouteModules(): Promise<void> {
     import("../../pages/Research/ResearchPage"),
     import("../../pages/Projects/ProjectsPage"),
     import("../../pages/Contact/ContactPage"),
-    import("../../pages/Admin/AdminLandingPage")
+    import("../../pages/Admin/AdminLandingPage"),
   ]);
 }
 
@@ -121,42 +131,42 @@ export const routeDefinitions: RouteDefinition[] = [
     element: withSuspense(<HomePage />),
     labelKey: "navigation.home",
     showInNavigation: true,
-    index: true
+    index: true,
   },
   {
     path: "/profile",
     element: withSuspense(<ProfilePage />),
     labelKey: "navigation.profile",
-    showInNavigation: true
+    showInNavigation: true,
   },
   {
     path: "/research",
     element: withSuspense(<ResearchPage />),
     labelKey: "navigation.research",
-    showInNavigation: true
+    showInNavigation: true,
   },
   {
     path: "/projects",
     element: withSuspense(<ProjectsPage />),
     labelKey: "navigation.projects",
-    showInNavigation: true
+    showInNavigation: true,
   },
   {
     path: "/contact",
     element: withSuspense(<ContactPage />),
     labelKey: "navigation.contact",
-    showInNavigation: true
+    showInNavigation: true,
   },
   {
     path: "/admin",
     element: withSuspense(<AdminLandingPage />),
-    labelKey: "navigation.admin"
-  }
+    labelKey: "navigation.admin",
+  },
 ];
 
 export const navigationItems: NavigationItem[] = routeDefinitions
   .filter((route) => route.showInNavigation)
   .map(({ path, labelKey }) => ({
     path,
-    labelKey
+    labelKey,
   }));

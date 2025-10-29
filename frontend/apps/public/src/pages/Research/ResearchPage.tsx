@@ -96,7 +96,9 @@ export function ResearchPage() {
         {!isLoading && !filteredEntries.length ? (
           <article className="rounded-xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              {selectedTag ? t("research.noEntriesForTag", { tag: selectedTag }) : t("research.placeholder")}
+              {selectedTag
+                ? t("research.noEntriesForTag", { tag: selectedTag })
+                : t("research.placeholder")}
             </p>
           </article>
         ) : null}
@@ -117,7 +119,9 @@ export function ResearchPage() {
                     : null}
                 </p>
               </div>
-              <p className="text-sm text-slate-600 dark:text-slate-300">{entry.summary}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                {entry.summary}
+              </p>
               {entry.tags.length ? (
                 <ul className="flex flex-wrap gap-2">
                   {entry.tags.map((tag) => (
@@ -178,7 +182,10 @@ export function ResearchPage() {
           </article>
         ))}
         {error ? (
-          <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+          <p
+            role="alert"
+            className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+          >
             {t("research.error")}
           </p>
         ) : null}

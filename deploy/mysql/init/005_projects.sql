@@ -24,27 +24,40 @@ CREATE TABLE IF NOT EXISTS project_tech_stack (
         ON DELETE CASCADE
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-INSERT INTO projects (
-    id,
-    title_ja,
-    title_en,
-    description_ja,
-    description_en,
-    link_url,
-    year,
-    published,
-    sort_order
-) VALUES (
-    1,
-    'リアルタイム行動解析ダッシュボード',
-    'Real-time Activity Analytics Dashboard',
-    'IoT センサーから収集したデータをリアルタイムで可視化し、異常検知を行うための社内向けダッシュボード。イベントドリブンなアーキテクチャとストリーミング処理を採用。',
-    'An internal dashboard that ingests IoT sensor data, performs real-time anomaly detection, and visualises metrics in a streaming-first architecture.',
-    'https://example.com/projects/realtime-analytics',
-    2024,
-    TRUE,
-    10
-)
+INSERT INTO projects (id, title_ja, title_en, description_ja, description_en, link_url, year, published, sort_order) VALUES
+    (
+        1,
+        'RAG 学習支援システム「ClassNav」',
+        'ClassNav: RAG-powered Learning Assistant',
+        '大学の LMS と連携し、講義資料を自動で取り込み要約・検索できる学習支援システム。Docling によるマルチフォーマット解析と RAG を組み合わせ、NotebookLM との差別化となる資料リンク提示や自動アップロード機能を実装。',
+        'Learning assistant that syncs with the university LMS, parses lecture materials via Docling, and provides RAG-based answers with direct source linking and automatic ingestion.',
+        'https://github.com/ttokunaga-jp',
+        2024,
+        TRUE,
+        30
+    ),
+    (
+        2,
+        'searchService: ハイブリッド検索マイクロサービス',
+        'searchService: Hybrid Retrieval Microservice',
+        'Elasticsearch と Qdrant を統合し、キーワード・ベクトルを加重スコアリングする検索基盤。Kafka を用いた非同期インデックス更新、OpenTelemetry / Prometheus による可観測性、gRPC + HTTP API を備え、RAG サービスの共通モジュールとして運用。',
+        'Hybrid retrieval service that blends Elasticsearch and Qdrant scoring, supports Kafka-driven asynchronous indexing, and exposes gRPC/HTTP APIs with full observability for RAG workloads.',
+        'https://github.com/ttokunaga-jp',
+        2024,
+        TRUE,
+        20
+    ),
+    (
+        3,
+        '個人ポートフォリオサイト（Go + React）',
+        'Personal Portfolio Site (Go + React)',
+        'Go (Gin) と React SPA で構築した個人ポートフォリオ。公開サイトと管理 GUI を分離し、予約フォーム、Google OAuth + JWT 認証、Cloud Build → Cloud Run の CI/CD、Terraform による IaC を備える。',
+        'Full-stack personal site built with Go (Gin) and React SPA. Provides a public site and admin GUI with booking flows, Google OAuth + JWT auth, CI/CD on Cloud Build → Cloud Run, and Terraform-managed infrastructure.',
+        'https://github.com/ttokunaga-jp',
+        2025,
+        TRUE,
+        10
+    )
 ON DUPLICATE KEY UPDATE
     title_ja = VALUES(title_ja),
     title_en = VALUES(title_en),
@@ -55,10 +68,23 @@ ON DUPLICATE KEY UPDATE
     published = VALUES(published),
     sort_order = VALUES(sort_order);
 
-DELETE FROM project_tech_stack WHERE project_id = 1;
+DELETE FROM project_tech_stack WHERE project_id IN (1, 2, 3);
 
 INSERT INTO project_tech_stack (project_id, label, sort_order) VALUES
-    (1, 'Go / Gin', 1),
-    (1, 'React / TypeScript', 2),
-    (1, 'GCP Pub/Sub / Cloud Run', 3),
-    (1, 'BigQuery / Looker Studio', 4);
+    (1, 'RAG / LangChain', 1),
+    (1, 'Go / Fiber API', 2),
+    (1, 'React / TypeScript / Tailwind', 3),
+    (1, 'PostgreSQL / Redis', 4),
+    (1, 'GCP Cloud Run / Secret Manager', 5),
+
+    (2, 'Go / gRPC', 1),
+    (2, 'Elasticsearch', 2),
+    (2, 'Qdrant', 3),
+    (2, 'Kafka', 4),
+    (2, 'OpenTelemetry / Prometheus / Jaeger', 5),
+
+    (3, 'Go / Gin / Fx', 1),
+    (3, 'React / pnpm Workspace', 2),
+    (3, 'MySQL', 3),
+    (3, 'Cloud Build / Cloud Run', 4),
+    (3, 'Terraform', 5);

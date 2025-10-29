@@ -1,0 +1,106 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: TA
+        - generic [ref=e8]:
+          - generic [ref=e9]: Portfolio
+          - generic [ref=e10]: Takumi Tokunaga
+      - navigation "Primary Navigation" [ref=e11]:
+        - link "Home" [ref=e12]:
+          - /url: /
+        - link "Profile" [ref=e13]:
+          - /url: /profile
+        - link "Research" [ref=e14]:
+          - /url: /research
+        - link "Projects" [ref=e15]:
+          - /url: /projects
+        - link "Contact" [ref=e16]:
+          - /url: /contact
+        - generic [ref=e17]:
+          - button "English" [pressed] [ref=e18] [cursor=pointer]
+          - generic [ref=e19]: /
+          - button "日本語" [ref=e20] [cursor=pointer]
+        - button "Switch to dark theme" [ref=e21] [cursor=pointer]:
+          - img [ref=e22]
+  - main [ref=e24]:
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - paragraph [ref=e27]: Projects
+        - heading "Project archive" [level=1] [ref=e28]
+        - paragraph [ref=e29]: Highlight technical projects with tech stack chips, links, and filtering options.
+      - generic [ref=e30]:
+        - button "All stacks" [ref=e31] [cursor=pointer]
+        - button "Cloud Run" [ref=e32] [cursor=pointer]
+        - button "Docker" [ref=e33] [cursor=pointer]
+        - button "Docling" [ref=e34] [cursor=pointer]
+        - button "Elasticsearch" [ref=e35] [cursor=pointer]
+        - button "Go" [ref=e36] [cursor=pointer]
+        - button "gRPC" [ref=e37] [cursor=pointer]
+        - button "Kafka" [ref=e38] [cursor=pointer]
+        - button "LangChain" [ref=e39] [cursor=pointer]
+        - button "MySQL" [ref=e40] [cursor=pointer]
+        - button "Qdrant" [ref=e41] [cursor=pointer]
+        - button "React" [ref=e42] [cursor=pointer]
+        - button "Terraform" [ref=e43] [cursor=pointer]
+        - button "TypeScript" [active] [pressed] [ref=e44] [cursor=pointer]
+      - generic [ref=e45]:
+        - article [ref=e46]:
+          - generic [ref=e47]:
+            - generic [ref=e48]:
+              - 'heading "ClassNav: RAG-powered Learning Assistant" [level=2] [ref=e49]'
+              - paragraph [ref=e50]: Adaptive study companion for LMS content
+              - generic [ref=e51]: Education
+            - paragraph [ref=e52]: Apr 2024 – Present
+          - paragraph [ref=e53]: Integrates with the university LMS to ingest lecture artefacts automatically, parse diverse formats via Docling, and surface cited responses backed by hybrid retrieval. Designed for reliability, latency, and educator control.
+          - list [ref=e54]:
+            - listitem [ref=e55]: Go
+            - listitem [ref=e56]: TypeScript
+            - listitem [ref=e57]: LangChain
+            - listitem [ref=e58]: Docling
+            - listitem [ref=e59]: Cloud Run
+            - listitem [ref=e60]: MySQL
+          - generic [ref=e61]:
+            - link "Repository" [ref=e62]:
+              - /url: https://github.com/ttokunaga-jp/classnav
+            - link "Project overview" [ref=e63]:
+              - /url: https://github.com/ttokunaga-jp/classnav#readme
+          - generic [ref=e64]:
+            - generic [ref=e65]: RAG
+            - generic [ref=e66]: Education
+            - generic [ref=e67]: GenAI
+        - article [ref=e68]:
+          - generic [ref=e69]:
+            - generic [ref=e70]:
+              - heading "Personal Website & Admin Console" [level=2] [ref=e71]
+              - paragraph [ref=e72]: Go API + React SPA deployed on Cloud Run
+              - generic [ref=e73]: Portfolio
+            - paragraph [ref=e74]: Jan 2025 – Present
+          - paragraph [ref=e75]: End-to-end portfolio stack featuring public content, admin workflows, booking automation, and CI/CD (GitHub Actions → Cloud Build). Infrastructure codified with Terraform for multi-environment rollouts.
+          - list [ref=e76]:
+            - listitem [ref=e77]: Go
+            - listitem [ref=e78]: TypeScript
+            - listitem [ref=e79]: React
+            - listitem [ref=e80]: MySQL
+            - listitem [ref=e81]: Cloud Run
+            - listitem [ref=e82]: Terraform
+          - link "Repository" [ref=e84]:
+            - /url: https://github.com/ttokunaga-jp/personalWebsite
+          - generic [ref=e85]:
+            - generic [ref=e86]: Full-stack
+            - generic [ref=e87]: CI/CD
+            - generic [ref=e88]: Infrastructure
+  - contentinfo [ref=e89]:
+    - generic [ref=e90]:
+      - paragraph [ref=e91]: © 2025 Takumi Tokunaga. All rights reserved.
+      - generic [ref=e92]:
+        - link "GitHub" [ref=e93]:
+          - /url: https://github.com/
+        - link "X (Twitter)" [ref=e94]:
+          - /url: https://x.com/
+        - link "Email" [ref=e95]:
+          - /url: mailto:someone@example.com
+```

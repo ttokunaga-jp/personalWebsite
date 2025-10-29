@@ -7,46 +7,49 @@ import { vi } from "vitest";
 
 import { renderWithRouter } from "./test-utils/renderWithRouter";
 
+const profileResponse = {
+  name: "Takumi Tokunaga",
+  headline:
+    "Real-world information engineering student & full-stack engineer",
+  summary:
+    "Ritsumeikan University student building retrieval-augmented learning assistants and search infrastructure.",
+  affiliations: [
+    {
+      id: "aff-1",
+      organization: "Ritsumeikan University",
+      department: "College of Information Science and Engineering",
+      role: "B.S. Candidate",
+      startDate: "2023-04-01",
+      endDate: null,
+      isCurrent: true,
+    },
+  ],
+  workHistory: [],
+  skillGroups: [],
+  communities: [],
+  socialLinks: [],
+};
+
 let user = userEvent.setup();
 
 describe("App", () => {
   beforeEach(() => {
-    const profileResponse = {
-      name: "Takumi Asano",
-      headline: "Research Engineer",
-      summary: "Building reliable software around human-centered research.",
-      affiliations: [
-        {
-          id: "aff-1",
-          organization: "Kyoto University",
-          department: "Graduate School of Informatics",
-          role: "Research Fellow",
-          startDate: "2023-04-01",
-          endDate: null,
-          isCurrent: true
-        }
-      ],
-      workHistory: [],
-      skillGroups: [],
-      communities: [],
-      socialLinks: []
-    };
 
     vi.spyOn(apiClient, "get").mockImplementation((url) => {
       if (typeof url === "string" && url === "/health") {
         return Promise.resolve({
-          data: { status: "healthy" }
+          data: { status: "healthy" },
         } as AxiosResponse<{ status: string }>);
       }
 
       if (typeof url === "string" && url.includes("/v1/public/profile")) {
         return Promise.resolve({
-          data: { data: profileResponse }
+          data: { data: profileResponse },
         } as AxiosResponse<{ data: typeof profileResponse }>);
       }
 
       return Promise.resolve({
-        data: {}
+        data: {},
       } as AxiosResponse<Record<string, unknown>>);
     });
 
@@ -62,7 +65,9 @@ describe("App", () => {
       expect(apiClient.get).toHaveBeenCalledWith("/health");
     });
 
-    expect(await screen.findByText(/Research Engineer/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(profileResponse.headline),
+    ).toBeInTheDocument();
     expect(await screen.findByText("healthy")).toBeInTheDocument();
   });
 
@@ -72,7 +77,7 @@ describe("App", () => {
     });
 
     const [toggle] = await screen.findAllByRole("button", {
-      name: /switch to dark theme/i
+      name: /switch to dark theme/i,
     });
 
     await act(async () => {
@@ -90,13 +95,17 @@ describe("App", () => {
       await renderWithRouter();
     });
 
-    const [japaneseButton] = await screen.findAllByRole("button", { name: "日本語" });
+    const [japaneseButton] = await screen.findAllByRole("button", {
+      name: "日本語",
+    });
 
     await act(async () => {
       await user.click(japaneseButton);
     });
 
-    expect(await screen.findByText("人を軸にしたイノベーション")).toBeInTheDocument();
+    expect(
+      await screen.findByText("実世界データと共創するイノベーション"),
+    ).toBeInTheDocument();
   });
 
   it("navigates to the profile page via navigation links", async () => {
@@ -105,20 +114,22 @@ describe("App", () => {
     });
 
     const mobileMenuToggle = await screen.findByRole("button", {
-      name: /toggle navigation menu/i
+      name: /toggle navigation menu/i,
     });
     await act(async () => {
       await user.click(mobileMenuToggle);
     });
 
-    const mobileNav = await screen.findByRole("navigation", { name: /mobile navigation/i });
-    const profileLink = await within(mobileNav).findByRole("link", { name: /profile/i });
+    const mobileNav = await screen.findByRole("navigation", {
+      name: /mobile navigation/i,
+    });
+    const profileLink = await within(mobileNav).findByRole("link", {
+      name: /profile/i,
+    });
     await act(async () => {
       await user.click(profileLink);
     });
 
-    expect(
-      await screen.findByText(/Professional profile/)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Professional profile/)).toBeInTheDocument();
   });
 });

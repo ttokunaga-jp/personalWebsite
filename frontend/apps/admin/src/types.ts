@@ -71,4 +71,3 @@ export type AdminSummary = {
   pendingMeetings: number;
   blacklistEntries: number;
 };
-

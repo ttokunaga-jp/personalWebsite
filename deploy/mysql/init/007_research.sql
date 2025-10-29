@@ -26,13 +26,13 @@ INSERT INTO research (
     sort_order
 ) VALUES (
     1,
-    '大規模時系列データのオンライン異常検知',
-    'Online Anomaly Detection for Large-scale Time Series',
-    'エッジデバイスから収集した数百万系列のデータに対して、リアルタイムな異常検知を行うためのストリーミング処理基盤を構築。',
-    'Designed a streaming platform capable of running real-time anomaly detection across millions of edge-device time series.',
-    '# 研究概要\n\nGo と Rust を用いたストリーミング処理によって、従来数時間を要していたバッチ解析を数秒レイテンシまで短縮しました。Cloud Run と Pub/Sub を活用し、スケールするイベントドリブンなアーキテクチャを採用しています。',
-    '# Overview\n\nA streaming architecture written in Go and Rust reduced batch analysis latency from hours to seconds. Leveraged Cloud Run and Pub/Sub for an event-driven design that scales with demand.',
-    2024,
+    'RAG による学習支援システムの信頼性向上に関する研究',
+    'Improving Reliability of RAG-based Learning Assistants',
+    '大学 LMS の資料を対象に、Docling を活用した抽出とベクトル検索を組み合わせ、引用リンク提示でハルシネーションを抑制する学習支援基盤を設計。',
+    'Designed a learning assistant that blends Docling-based parsing with hybrid retrieval to surface source-backed answers and reduce hallucinations for LMS course materials.',
+    '# 研究概要\n\nLMS から自動取得した講義資料を Docling で構造化し、Elasticsearch と Qdrant を統合したハイブリッド検索でベクトル類似度とキーワードスコアを重み付けします。回答には参照元のリンクを必ず添付し、ユーザーが検証しやすい UI を React で実装しました。RAG パイプライン全体を可観測化し、再現性のある評価ワークフローを整備しています。',
+    '# Overview\n\nCourse materials fetched from the LMS are parsed with Docling, indexed into Elasticsearch and Qdrant, and served via a hybrid scoring pipeline. Responses cite their sources by design, with a React UI that keeps verification one click away. Observability and repeatable evaluation workflows were introduced to quantify reliability improvements.',
+    2025,
     TRUE,
     10
 )

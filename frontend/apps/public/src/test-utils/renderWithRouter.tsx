@@ -15,7 +15,7 @@ type RenderWithRouterOptions = {
 export async function renderWithRouter({
   initialEntries,
   router,
-  themeOverrides
+  themeOverrides,
 }: RenderWithRouterOptions = {}) {
   await preloadRouteModules();
 
@@ -24,7 +24,9 @@ export async function renderWithRouter({
   let renderResult: ReturnType<typeof render> | null = null;
 
   await act(async () => {
-    renderResult = render(<App router={testRouter} themeOverrides={themeOverrides} />);
+    renderResult = render(
+      <App router={testRouter} themeOverrides={themeOverrides} />,
+    );
   });
 
   // Allow any queued microtasks (e.g., i18n initialization) to resolve before assertions.
@@ -32,7 +34,7 @@ export async function renderWithRouter({
     () =>
       new Promise<void>((resolve) => {
         setTimeout(resolve, 0);
-      })
+      }),
   );
 
   if (!renderResult) {

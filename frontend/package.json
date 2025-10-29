@@ -29,5 +29,8 @@
     "*.{ts,tsx,js,jsx}": "pnpm lint --filter ...[origin/main]",
     "*.{ts,tsx,js,jsx,json,css,md}": "pnpm format --filter ...[origin/main]"
   },
-  "packageManager": "pnpm@8.15.4"
+  "packageManager": "pnpm@8.15.4",
+  "engines": {
+    "node": ">=20"
+  }
 }

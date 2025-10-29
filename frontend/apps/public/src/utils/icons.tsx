@@ -48,7 +48,7 @@ const iconMap: Partial<Record<SocialPlatform, IconComponent>> = {
   x: TwitterIcon,
   linkedin: LinkedInIcon,
   email: MailIcon,
-  website: GlobeIcon
+  website: GlobeIcon,
 };
 
 export function getSocialIcon(platform: SocialPlatform): IconComponent {

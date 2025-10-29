@@ -18,12 +18,12 @@ const variantStyles: Record<Variant, string> = {
   primary:
     "bg-sky-600 text-white hover:bg-sky-500 active:bg-sky-700 dark:bg-sky-500 dark:text-slate-900 dark:hover:bg-sky-400",
   ghost:
-    "border border-slate-300 text-slate-700 hover:border-sky-400 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-400 dark:hover:text-sky-300"
+    "border border-slate-300 text-slate-700 hover:border-sky-400 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-400 dark:hover:text-sky-300",
 };
 
 const sizeStyles: Record<Size, string> = {
   md: "px-5 py-2 text-sm",
-  sm: "px-4 py-1.5 text-xs"
+  sm: "px-4 py-1.5 text-xs",
 };
 
 export function Button({
@@ -40,7 +40,7 @@ export function Button({
         variantStyles[variant],
         sizeStyles[size],
         block && "w-full",
-        className
+        className,
       )}
       {...props}
     />

@@ -1,7 +1,18 @@
 import { apiClient } from "@shared/lib/api-client";
 
-import { type UseApiResourceResult, useApiResource } from "../../lib/useApiResource";
+import {
+  type UseApiResourceResult,
+  useApiResource,
+} from "../../lib/useApiResource";
 
+import {
+  transformProfile,
+  transformProjects,
+  transformResearchEntries,
+  type RawProfileResponse,
+  type RawProject,
+  type RawResearchEntry,
+} from "./transform";
 import type {
   ContactAvailabilityResponse,
   ContactConfigResponse,
@@ -9,7 +20,7 @@ import type {
   CreateBookingResponse,
   ProfileResponse,
   Project,
-  ResearchEntry
+  ResearchEntry,
 } from "./types";
 
 const BASE_PATH = "/v1/public";
@@ -28,57 +39,57 @@ function unwrapData<T>(response: ApiSuccessResponse<T>): T {
 
 export const publicApi = {
   async getProfile(signal: AbortSignal): Promise<ProfileResponse> {
-    const response = await apiClient.get<ApiSuccessResponse<ProfileResponse>>(
+    const response = await apiClient.get<ApiSuccessResponse<RawProfileResponse>>(
       `${BASE_PATH}/profile`,
       {
-        ...withAbortSignal(signal)
-      }
+        ...withAbortSignal(signal),
+      },
     );
-    return unwrapData(response.data);
+    return transformProfile(unwrapData(response.data));
   },
   async getResearch(signal: AbortSignal): Promise<ResearchEntry[]> {
-    const response = await apiClient.get<ApiSuccessResponse<ResearchEntry[]>>(
-      `${BASE_PATH}/research`,
-      {
-        ...withAbortSignal(signal)
-      }
-    );
-    return unwrapData(response.data);
+    const response = await apiClient.get<
+      ApiSuccessResponse<RawResearchEntry[]>
+    >(`${BASE_PATH}/research`, {
+      ...withAbortSignal(signal),
+    });
+    return transformResearchEntries(unwrapData(response.data));
   },
   async getProjects(signal: AbortSignal): Promise<Project[]> {
-    const response = await apiClient.get<ApiSuccessResponse<Project[]>>(
+    const response = await apiClient.get<ApiSuccessResponse<RawProject[]>>(
       `${BASE_PATH}/projects`,
       {
-        ...withAbortSignal(signal)
-      }
+        ...withAbortSignal(signal),
+      },
     );
-    return unwrapData(response.data);
+    return transformProjects(unwrapData(response.data));
   },
-  async getContactAvailability(signal: AbortSignal): Promise<ContactAvailabilityResponse> {
-    const response = await apiClient.get<ApiSuccessResponse<ContactAvailabilityResponse>>(
-      `${BASE_PATH}/contact/availability`,
-      {
-        ...withAbortSignal(signal)
-      }
-    );
+  async getContactAvailability(
+    signal: AbortSignal,
+  ): Promise<ContactAvailabilityResponse> {
+    const response = await apiClient.get<
+      ApiSuccessResponse<ContactAvailabilityResponse>
+    >(`${BASE_PATH}/contact/availability`, {
+      ...withAbortSignal(signal),
+    });
     return unwrapData(response.data);
   },
   async getContactConfig(signal: AbortSignal): Promise<ContactConfigResponse> {
-    const response = await apiClient.get<ApiSuccessResponse<ContactConfigResponse>>(
-      `${BASE_PATH}/contact/config`,
-      {
-        ...withAbortSignal(signal)
-      }
-    );
+    const response = await apiClient.get<
+      ApiSuccessResponse<ContactConfigResponse>
+    >(`${BASE_PATH}/contact/config`, {
+      ...withAbortSignal(signal),
+    });
     return unwrapData(response.data);
   },
-  async createBooking(payload: CreateBookingPayload): Promise<CreateBookingResponse> {
-    const response = await apiClient.post<ApiSuccessResponse<CreateBookingResponse>>(
-      `${BASE_PATH}/contact/bookings`,
-      payload
-    );
+  async createBooking(
+    payload: CreateBookingPayload,
+  ): Promise<CreateBookingResponse> {
+    const response = await apiClient.post<
+      ApiSuccessResponse<CreateBookingResponse>
+    >(`${BASE_PATH}/contact/bookings`, payload);
     return unwrapData(response.data);
-  }
+  },
 };
 
 export function useProfileResource(): UseApiResourceResult<ProfileResponse> {

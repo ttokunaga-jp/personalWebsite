@@ -3,7 +3,7 @@ import type {
   AxiosError,
   AxiosPromise,
   AxiosRequestConfig,
-  RawAxiosRequestHeaders
+  RawAxiosRequestHeaders,
 } from "axios";
 
 import { getCsrfToken, invalidateCsrfToken } from "./csrf";
@@ -13,14 +13,18 @@ const SAFE_METHODS = new Set(["get", "head", "options", "trace"]);
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "/api",
   timeout: 10_000,
-  withCredentials: true
+  withCredentials: true,
 });
 
 type CsrfAwareRequestConfig = AxiosRequestConfig & {
   _csrfRetry?: boolean;
 };
 
-function setHeader(config: AxiosRequestConfig, key: string, value: string): void {
+function setHeader(
+  config: AxiosRequestConfig,
+  key: string,
+  value: string,
+): void {
   if (!config.headers) {
     config.headers = {};
   }
@@ -70,7 +74,7 @@ apiClient.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export type ApiClientPromise<T> = AxiosPromise<T>;

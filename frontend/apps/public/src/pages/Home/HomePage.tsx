@@ -13,7 +13,11 @@ type HealthResponse = {
 
 export function HomePage() {
   const { t } = useTranslation();
-  const { data: profile, isLoading: isProfileLoading, error: profileError } = useProfileResource();
+  const {
+    data: profile,
+    isLoading: isProfileLoading,
+    error: profileError,
+  } = useProfileResource();
   const [status, setStatus] = useState<string>("loading");
 
   useEffect(() => {
@@ -49,7 +53,9 @@ export function HomePage() {
       return null;
     }
     return (
-      affiliations.find((affiliation) => affiliation.isCurrent) ?? affiliations.at(0) ?? null
+      affiliations.find((affiliation) => affiliation.isCurrent) ??
+      affiliations.at(0) ??
+      null
     );
   }, [profile]);
 
@@ -59,7 +65,9 @@ export function HomePage() {
     }
 
     return profile.socialLinks.filter((link) =>
-      ["github", "x", "twitter", "linkedin", "email", "website"].includes(link.platform)
+      ["github", "x", "twitter", "linkedin", "email", "website"].includes(
+        link.platform,
+      ),
     );
   }, [profile]);
 
@@ -75,7 +83,11 @@ export function HomePage() {
           {profile?.headline ?? t("home.hero.title")}
         </h1>
         <p className="text-lg leading-relaxed text-slate-600 dark:text-slate-300 md:max-w-3xl md:text-left md:leading-relaxed">
-          {profile?.summary ? profile.summary : <Trans i18nKey="home.hero.description" />}
+          {profile?.summary ? (
+            profile.summary
+          ) : (
+            <Trans i18nKey="home.hero.description" />
+          )}
         </p>
       </header>
 
@@ -114,7 +126,9 @@ export function HomePage() {
                   <span className="font-semibold text-slate-900 dark:text-slate-100">
                     {primaryAffiliation.organization}
                   </span>
-                  {primaryAffiliation.department ? ` · ${primaryAffiliation.department}` : ""}
+                  {primaryAffiliation.department
+                    ? ` · ${primaryAffiliation.department}`
+                    : ""}
                   <br />
                   <span>{primaryAffiliation.role}</span>
                   <br />
@@ -122,7 +136,7 @@ export function HomePage() {
                     {formatDateRange(
                       primaryAffiliation.startDate,
                       primaryAffiliation.endDate,
-                      t("common.presentLabel")
+                      t("common.presentLabel"),
                     )}
                   </span>
                 </>
@@ -158,7 +172,10 @@ export function HomePage() {
             </div>
           </div>
           {profileError ? (
-            <p role="alert" className="text-sm text-rose-500 dark:text-rose-400">
+            <p
+              role="alert"
+              className="text-sm text-rose-500 dark:text-rose-400"
+            >
               {t("home.about.error")}
             </p>
           ) : null}

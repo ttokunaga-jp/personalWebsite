@@ -41,16 +41,16 @@ INSERT INTO profile (
     summary_en
 ) VALUES (
     1,
-    '高橋 拓海',
-    'Takumi Takahashi',
-    'フルスタックエンジニア',
-    'Full-stack Engineer',
-    '株式会社サンプル / プロダクト開発部',
-    'Sample Inc. / Product Engineering',
-    'クラウド・AI応用研究室',
-    'Cloud & Applied AI Lab',
-    'クラウドネイティブな分散システムと AI 応用を中心に、研究開発から実運用まで横断的に取り組んでいます。Go / TypeScript を軸に、高品質で保守性の高いサービス構築をリードしています。',
-    'Leads research and delivery of cloud-native distributed systems and applied AI solutions, focusing on Go and TypeScript to build maintainable, high-quality services.'
+    '徳永 拓未',
+    'Takumi Tokunaga',
+    '立命館大学 情報理工学部 実世界情報コース / フルスタックエンジニア',
+    'Ritsumeikan Univ. Real-world Information Program / Full-stack Engineer',
+    '立命館大学 情報理工学部 実世界情報コース',
+    'College of Information Science and Engineering, Ritsumeikan University',
+    '木村研究室（RM²C モバイルコンピューティング／リアリティメディア研究室）',
+    'Kimura Laboratory (RM²C Mobile Computing / Reality Media Lab)',
+    'ロボティクスと XR を核に実世界とサイバー空間をつなぐ体験設計を探究しつつ、RAG や検索基盤、教育向けプロダクトを Go / TypeScript / GCP で開発しています。起業経験と大規模サービス開発の現場経験を掛け合わせ、企画から運用まで一気通貫で価値提供することを目指しています。',
+    'Exploring ways to connect the physical and digital worlds via robotics and XR while building RAG-powered learning tools, search infrastructure, and education products with Go, TypeScript, and GCP. Combines entrepreneurial experience with large-scale service development to deliver value end-to-end.'
 )
 ON DUPLICATE KEY UPDATE
     name_ja = VALUES(name_ja),
@@ -70,10 +70,11 @@ INSERT INTO profile_skills (
     skill_en,
     sort_order
 ) VALUES
-    (1, 'Go / Gin / Clean Architecture', 'Go / Gin / Clean Architecture', 1),
-    (1, 'React / TypeScript / Next.js', 'React / TypeScript / Next.js', 2),
-    (1, 'GCP / Cloud Run / Cloud SQL', 'GCP / Cloud Run / Cloud SQL', 3),
-    (1, 'CI/CD / Terraform / GitHub Actions', 'CI/CD / Terraform / GitHub Actions', 4)
+    (1, 'RAG / 検索基盤開発', 'RAG / Retrieval Systems', 1),
+    (1, 'Go / Gin / gRPC', 'Go / Gin / gRPC', 2),
+    (1, 'React / TypeScript / Tailwind', 'React / TypeScript / Tailwind', 3),
+    (1, 'GCP / Cloud Run / Terraform', 'GCP / Cloud Run / Terraform', 4),
+    (1, 'ROS / ロボットシステム', 'ROS / Robotics', 5)
 ON DUPLICATE KEY UPDATE
     skill_ja = VALUES(skill_ja),
     skill_en = VALUES(skill_en),

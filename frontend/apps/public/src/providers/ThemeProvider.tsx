@@ -5,7 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState
+  useState,
 } from "react";
 
 const STORAGE_KEY = "personal-website.theme";
@@ -28,8 +28,14 @@ type ThemeStorage = {
 
 type ThemeMatchMedia = (query: string) => {
   matches: boolean;
-  addEventListener?: (type: "change", listener: (event: MediaQueryListEvent) => void) => void;
-  removeEventListener?: (type: "change", listener: (event: MediaQueryListEvent) => void) => void;
+  addEventListener?: (
+    type: "change",
+    listener: (event: MediaQueryListEvent) => void,
+  ) => void;
+  removeEventListener?: (
+    type: "change",
+    listener: (event: MediaQueryListEvent) => void,
+  ) => void;
   addListener?: (listener: (event: MediaQueryListEvent) => void) => void;
   removeListener?: (listener: (event: MediaQueryListEvent) => void) => void;
 } | null;
@@ -45,26 +51,37 @@ function resolveStorage(storage?: ThemeStorage): ThemeStorage | null {
     return storage;
   }
 
-  if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
+  if (
+    typeof window === "undefined" ||
+    typeof window.localStorage === "undefined"
+  ) {
     return null;
   }
 
   return window.localStorage;
 }
 
-function resolveMatchMedia(matchMediaFn?: ThemeMatchMedia): ThemeMatchMedia | null {
+function resolveMatchMedia(
+  matchMediaFn?: ThemeMatchMedia,
+): ThemeMatchMedia | null {
   if (matchMediaFn) {
     return matchMediaFn;
   }
 
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
     return null;
   }
 
   return (query: string) => window.matchMedia(query);
 }
 
-function getInitialTheme(storage: ThemeStorage | null, matchMediaFn: ThemeMatchMedia | null): Theme {
+function getInitialTheme(
+  storage: ThemeStorage | null,
+  matchMediaFn: ThemeMatchMedia | null,
+): Theme {
   const fromStorage = storage?.getItem(STORAGE_KEY) as Theme | null;
   if (fromStorage === "light" || fromStorage === "dark") {
     return fromStorage;
@@ -78,12 +95,19 @@ function getInitialTheme(storage: ThemeStorage | null, matchMediaFn: ThemeMatchM
   return "light";
 }
 
-export function ThemeProvider({ children, storage, matchMedia }: ThemeProviderProps) {
+export function ThemeProvider({
+  children,
+  storage,
+  matchMedia,
+}: ThemeProviderProps) {
   const resolvedStorage = useMemo(() => resolveStorage(storage), [storage]);
-  const resolvedMatchMedia = useMemo(() => resolveMatchMedia(matchMedia), [matchMedia]);
+  const resolvedMatchMedia = useMemo(
+    () => resolveMatchMedia(matchMedia),
+    [matchMedia],
+  );
 
   const [theme, setThemeState] = useState<Theme>(() =>
-    getInitialTheme(resolvedStorage, resolvedMatchMedia)
+    getInitialTheme(resolvedStorage, resolvedMatchMedia),
   );
 
   useEffect(() => {
@@ -134,12 +158,14 @@ export function ThemeProvider({ children, storage, matchMedia }: ThemeProviderPr
     () => ({
       theme,
       toggle,
-      setTheme
+      setTheme,
     }),
-    [theme, setTheme, toggle]
+    [theme, setTheme, toggle],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

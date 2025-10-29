@@ -76,7 +76,7 @@ export function ProjectsPage() {
     }
 
     return projects.filter((project) =>
-      project.techStack.some((tech) => selectedStacks.has(tech))
+      project.techStack.some((tech) => selectedStacks.has(tech)),
     );
   }, [projects, selectedStacks]);
 
@@ -182,7 +182,9 @@ export function ProjectsPage() {
                   {project.title}
                 </h2>
                 {project.subtitle ? (
-                  <p className="text-sm text-slate-600 dark:text-slate-300">{project.subtitle}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    {project.subtitle}
+                  </p>
                 ) : null}
                 {project.category ? (
                   <span className="mt-2 inline-flex items-center rounded-full border border-slate-300 px-2 py-1 text-xs font-medium uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:text-slate-300">
@@ -195,7 +197,7 @@ export function ProjectsPage() {
                   {formatDateRange(
                     project.period.start,
                     project.period.end,
-                    t("common.presentLabel")
+                    t("common.presentLabel"),
                   )}
                 </p>
               ) : null}
@@ -208,7 +210,9 @@ export function ProjectsPage() {
                 loading="lazy"
               />
             ) : null}
-            <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">{project.description}</p>
+            <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
+              {project.description}
+            </p>
             {project.techStack.length ? (
               <ul className="mt-4 flex flex-wrap gap-2">
                 {project.techStack.map((tech) => (
@@ -222,7 +226,9 @@ export function ProjectsPage() {
               </ul>
             ) : null}
             {project.links.length ? (
-              <div className="mt-4 flex flex-wrap gap-3">{renderProjectLinks(project)}</div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                {renderProjectLinks(project)}
+              </div>
             ) : null}
             {project.tags?.length ? (
               <div className="mt-4 flex flex-wrap gap-2">
@@ -239,7 +245,10 @@ export function ProjectsPage() {
           </article>
         ))}
         {error ? (
-          <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+          <p
+            role="alert"
+            className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+          >
             {t("projects.error")}
           </p>
         ) : null}

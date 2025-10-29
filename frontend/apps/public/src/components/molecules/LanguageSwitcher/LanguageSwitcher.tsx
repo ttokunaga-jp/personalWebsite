@@ -5,7 +5,7 @@ import { Button } from "../../atoms/Button";
 
 const languages = [
   { code: "en", labelKey: "languages.en" },
-  { code: "ja", labelKey: "languages.ja" }
+  { code: "ja", labelKey: "languages.ja" },
 ] as const;
 
 export function LanguageSwitcher() {
@@ -31,7 +31,9 @@ export function LanguageSwitcher() {
               {t(language.labelKey)}
             </Button>
             {index < languages.length - 1 ? (
-              <span className="text-xs text-slate-400 dark:text-slate-600">/</span>
+              <span className="text-xs text-slate-400 dark:text-slate-600">
+                /
+              </span>
             ) : null}
           </Fragment>
         );

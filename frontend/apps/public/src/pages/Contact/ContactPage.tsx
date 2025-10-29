@@ -1,7 +1,11 @@
 import { FormEvent, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useContactAvailability, useContactConfig, publicApi } from "../../modules/public-api";
+import {
+  useContactAvailability,
+  useContactConfig,
+  publicApi,
+} from "../../modules/public-api";
 import { formatDateTime, formatTime } from "../../utils/date";
 
 type FormState = {
@@ -18,7 +22,10 @@ declare global {
   interface Window {
     grecaptcha?: {
       ready: (callback: () => void) => void;
-      execute: (siteKey: string, options: { action: string }) => Promise<string>;
+      execute: (
+        siteKey: string,
+        options: { action: string },
+      ) => Promise<string>;
     };
   }
 }
@@ -28,14 +35,21 @@ const initialFormState: FormState = {
   email: "",
   topic: "",
   message: "",
-  slotId: ""
+  slotId: "",
 };
 
 export function ContactPage() {
   const { t } = useTranslation();
-  const { data: availability, isLoading: isAvailabilityLoading, error: availabilityError } =
-    useContactAvailability();
-  const { data: config, isLoading: isConfigLoading, error: configError } = useContactConfig();
+  const {
+    data: availability,
+    isLoading: isAvailabilityLoading,
+    error: availabilityError,
+  } = useContactAvailability();
+  const {
+    data: config,
+    isLoading: isConfigLoading,
+    error: configError,
+  } = useContactConfig();
   const slots = availability?.slots ?? [];
   const topics = config?.topics ?? [];
 
@@ -44,7 +58,10 @@ export function ContactPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const timezoneLabel = useMemo(() => availability?.timezone ?? "", [availability]);
+  const timezoneLabel = useMemo(
+    () => availability?.timezone ?? "",
+    [availability],
+  );
 
   const validate = useCallback(
     (state: FormState): FormErrors => {
@@ -74,15 +91,21 @@ export function ContactPage() {
 
       return errors;
     },
-    [t]
+    [t],
   );
 
-  const handleInputChange = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormState((previous) => ({
-      ...previous,
-      [field]: event.target.value
-    }));
-  };
+  const handleInputChange =
+    (field: keyof FormState) =>
+    (
+      event: React.ChangeEvent<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >,
+    ) => {
+      setFormState((previous) => ({
+        ...previous,
+        [field]: event.target.value,
+      }));
+    };
 
   const loadRecaptchaToken = useCallback(async (): Promise<string> => {
     if (!config?.recaptchaSiteKey) {
@@ -114,7 +137,9 @@ export function ContactPage() {
       throw new Error("Recaptcha unavailable");
     }
 
-    return window.grecaptcha.execute(config.recaptchaSiteKey, { action: "submit" });
+    return window.grecaptcha.execute(config.recaptchaSiteKey, {
+      action: "submit",
+    });
   }, [config?.recaptchaSiteKey]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -137,10 +162,12 @@ export function ContactPage() {
         topic: formState.topic,
         message: formState.message.trim(),
         slotId: formState.slotId,
-        recaptchaToken
+        recaptchaToken,
       });
 
-      setStatusMessage(t("contact.form.success", { bookingId: response.bookingId }));
+      setStatusMessage(
+        t("contact.form.success", { bookingId: response.bookingId }),
+      );
       setFormState(initialFormState);
       setFormErrors({});
     } catch (error) {
@@ -159,7 +186,7 @@ export function ContactPage() {
     }
     setFormState((previous) => ({
       ...previous,
-      slotId: previous.slotId === slotId ? "" : slotId
+      slotId: previous.slotId === slotId ? "" : slotId,
     }));
   };
 
@@ -186,7 +213,11 @@ export function ContactPage() {
         <p className="text-sm text-slate-600 dark:text-slate-300">
           {t("contact.availability.description")}
         </p>
-        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label={t("contact.availability.groupLabel")}>
+        <div
+          className="mt-4 flex flex-wrap gap-2"
+          role="group"
+          aria-label={t("contact.availability.groupLabel")}
+        >
           {isAvailabilityLoading && (
             <>
               <span className="inline-block h-10 w-28 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
@@ -221,7 +252,7 @@ export function ContactPage() {
                 </span>
                 <span className="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   {t("contact.availability.slotTo", {
-                    end: formatTime(slot.end, availability?.timezone)
+                    end: formatTime(slot.end, availability?.timezone),
                   })}
                 </span>
               </button>
@@ -229,7 +260,9 @@ export function ContactPage() {
           })}
         </div>
         {formErrors.slotId ? (
-          <p className="mt-2 text-xs text-rose-500 dark:text-rose-400">{formErrors.slotId}</p>
+          <p className="mt-2 text-xs text-rose-500 dark:text-rose-400">
+            {formErrors.slotId}
+          </p>
         ) : null}
         {timezoneLabel ? (
           <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
@@ -237,7 +270,10 @@ export function ContactPage() {
           </p>
         ) : null}
         {availabilityError ? (
-          <p role="alert" className="mt-3 text-xs text-rose-500 dark:text-rose-400">
+          <p
+            role="alert"
+            className="mt-3 text-xs text-rose-500 dark:text-rose-400"
+          >
             {t("contact.availability.error")}
           </p>
         ) : null}
@@ -264,7 +300,9 @@ export function ContactPage() {
               aria-invalid={Boolean(formErrors.name)}
             />
             {formErrors.name ? (
-              <span className="text-xs text-rose-500 dark:text-rose-400">{formErrors.name}</span>
+              <span className="text-xs text-rose-500 dark:text-rose-400">
+                {formErrors.name}
+              </span>
             ) : null}
           </label>
 
@@ -282,7 +320,9 @@ export function ContactPage() {
               aria-invalid={Boolean(formErrors.email)}
             />
             {formErrors.email ? (
-              <span className="text-xs text-rose-500 dark:text-rose-400">{formErrors.email}</span>
+              <span className="text-xs text-rose-500 dark:text-rose-400">
+                {formErrors.email}
+              </span>
             ) : null}
           </label>
 
@@ -306,7 +346,9 @@ export function ContactPage() {
               ))}
             </select>
             {formErrors.topic ? (
-              <span className="text-xs text-rose-500 dark:text-rose-400">{formErrors.topic}</span>
+              <span className="text-xs text-rose-500 dark:text-rose-400">
+                {formErrors.topic}
+              </span>
             ) : null}
           </label>
 
@@ -323,10 +365,14 @@ export function ContactPage() {
               aria-invalid={Boolean(formErrors.message)}
             />
             {formErrors.message ? (
-              <span className="text-xs text-rose-500 dark:text-rose-400">{formErrors.message}</span>
+              <span className="text-xs text-rose-500 dark:text-rose-400">
+                {formErrors.message}
+              </span>
             ) : null}
             {config?.consentText ? (
-              <p className="text-xs text-slate-500 dark:text-slate-400">{config.consentText}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {config.consentText}
+              </p>
             ) : null}
           </label>
         </fieldset>
@@ -336,10 +382,14 @@ export function ContactPage() {
           disabled={isSubmitting || isConfigLoading}
           className="inline-flex w-full items-center justify-center rounded-full bg-sky-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-sky-500 dark:text-slate-900 dark:hover:bg-sky-400 dark:focus-visible:ring-sky-300"
         >
-          {isSubmitting ? t("contact.form.submitting") : t("contact.form.submit")}
+          {isSubmitting
+            ? t("contact.form.submitting")
+            : t("contact.form.submit")}
         </button>
         {statusMessage ? (
-          <p className="text-sm text-slate-600 dark:text-slate-300">{statusMessage}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            {statusMessage}
+          </p>
         ) : null}
         {configError ? (
           <p role="alert" className="text-xs text-rose-500 dark:text-rose-400">

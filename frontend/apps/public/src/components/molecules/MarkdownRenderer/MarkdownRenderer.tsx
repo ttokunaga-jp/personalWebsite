@@ -19,7 +19,7 @@ const ALLOWED_TAGS = new Set([
   "blockquote",
   "img",
   "figure",
-  "figcaption"
+  "figcaption",
 ]);
 
 const ALLOWED_URI_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
@@ -138,7 +138,10 @@ function renderInlineMarkdown(value: string): string {
 function sanitizeHtml(html: string): string {
   const parser = new DOMParser();
   const document = parser.parseFromString(html, "text/html");
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_ELEMENT,
+  );
 
   const nodesToRemove: Element[] = [];
 
@@ -192,7 +195,11 @@ type MarkdownRendererProps = {
   html?: string;
 } & React.HTMLAttributes<HTMLDivElement>;
 
-export function MarkdownRenderer({ markdown, html, ...divProps }: MarkdownRendererProps) {
+export function MarkdownRenderer({
+  markdown,
+  html,
+  ...divProps
+}: MarkdownRendererProps) {
   const renderedHtml = useMemo(() => {
     if (html) {
       return sanitizeHtml(html);
@@ -201,5 +208,7 @@ export function MarkdownRenderer({ markdown, html, ...divProps }: MarkdownRender
     return sanitizeHtml(convertMarkdownToHtml(markdown));
   }, [html, markdown]);
 
-  return <div {...divProps} dangerouslySetInnerHTML={{ __html: renderedHtml }} />;
+  return (
+    <div {...divProps} dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+  );
 }

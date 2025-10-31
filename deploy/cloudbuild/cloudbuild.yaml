@@ -62,7 +62,7 @@ steps:
     entrypoint: bash
     args:
       - -c
-  - |
+      - |
         set -euo pipefail
 
         BACKEND_IMAGE="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPO}/backend:${SHORT_SHA}"

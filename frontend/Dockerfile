@@ -22,7 +22,6 @@ COPY deploy/docker/nginx/default.conf.template /etc/nginx/templates/default.conf
 
 ENV NGINX_ENVSUBST_TEMPLATE_DIR=/etc/nginx/templates \
     NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d \
-    NGINX_ENVSUBST_VARS=PORT \
     PORT=8080
 
 RUN mkdir -p \

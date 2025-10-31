@@ -17,3 +17,4 @@ WORKDIR /usr/share/nginx/html
 COPY --from=base /app/apps/public/dist ./
 COPY --from=base /app/apps/admin/dist ./admin
 COPY deploy/docker/nginx/default.conf /etc/nginx/conf.d/default.conf
+EXPOSE 8080

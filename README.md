@@ -233,7 +233,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
    - `BACKEND_GOOGLE_CLIENT_ID`
    - `FIRESTORE_DATABASE_ID`（必要な場合のみ）
    - `FIRESTORE_COLLECTION_PREFIX`（必要な場合のみ）
-   - `BACKEND_TRAFFIC_PERCENT`, `FRONTEND_TRAFFIC_PERCENT`
+   - `BACKEND_TRAFFIC_PERCENT`, `FRONTEND_TRAFFIC_PERCENT`（現在の CI は 100% デプロイのみ自動適用。段階的リリースを行う場合はデプロイ後に `gcloud run services update-traffic` で手動調整が必要）
 2. 同環境の Secrets:
    - `BACKEND_SECRET_JWT`
    - `BACKEND_SECRET_STATE`

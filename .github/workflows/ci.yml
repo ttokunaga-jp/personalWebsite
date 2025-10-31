@@ -203,7 +203,6 @@ jobs:
             --no-allow-unauthenticated
             --set-env-vars="${ENV_VARS_BACKEND}"
             --set-secrets="${BACKEND_SECRETS}"
-            --traffic latest=${BACKEND_TRAFFIC}
             --quiet
             --max-instances=3
             --labels="service=${BACKEND_SERVICE},stage=${DEPLOY_ENV},managed-by=github-actions"
@@ -214,6 +213,10 @@ jobs:
           fi
 
           "${BACKEND_CMD[@]}"
+
+          if [[ "${BACKEND_TRAFFIC}" != "100" ]]; then
+            echo "Warning: BACKEND_TRAFFIC_PERCENT=${BACKEND_TRAFFIC} is not currently applied. Update traffic manually via gcloud run services update-traffic." >&2
+          fi
 
           ENV_VARS_FRONTEND="ENV=${DEPLOY_ENV},VITE_API_BASE_URL=${FRONTEND_API_BASE_URL}"
           FRONTEND_CMD=(
@@ -226,7 +229,6 @@ jobs:
             --execution-environment=gen2
             --allow-unauthenticated
             --set-env-vars="${ENV_VARS_FRONTEND}"
-            --traffic latest=${FRONTEND_TRAFFIC}
             --quiet
             --labels="service=${FRONTEND_SERVICE},stage=${DEPLOY_ENV},managed-by=github-actions"
           )
@@ -236,3 +238,7 @@ jobs:
           fi
 
           "${FRONTEND_CMD[@]}"
+
+          if [[ "${FRONTEND_TRAFFIC}" != "100" ]]; then
+            echo "Warning: FRONTEND_TRAFFIC_PERCENT=${FRONTEND_TRAFFIC} is not currently applied. Update traffic manually via gcloud run services update-traffic." >&2
+          fi

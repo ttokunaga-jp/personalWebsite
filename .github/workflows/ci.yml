@@ -179,6 +179,15 @@ jobs:
             echo "Verify the repository exists and the workload identity principal has artifactregistry.repositories.get permission." >&2
           fi
 
+          ensure_secret_ref() {
+            local ref="$1"
+            if [[ "${ref}" == *":"* ]]; then
+              printf '%s' "${ref}"
+            else
+              printf '%s:latest' "${ref}"
+            fi
+          }
+
           docker build -f backend/Dockerfile -t "${BACKEND_IMAGE}" backend
           docker build -f frontend/Dockerfile -t "${FRONTEND_IMAGE}" frontend
 
@@ -186,10 +195,14 @@ jobs:
           docker push "${FRONTEND_IMAGE}"
 
           ENV_VARS_BACKEND="GIN_MODE=release,ENV=${DEPLOY_ENV},APP_FIRESTORE_PROJECT_ID=${GCP_PROJECT_ID},APP_FIRESTORE_DATABASE_ID=${FIRESTORE_DB},APP_FIRESTORE_COLLECTION_PREFIX=${FIRESTORE_PREFIX},APP_GOOGLE_CLIENT_ID=${BACKEND_GOOGLE_CLIENT_ID}"
-          BACKEND_SECRETS="APP_AUTH_JWT_SECRET=${BACKEND_SECRET_JWT},APP_AUTH_STATE_SECRET=${BACKEND_SECRET_STATE},APP_SECURITY_CSRF_SIGNING_KEY=${BACKEND_SECRET_CSRF},APP_GOOGLE_CLIENT_SECRET=${BACKEND_SECRET_GOOGLE_CLIENT_SECRET}"
+          BACKEND_SECRET_JWT_REF="$(ensure_secret_ref "${BACKEND_SECRET_JWT}")"
+          BACKEND_SECRET_STATE_REF="$(ensure_secret_ref "${BACKEND_SECRET_STATE}")"
+          BACKEND_SECRET_CSRF_REF="$(ensure_secret_ref "${BACKEND_SECRET_CSRF}")"
+          BACKEND_SECRET_GOOGLE_CLIENT_SECRET_REF="$(ensure_secret_ref "${BACKEND_SECRET_GOOGLE_CLIENT_SECRET}")"
+          BACKEND_SECRETS="APP_AUTH_JWT_SECRET=${BACKEND_SECRET_JWT_REF},APP_AUTH_STATE_SECRET=${BACKEND_SECRET_STATE_REF},APP_SECURITY_CSRF_SIGNING_KEY=${BACKEND_SECRET_CSRF_REF},APP_GOOGLE_CLIENT_SECRET=${BACKEND_SECRET_GOOGLE_CLIENT_SECRET_REF}"
 
           if [[ -n "${BACKEND_RECAPTCHA}" ]]; then
-            BACKEND_SECRETS="${BACKEND_SECRETS},G_RECAPTCHA_SECRET=${BACKEND_RECAPTCHA}"
+            BACKEND_SECRETS="${BACKEND_SECRETS},G_RECAPTCHA_SECRET=$(ensure_secret_ref "${BACKEND_RECAPTCHA}")"
           fi
 
           BACKEND_CMD=(
@@ -234,7 +247,7 @@ jobs:
           )
 
           if [[ -n "${FRONTEND_RECAPTCHA}" ]]; then
-            FRONTEND_CMD+=(--set-secrets="VITE_RECAPTCHA_SECRET=${FRONTEND_RECAPTCHA}")
+            FRONTEND_CMD+=(--set-secrets="VITE_RECAPTCHA_SECRET=$(ensure_secret_ref "${FRONTEND_RECAPTCHA}")")
           fi
 
           "${FRONTEND_CMD[@]}"

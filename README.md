@@ -241,6 +241,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
    - `BACKEND_SECRET_GOOGLE_CLIENT_SECRET`
    - `BACKEND_SECRET_RECAPTCHA`（任意）
    - `FRONTEND_SECRET_RECAPTCHA`（任意）
+   - Secret の値には Secret Manager のシークレット ID を設定すればよい（`:latest` などのバージョン指定は CI が自動的に付加）。
 3. リポジトリ全体の Actions Secrets:
    - `GCP_PROJECT_ID`
    - `GCP_WORKLOAD_IDENTITY_PROVIDER`

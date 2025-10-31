@@ -255,6 +255,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
        --repository-format=docker \
        --location="${CLOUD_BUILD_ARTIFACT_LOCATION}"
      ```
+   - Workload Identity で利用するプリンシパルに `roles/artifactregistry.writer` に加え `roles/artifactregistry.reader` 以上が付与されているか確認する。
 
 ### デプロイ検証
 - `workflow_dispatch` で `environment=staging` を指定 → Cloud Build 実行

@@ -203,7 +203,7 @@ jobs:
             --no-allow-unauthenticated
             --set-env-vars="${ENV_VARS_BACKEND}"
             --set-secrets="${BACKEND_SECRETS}"
-            --set-traffic="latest=${BACKEND_TRAFFIC}"
+            --traffic latest=${BACKEND_TRAFFIC}
             --quiet
             --max-instances=3
             --labels="service=${BACKEND_SERVICE},stage=${DEPLOY_ENV},managed-by=github-actions"
@@ -226,7 +226,7 @@ jobs:
             --execution-environment=gen2
             --allow-unauthenticated
             --set-env-vars="${ENV_VARS_FRONTEND}"
-            --set-traffic="latest=${FRONTEND_TRAFFIC}"
+            --traffic latest=${FRONTEND_TRAFFIC}
             --quiet
             --labels="service=${FRONTEND_SERVICE},stage=${DEPLOY_ENV},managed-by=github-actions"
           )

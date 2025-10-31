@@ -225,7 +225,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 
 ### GitHub Environments / Secrets
 1. `staging`, `production` 環境を作成し、下記を Environment Variables に登録:
-   - `CLOUD_RUN_REGION`, `CLOUD_BUILD_ARTIFACT_REPO`
+   - `CLOUD_RUN_REGION`, `CLOUD_BUILD_ARTIFACT_REPO`, `CLOUD_BUILD_ARTIFACT_LOCATION`
    - `CLOUD_RUN_BACKEND_SERVICE`, `CLOUD_RUN_FRONTEND_SERVICE`
    - `CLOUD_RUN_VPC_CONNECTOR`（必要な場合のみ）
    - `BACKEND_SERVICE_ACCOUNT_EMAIL`, `FRONTEND_SERVICE_ACCOUNT_EMAIL`

@@ -164,6 +164,9 @@ jobs:
           BACKEND_RECAPTCHA="${BACKEND_SECRET_RECAPTCHA:-}"
           FRONTEND_RECAPTCHA="${FRONTEND_SECRET_RECAPTCHA:-}"
           VPC="${VPC_CONNECTOR:-}"
+          if [[ "${VPC,,}" == "none" ]]; then
+            VPC=""
+          fi
           FIRESTORE_DB="${FIRESTORE_DATABASE_ID:-(default)}"
           FIRESTORE_PREFIX="${FIRESTORE_COLLECTION_PREFIX:-}"
 

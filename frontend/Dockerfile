@@ -21,11 +21,11 @@ COPY deploy/docker/nginx/default.conf.template /etc/nginx/conf.d/default.conf.te
 COPY deploy/docker/nginx/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-RUN mkdir -p /var/cache/nginx /var/run/nginx /var/log/nginx \
+RUN mkdir -p /var/cache/nginx /var/run/nginx /var/log/nginx /var/lib/nginx/tmp \
     && addgroup -g 65532 -S cloudrun \
     && adduser -S -D -H -u 65532 -s /sbin/nologin cloudrun -G cloudrun \
     && sed -i 's/^user .*;/user cloudrun;/g' /etc/nginx/nginx.conf \
-    && chown -R cloudrun:cloudrun /usr/share/nginx/html /etc/nginx /var/cache/nginx /var/run/nginx /var/log/nginx
+    && chown -R cloudrun:cloudrun /usr/share/nginx/html /etc/nginx /var/cache/nginx /var/run/nginx /var/log/nginx /var/lib/nginx
 
 USER 65532:65532
 EXPOSE 8080

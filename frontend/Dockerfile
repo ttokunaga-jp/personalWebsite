@@ -13,8 +13,16 @@ RUN pnpm install
 RUN pnpm -r build
 
 FROM nginx:1.25-alpine
+ENV PORT=8080
 WORKDIR /usr/share/nginx/html
 COPY --from=base /app/apps/public/dist ./
 COPY --from=base /app/apps/admin/dist ./admin
 COPY deploy/docker/nginx/default.conf /etc/nginx/conf.d/default.conf
+
+RUN mkdir -p /var/cache/nginx /var/run/nginx /var/log/nginx \
+    && addgroup -g 65532 -S cloudrun \
+    && adduser -S -D -H -u 65532 -s /sbin/nologin cloudrun -G cloudrun \
+    && chown -R cloudrun:cloudrun /usr/share/nginx/html /etc/nginx /var/cache/nginx /var/run/nginx /var/log/nginx
+
+USER 65532:65532
 EXPOSE 8080

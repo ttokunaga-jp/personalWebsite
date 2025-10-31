@@ -29,4 +29,4 @@ RUN mkdir -p /var/cache/nginx /var/run/nginx /var/log/nginx \
 USER 65532:65532
 EXPOSE 8080
 
-CMD ["/entrypoint.sh"]
+CMD sh -c "/entrypoint.sh > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"

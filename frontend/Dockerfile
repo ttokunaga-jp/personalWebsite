@@ -17,7 +17,7 @@ RUN apk add --no-cache gettext
 WORKDIR /usr/share/nginx/html
 COPY --from=base /app/apps/public/dist ./
 COPY --from=base /app/apps/admin/dist ./admin
-COPY deploy/docker/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY deploy/docker/nginx/default.conf.template /etc/nginx/conf.d/default.conf.template
 COPY deploy/docker/nginx/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
@@ -29,4 +29,4 @@ RUN mkdir -p /var/cache/nginx /var/run/nginx /var/log/nginx \
 USER 65532:65532
 EXPOSE 8080
 
-CMD sh -c "/entrypoint.sh > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+CMD ["/entrypoint.sh"]

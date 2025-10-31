@@ -38,12 +38,7 @@ RUN mkdir -p \
         /var/lib/nginx/tmp/fastcgi \
         /var/lib/nginx/tmp/uwsgi \
         /var/lib/nginx/tmp/scgi \
-    && addgroup -g 65532 -S cloudrun \
-    && adduser -S -D -H -u 65532 -s /sbin/nologin cloudrun -G cloudrun \
-    && sed -i 's/^user .*;/user cloudrun;/g' /etc/nginx/nginx.conf \
-    && chown -R cloudrun:cloudrun /usr/share/nginx/html /etc/nginx /var/cache/nginx /var/run/nginx /var/log/nginx /var/lib/nginx
-
-USER 65532:65532
+    && chown -R nginx:nginx /usr/share/nginx/html /etc/nginx /var/cache/nginx /var/run/nginx /var/log/nginx /var/lib/nginx
 EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]

@@ -22,7 +22,8 @@ COPY deploy/docker/nginx/default.conf.template /etc/nginx/templates/default.conf
 
 ENV NGINX_ENVSUBST_TEMPLATE_DIR=/etc/nginx/templates \
     NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d \
-    PORT=8080
+    PORT=8080 \
+    API_PROXY_PASS=http://backend:8100/api/
 
 RUN mkdir -p \
         /var/cache/nginx/client_temp \

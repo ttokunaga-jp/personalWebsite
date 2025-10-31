@@ -70,6 +70,8 @@ steps:
 
         BACKEND_SERVICE_ACCOUNT="${_BACKEND_SERVICE_ACCOUNT}"
         FRONTEND_SERVICE_ACCOUNT="${_FRONTEND_SERVICE_ACCOUNT}"
+        BACKEND_SECRET_STATE="${_BACKEND_SECRET_STATE}"
+        BACKEND_SECRET_CSRF="${_BACKEND_SECRET_CSRF}"
 
         if [[ -z "${BACKEND_SERVICE_ACCOUNT}" && -n "${FRONTEND_SERVICE_ACCOUNT}" ]]; then
           echo "Backend service account substitution missing. Reusing frontend service account." >&2
@@ -96,6 +98,11 @@ steps:
           exit 1
         fi
 
+        if [[ -z "${BACKEND_SECRET_CSRF}" && -n "${BACKEND_SECRET_STATE}" ]]; then
+          echo "Backend CSRF secret substitution missing. Reusing backend state secret." >&2
+          BACKEND_SECRET_CSRF="${BACKEND_SECRET_STATE}"
+        fi
+
         if [[ -z "${_BACKEND_GOOGLE_CLIENT_ID}" ]]; then
           echo "Backend Google client ID substitution is required." >&2
           exit 1
@@ -106,7 +113,7 @@ steps:
           exit 1
         fi
 
-        if [[ -z "${_BACKEND_SECRET_CSRF}" ]]; then
+        if [[ -z "${BACKEND_SECRET_CSRF}" ]]; then
           echo "Backend CSRF secret substitution is required." >&2
           exit 1
         fi
@@ -129,7 +136,7 @@ steps:
           --execution-environment=gen2
           --no-allow-unauthenticated
           --set-env-vars="GIN_MODE=release,ENV=${_ENV},APP_FIRESTORE_PROJECT_ID=${PROJECT_ID},APP_FIRESTORE_DATABASE_ID=${_FIRESTORE_DATABASE_ID},APP_FIRESTORE_COLLECTION_PREFIX=${_FIRESTORE_COLLECTION_PREFIX},APP_GOOGLE_CLIENT_ID=${_BACKEND_GOOGLE_CLIENT_ID}"
-          --set-secrets="APP_AUTH_JWT_SECRET=${_BACKEND_SECRET_JWT},APP_AUTH_STATE_SECRET=${_BACKEND_SECRET_STATE},APP_SECURITY_CSRF_SIGNING_KEY=${_BACKEND_SECRET_CSRF},APP_GOOGLE_CLIENT_SECRET=${_BACKEND_SECRET_GOOGLE_CLIENT_SECRET}"
+          --set-secrets="APP_AUTH_JWT_SECRET=${_BACKEND_SECRET_JWT},APP_AUTH_STATE_SECRET=${_BACKEND_SECRET_STATE},APP_SECURITY_CSRF_SIGNING_KEY=${BACKEND_SECRET_CSRF},APP_GOOGLE_CLIENT_SECRET=${_BACKEND_SECRET_GOOGLE_CLIENT_SECRET}"
           --set-traffic="latest=${BACKEND_TRAFFIC}"
           --quiet
           --max-instances=3

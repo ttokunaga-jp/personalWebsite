@@ -136,6 +136,11 @@ jobs:
             BACKEND_SERVICE_ACCOUNT="${FRONTEND_SERVICE_ACCOUNT}"
           fi
 
+          if [[ -z "${BACKEND_SECRET_CSRF:-}" && -n "${BACKEND_SECRET_STATE:-}" ]]; then
+            echo "BACKEND_SECRET_CSRF is not set. Falling back to BACKEND_SECRET_STATE." >&2
+            BACKEND_SECRET_CSRF="${BACKEND_SECRET_STATE}"
+          fi
+
           : "${CLOUD_RUN_REGION:?Missing CLOUD_RUN_REGION var}"
           : "${ARTIFACT_REPO:?Missing CLOUD_BUILD_ARTIFACT_REPO var}"
           : "${BACKEND_SERVICE:?Missing CLOUD_RUN_BACKEND_SERVICE var}"

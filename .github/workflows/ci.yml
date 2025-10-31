@@ -229,6 +229,8 @@ jobs:
 
           if [[ -n "${VPC}" ]]; then
             BACKEND_CMD+=(--vpc-connector="${VPC}")
+          else
+            BACKEND_CMD+=(--clear-vpc-connector)
           fi
 
           "${BACKEND_CMD[@]}"
@@ -254,6 +256,12 @@ jobs:
 
           if [[ -n "${FRONTEND_RECAPTCHA}" ]]; then
             FRONTEND_CMD+=(--set-secrets="VITE_RECAPTCHA_SECRET=$(ensure_secret_ref "${FRONTEND_RECAPTCHA}")")
+          fi
+
+          if [[ -n "${VPC}" ]]; then
+            FRONTEND_CMD+=(--vpc-connector="${VPC}")
+          else
+            FRONTEND_CMD+=(--clear-vpc-connector)
           fi
 
           "${FRONTEND_CMD[@]}"

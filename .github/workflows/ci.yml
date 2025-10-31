@@ -150,7 +150,10 @@ jobs:
           : "${BACKEND_SECRET_JWT:?Missing BACKEND_SECRET_JWT secret}"
           : "${BACKEND_SECRET_STATE:?Missing BACKEND_SECRET_STATE secret}"
           : "${BACKEND_SECRET_CSRF:?Missing BACKEND_SECRET_CSRF secret}"
-          : "${BACKEND_GOOGLE_CLIENT_ID:?Missing BACKEND_GOOGLE_CLIENT_ID var}"
+
+          if [[ -z "${BACKEND_GOOGLE_CLIENT_ID:-}" ]]; then
+            echo "BACKEND_GOOGLE_CLIENT_ID is not set. Google OAuth endpoints will be disabled." >&2
+          fi
           : "${BACKEND_SECRET_GOOGLE_CLIENT_SECRET:?Missing BACKEND_SECRET_GOOGLE_CLIENT_SECRET secret}"
           : "${FRONTEND_API_BASE_URL:?Missing FRONTEND_API_BASE_URL var}"
 

@@ -104,8 +104,7 @@ steps:
         fi
 
         if [[ -z "${_BACKEND_GOOGLE_CLIENT_ID}" ]]; then
-          echo "Backend Google client ID substitution is required." >&2
-          exit 1
+          echo "Backend Google client ID substitution not provided. OAuth endpoints will be disabled." >&2
         fi
 
         if [[ -z "${_BACKEND_SECRET_GOOGLE_CLIENT_SECRET}" ]]; then

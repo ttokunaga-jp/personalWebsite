@@ -89,7 +89,6 @@ jobs:
     environment:
       name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'staging' }}
     env:
-      CLOUD_BUILD_CONFIG: deploy/cloudbuild/cloudbuild.yaml
       CLOUD_RUN_REGION: ${{ vars.CLOUD_RUN_REGION }}
       ARTIFACT_REPO: ${{ vars.CLOUD_BUILD_ARTIFACT_REPO }}
       BACKEND_SERVICE: ${{ vars.CLOUD_RUN_BACKEND_SERVICE }}
@@ -109,6 +108,7 @@ jobs:
       FRONTEND_SECRET_RECAPTCHA: ${{ secrets.FRONTEND_SECRET_RECAPTCHA }}
       FIRESTORE_DATABASE_ID: ${{ vars.FIRESTORE_DATABASE_ID }}
       FIRESTORE_COLLECTION_PREFIX: ${{ vars.FIRESTORE_COLLECTION_PREFIX }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -125,7 +125,7 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-      - name: Submit Cloud Build
+      - name: Build and Deploy
         env:
           DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'staging' }}
         run: |
@@ -165,16 +165,67 @@ jobs:
           FIRESTORE_DB="${FIRESTORE_DATABASE_ID:-(default)}"
           FIRESTORE_PREFIX="${FIRESTORE_COLLECTION_PREFIX:-}"
 
-          SUBSTITUTIONS="_ENV=${DEPLOY_ENV},_REGION=${CLOUD_RUN_REGION},_ARTIFACT_REPO=${ARTIFACT_REPO},_BACKEND_SERVICE=${BACKEND_SERVICE},_FRONTEND_SERVICE=${FRONTEND_SERVICE},_VPC_CONNECTOR=${VPC},_BACKEND_SERVICE_ACCOUNT=${BACKEND_SERVICE_ACCOUNT},_FRONTEND_SERVICE_ACCOUNT=${FRONTEND_SERVICE_ACCOUNT},_BACKEND_SECRET_JWT=${BACKEND_SECRET_JWT},_BACKEND_SECRET_STATE=${BACKEND_SECRET_STATE},_BACKEND_SECRET_CSRF=${BACKEND_SECRET_CSRF},_BACKEND_GOOGLE_CLIENT_ID=${BACKEND_GOOGLE_CLIENT_ID},_BACKEND_SECRET_GOOGLE_CLIENT_SECRET=${BACKEND_SECRET_GOOGLE_CLIENT_SECRET},_FRONTEND_API_BASE_URL=${FRONTEND_API_BASE_URL},_FIRESTORE_DATABASE_ID=${FIRESTORE_DB},_FIRESTORE_COLLECTION_PREFIX=${FIRESTORE_PREFIX},_BACKEND_TRAFFIC=${BACKEND_TRAFFIC},_FRONTEND_TRAFFIC=${FRONTEND_TRAFFIC}"
+          SHORT_SHA="$(printf '%s' "${GITHUB_SHA}" | cut -c1-7)"
+          ARTIFACT_HOST="${CLOUD_RUN_REGION}-docker.pkg.dev"
+          BACKEND_IMAGE="${ARTIFACT_HOST}/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/backend:${SHORT_SHA}"
+          FRONTEND_IMAGE="${ARTIFACT_HOST}/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/frontend:${SHORT_SHA}"
+
+          gcloud auth configure-docker "${ARTIFACT_HOST}" --quiet
+
+          docker build -f backend/Dockerfile -t "${BACKEND_IMAGE}" backend
+          docker build -f frontend/Dockerfile -t "${FRONTEND_IMAGE}" frontend
+
+          docker push "${BACKEND_IMAGE}"
+          docker push "${FRONTEND_IMAGE}"
+
+          ENV_VARS_BACKEND="GIN_MODE=release,ENV=${DEPLOY_ENV},APP_FIRESTORE_PROJECT_ID=${GCP_PROJECT_ID},APP_FIRESTORE_DATABASE_ID=${FIRESTORE_DB},APP_FIRESTORE_COLLECTION_PREFIX=${FIRESTORE_PREFIX},APP_GOOGLE_CLIENT_ID=${BACKEND_GOOGLE_CLIENT_ID}"
+          BACKEND_SECRETS="APP_AUTH_JWT_SECRET=${BACKEND_SECRET_JWT},APP_AUTH_STATE_SECRET=${BACKEND_SECRET_STATE},APP_SECURITY_CSRF_SIGNING_KEY=${BACKEND_SECRET_CSRF},APP_GOOGLE_CLIENT_SECRET=${BACKEND_SECRET_GOOGLE_CLIENT_SECRET}"
 
           if [[ -n "${BACKEND_RECAPTCHA}" ]]; then
-            SUBSTITUTIONS="${SUBSTITUTIONS},_BACKEND_SECRET_RECAPTCHA=${BACKEND_RECAPTCHA}"
+            BACKEND_SECRETS="${BACKEND_SECRETS},G_RECAPTCHA_SECRET=${BACKEND_RECAPTCHA}"
           fi
+
+          BACKEND_CMD=(
+            gcloud run deploy "${BACKEND_SERVICE}-${DEPLOY_ENV}"
+            --project="${GCP_PROJECT_ID}"
+            --region="${CLOUD_RUN_REGION}"
+            --platform=managed
+            --image="${BACKEND_IMAGE}"
+            --service-account="${BACKEND_SERVICE_ACCOUNT}"
+            --execution-environment=gen2
+            --no-allow-unauthenticated
+            --set-env-vars="${ENV_VARS_BACKEND}"
+            --set-secrets="${BACKEND_SECRETS}"
+            --set-traffic="latest=${BACKEND_TRAFFIC}"
+            --quiet
+            --max-instances=3
+            --labels="service=${BACKEND_SERVICE},stage=${DEPLOY_ENV},managed-by=github-actions"
+          )
+
+          if [[ -n "${VPC}" ]]; then
+            BACKEND_CMD+=(--vpc-connector="${VPC}")
+          fi
+
+          "${BACKEND_CMD[@]}"
+
+          ENV_VARS_FRONTEND="ENV=${DEPLOY_ENV},VITE_API_BASE_URL=${FRONTEND_API_BASE_URL}"
+          FRONTEND_CMD=(
+            gcloud run deploy "${FRONTEND_SERVICE}-${DEPLOY_ENV}"
+            --project="${GCP_PROJECT_ID}"
+            --region="${CLOUD_RUN_REGION}"
+            --platform=managed
+            --image="${FRONTEND_IMAGE}"
+            --service-account="${FRONTEND_SERVICE_ACCOUNT}"
+            --execution-environment=gen2
+            --allow-unauthenticated
+            --set-env-vars="${ENV_VARS_FRONTEND}"
+            --set-traffic="latest=${FRONTEND_TRAFFIC}"
+            --quiet
+            --labels="service=${FRONTEND_SERVICE},stage=${DEPLOY_ENV},managed-by=github-actions"
+          )
 
           if [[ -n "${FRONTEND_RECAPTCHA}" ]]; then
-            SUBSTITUTIONS="${SUBSTITUTIONS},_FRONTEND_SECRET_RECAPTCHA=${FRONTEND_RECAPTCHA}"
+            FRONTEND_CMD+=(--set-secrets="VITE_RECAPTCHA_SECRET=${FRONTEND_RECAPTCHA}")
           fi
 
-          gcloud builds submit \
-            --config "${CLOUD_BUILD_CONFIG}" \
-            --substitutions "${SUBSTITUTIONS}"
+          "${FRONTEND_CMD[@]}"

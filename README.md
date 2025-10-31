@@ -248,6 +248,13 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 4. 上記サービスアカウントに必要なロールを付与:
    - Cloud Build Editor / Cloud Run Admin / Artifact Registry Administrator
    - Service Account User / Secret Manager Secret Accessor
+   - Artifact Registry リポジトリ（`${CLOUD_BUILD_ARTIFACT_LOCATION}`）の作成忘れに注意。未作成の場合は下記コマンドで事前に作成する:
+
+     ```sh
+     gcloud artifacts repositories create "${CLOUD_BUILD_ARTIFACT_REPO}" \
+       --repository-format=docker \
+       --location="${CLOUD_BUILD_ARTIFACT_LOCATION}"
+     ```
 
 ### デプロイ検証
 - `workflow_dispatch` で `environment=staging` を指定 → Cloud Build 実行

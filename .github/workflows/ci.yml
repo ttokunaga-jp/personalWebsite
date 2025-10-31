@@ -173,6 +173,7 @@ jobs:
           FRONTEND_IMAGE="${ARTIFACT_HOST}/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/frontend:${SHORT_SHA}"
 
           gcloud auth configure-docker "${ARTIFACT_HOST}" --quiet
+          gcloud artifacts repositories describe "${ARTIFACT_REPO}" --location="${ARTIFACT_REPO_LOCATION}" >/dev/null
 
           docker build -f backend/Dockerfile -t "${BACKEND_IMAGE}" backend
           docker build -f frontend/Dockerfile -t "${FRONTEND_IMAGE}" frontend

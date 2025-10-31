@@ -163,9 +163,12 @@ jobs:
           FRONTEND_TRAFFIC="${FRONTEND_TRAFFIC_PERCENT:-100}"
           BACKEND_RECAPTCHA="${BACKEND_SECRET_RECAPTCHA:-}"
           FRONTEND_RECAPTCHA="${FRONTEND_SECRET_RECAPTCHA:-}"
-          VPC="${VPC_CONNECTOR:-}"
-          if [[ "${VPC,,}" == "none" ]]; then
+          VPC_RAW="${VPC_CONNECTOR:-}"
+          VPC_CANON="$(printf '%s' "${VPC_RAW}" | tr '[:upper:]' '[:lower:]')"
+          if [[ -z "${VPC_CANON}" || "${VPC_CANON}" == "none" ]]; then
             VPC=""
+          else
+            VPC="${VPC_RAW}"
           fi
           FIRESTORE_DB="${FIRESTORE_DATABASE_ID:-(default)}"
           FIRESTORE_PREFIX="${FIRESTORE_COLLECTION_PREFIX:-}"

@@ -62,14 +62,27 @@ steps:
     entrypoint: bash
     args:
       - -c
-      - |
+  - |
         set -euo pipefail
 
         BACKEND_IMAGE="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPO}/backend:${SHORT_SHA}"
         FRONTEND_IMAGE="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPO}/frontend:${SHORT_SHA}"
 
-        if [[ -z "${_BACKEND_SERVICE_ACCOUNT}" || -z "${_FRONTEND_SERVICE_ACCOUNT}" ]]; then
-          echo "Service account substitutions are required." >&2
+        BACKEND_SERVICE_ACCOUNT="${_BACKEND_SERVICE_ACCOUNT}"
+        FRONTEND_SERVICE_ACCOUNT="${_FRONTEND_SERVICE_ACCOUNT}"
+
+        if [[ -z "${BACKEND_SERVICE_ACCOUNT}" && -n "${FRONTEND_SERVICE_ACCOUNT}" ]]; then
+          echo "Backend service account substitution missing. Reusing frontend service account." >&2
+          BACKEND_SERVICE_ACCOUNT="${FRONTEND_SERVICE_ACCOUNT}"
+        fi
+
+        if [[ -z "${BACKEND_SERVICE_ACCOUNT}" ]]; then
+          echo "Backend service account substitution is required." >&2
+          exit 1
+        fi
+
+        if [[ -z "${FRONTEND_SERVICE_ACCOUNT}" ]]; then
+          echo "Frontend service account substitution is required." >&2
           exit 1
         fi
 
@@ -112,7 +125,7 @@ steps:
           --region="${_REGION}"
           --platform=managed
           --image="${BACKEND_IMAGE}"
-          --service-account="${_BACKEND_SERVICE_ACCOUNT}"
+          --service-account="${BACKEND_SERVICE_ACCOUNT}"
           --execution-environment=gen2
           --no-allow-unauthenticated
           --set-env-vars="GIN_MODE=release,ENV=${_ENV},APP_FIRESTORE_PROJECT_ID=${PROJECT_ID},APP_FIRESTORE_DATABASE_ID=${_FIRESTORE_DATABASE_ID},APP_FIRESTORE_COLLECTION_PREFIX=${_FIRESTORE_COLLECTION_PREFIX},APP_GOOGLE_CLIENT_ID=${_BACKEND_GOOGLE_CLIENT_ID}"
@@ -140,7 +153,7 @@ steps:
           --region="${_REGION}"
           --platform=managed
           --image="${FRONTEND_IMAGE}"
-          --service-account="${_FRONTEND_SERVICE_ACCOUNT}"
+          --service-account="${FRONTEND_SERVICE_ACCOUNT}"
           --execution-environment=gen2
           --allow-unauthenticated
           --set-env-vars="ENV=${_ENV},VITE_API_BASE_URL=${_FRONTEND_API_BASE_URL}"

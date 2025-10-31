@@ -131,6 +131,11 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [[ -z "${BACKEND_SERVICE_ACCOUNT:-}" && -n "${FRONTEND_SERVICE_ACCOUNT:-}" ]]; then
+            echo "BACKEND_SERVICE_ACCOUNT is not set. Falling back to FRONTEND_SERVICE_ACCOUNT." >&2
+            BACKEND_SERVICE_ACCOUNT="${FRONTEND_SERVICE_ACCOUNT}"
+          fi
+
           : "${CLOUD_RUN_REGION:?Missing CLOUD_RUN_REGION var}"
           : "${ARTIFACT_REPO:?Missing CLOUD_BUILD_ARTIFACT_REPO var}"
           : "${BACKEND_SERVICE:?Missing CLOUD_RUN_BACKEND_SERVICE var}"

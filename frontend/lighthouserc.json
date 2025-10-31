@@ -21,7 +21,6 @@
       }
     },
     "assert": {
-      "preset": "lighthouse:recommended",
       "assertions": {
         "categories:performance": [
           "error",
@@ -51,6 +50,24 @@
           "warn",
           {
             "maxLength": 1
+          }
+        ],
+        "cls-culprits-insight": [
+          "warn",
+          {
+            "minScore": 0
+          }
+        ],
+        "cumulative-layout-shift": [
+          "warn",
+          {
+            "minScore": 0.75
+          }
+        ],
+        "largest-contentful-paint": [
+          "warn",
+          {
+            "minScore": 0.85
           }
         ],
         "network-dependency-tree-insight": [

@@ -2,14 +2,9 @@ package google
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
-	"encoding/base64"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -61,14 +56,14 @@ LIMIT 1`
 		return nil, fmt.Errorf("mysql token store: select token: %w", err)
 	}
 
-	access, err := s.decrypt(row.AccessToken)
+	access, err := decryptToken(row.AccessToken, s.key)
 	if err != nil {
 		return nil, fmt.Errorf("mysql token store: decrypt access token: %w", err)
 	}
 
 	refresh := ""
 	if row.RefreshToken != "" {
-		refresh, err = s.decrypt(row.RefreshToken)
+		refresh, err = decryptToken(row.RefreshToken, s.key)
 		if err != nil {
 			return nil, fmt.Errorf("mysql token store: decrypt refresh token: %w", err)
 		}
@@ -86,14 +81,14 @@ func (s *mysqlTokenStore) Save(ctx context.Context, provider string, record *Tok
 		return fmt.Errorf("mysql token store: record is nil")
 	}
 
-	encAccess, err := s.encrypt(record.AccessToken)
+	encAccess, err := encryptToken(record.AccessToken, s.key)
 	if err != nil {
 		return fmt.Errorf("mysql token store: encrypt access token: %w", err)
 	}
 
 	encRefresh := ""
 	if record.RefreshToken != "" {
-		encRefresh, err = s.encrypt(record.RefreshToken)
+		encRefresh, err = encryptToken(record.RefreshToken, s.key)
 		if err != nil {
 			return fmt.Errorf("mysql token store: encrypt refresh token: %w", err)
 		}
@@ -127,46 +122,4 @@ ON DUPLICATE KEY UPDATE
 		return fmt.Errorf("mysql token store: upsert token: %w", err)
 	}
 	return nil
-}
-
-func (s *mysqlTokenStore) encrypt(value string) (string, error) {
-	block, err := aes.NewCipher(s.key)
-	if err != nil {
-		return "", err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", err
-	}
-	ciphertext := gcm.Seal(nonce, nonce, []byte(value), nil)
-	return base64.RawStdEncoding.EncodeToString(ciphertext), nil
-}
-
-func (s *mysqlTokenStore) decrypt(value string) (string, error) {
-	data, err := base64.RawStdEncoding.DecodeString(value)
-	if err != nil {
-		return "", err
-	}
-	block, err := aes.NewCipher(s.key)
-	if err != nil {
-		return "", err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-	if len(data) < gcm.NonceSize() {
-		return "", fmt.Errorf("ciphertext too short")
-	}
-	nonce := data[:gcm.NonceSize()]
-	ciphertext := data[gcm.NonceSize():]
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		return "", err
-	}
-	return string(plaintext), nil
 }

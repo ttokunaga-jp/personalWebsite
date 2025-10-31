@@ -1,84 +1,47 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { getCanonicalProjects } from "../../modules/profile-content";
 import { useProjectsResource } from "../../modules/public-api";
 import type { Project } from "../../modules/public-api";
 import { formatDateRange } from "../../utils/date";
 
-const PROJECT_SKELETON_COUNT = 3;
-
-function ProjectCardSkeleton() {
-  return (
-    <article className="rounded-xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <span className="block h-6 w-56 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-          <span className="block h-4 w-40 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-          <span className="block h-5 w-24 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
-        </div>
-        <span className="block h-4 w-28 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-      </header>
-      <span className="mt-4 block h-48 w-full animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
-      <div className="mt-4 space-y-2">
-        <span className="block h-4 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-        <span className="block h-4 w-5/6 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-        <span className="block h-4 w-4/6 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {Array.from({ length: 4 }).map((_, index) => (
-          // index is stable for skeleton placeholders
-          // eslint-disable-next-line react/no-array-index-key
-          <span
-            key={index}
-            className="inline-flex h-7 w-24 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700"
-          />
-        ))}
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {Array.from({ length: 3 }).map((_, index) => (
-          // index is stable for skeleton placeholders
-          // eslint-disable-next-line react/no-array-index-key
-          <span
-            key={index}
-            className="inline-flex h-6 w-20 animate-pulse rounded-full border border-dashed border-slate-200 bg-transparent dark:border-slate-700"
-          />
-        ))}
-      </div>
-    </article>
-  );
-}
-
 export function ProjectsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data: projects, isLoading, error } = useProjectsResource();
   const [selectedStacks, setSelectedStacks] = useState<Set<string>>(new Set());
+  const canonicalProjects = useMemo(
+    () => getCanonicalProjects(i18n.language),
+    [i18n.language],
+  );
+  const effectiveProjects = projects ?? canonicalProjects;
 
   const techStacks = useMemo(() => {
-    if (!projects?.length) {
+    if (!effectiveProjects?.length) {
       return [];
     }
 
     const stackSet = new Set<string>();
-    projects.forEach((project) => {
+    effectiveProjects.forEach((project) => {
       project.techStack.forEach((tech) => stackSet.add(tech));
     });
 
     return Array.from(stackSet).sort((a, b) => a.localeCompare(b));
-  }, [projects]);
+  }, [effectiveProjects]);
 
   const filteredProjects = useMemo(() => {
-    if (!projects) {
+    if (!effectiveProjects) {
       return [];
     }
 
     if (selectedStacks.size === 0) {
-      return projects;
+      return effectiveProjects;
     }
 
-    return projects.filter((project) =>
+    return effectiveProjects.filter((project) =>
       project.techStack.some((tech) => selectedStacks.has(tech)),
     );
-  }, [projects, selectedStacks]);
+  }, [effectiveProjects, selectedStacks]);
 
   const toggleStack = (stack: string) => {
     setSelectedStacks((prev) => {
@@ -122,49 +85,51 @@ export function ProjectsPage() {
           {t("projects.description")}
         </p>
       </header>
-      {techStacks.length ? (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setSelectedStacks(new Set())}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-              selectedStacks.size === 0
-                ? "border-sky-500 bg-sky-500 text-white"
-                : "border-slate-300 text-slate-700 hover:border-sky-400 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-400 dark:hover:text-sky-300"
-            }`}
-          >
-            {t("projects.filters.all")}
-          </button>
-          {techStacks.map((tech) => {
-            const isActive = selectedStacks.has(tech);
-            return (
-              <button
-                key={tech}
-                type="button"
-                onClick={() => toggleStack(tech)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                  isActive
-                    ? "border-sky-500 bg-sky-500 text-white"
-                    : "border-slate-300 text-slate-700 hover:border-sky-400 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-400 dark:hover:text-sky-300"
-                }`}
-                aria-pressed={isActive}
-              >
-                {tech}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+      <div className="flex min-h-[2.25rem] flex-wrap items-center gap-2">
+        {isLoading && !techStacks.length ? (
+          <>
+            <span className="inline-flex h-6 w-16 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
+            <span className="inline-flex h-6 w-20 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
+            <span className="inline-flex h-6 w-24 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
+          </>
+        ) : null}
+        {!isLoading && techStacks.length ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setSelectedStacks(new Set())}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                selectedStacks.size === 0
+                  ? "border-sky-500 bg-sky-500 text-white"
+                  : "border-slate-300 text-slate-700 hover:border-sky-400 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-400 dark:hover:text-sky-300"
+              }`}
+            >
+              {t("projects.filters.all")}
+            </button>
+            {techStacks.map((tech) => {
+              const isActive = selectedStacks.has(tech);
+              return (
+                <button
+                  key={tech}
+                  type="button"
+                  onClick={() => toggleStack(tech)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                    isActive
+                      ? "border-sky-500 bg-sky-500 text-white"
+                      : "border-slate-300 text-slate-700 hover:border-sky-400 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-400 dark:hover:text-sky-300"
+                  }`}
+                  aria-pressed={isActive}
+                >
+                  {tech}
+                </button>
+              );
+            })}
+          </>
+        ) : null}
+      </div>
 
       <div className="grid gap-4">
-        {isLoading
-          ? Array.from({ length: PROJECT_SKELETON_COUNT }).map((_, index) => (
-              // index is stable for skeleton placeholders
-              // eslint-disable-next-line react/no-array-index-key
-              <ProjectCardSkeleton key={index} />
-            ))
-          : null}
-        {!isLoading && !filteredProjects.length ? (
+        {!filteredProjects.length ? (
           <article className="rounded-xl border border-slate-200 bg-white/80 p-6 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
             {selectedStacks.size
               ? t("projects.noMatchesForSelection")
@@ -203,12 +168,14 @@ export function ProjectsPage() {
               ) : null}
             </header>
             {project.coverImageUrl ? (
-              <img
-                src={project.coverImageUrl}
-                alt=""
-                className="mt-4 h-48 w-full rounded-lg object-cover"
-                loading="lazy"
-              />
+              <div className="mt-4 aspect-video w-full overflow-hidden rounded-lg">
+                <img
+                  src={project.coverImageUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
             ) : null}
             <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
               {project.description}

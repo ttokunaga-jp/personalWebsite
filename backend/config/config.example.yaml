@@ -4,13 +4,11 @@ server:
   trusted_proxies: []
   tls_cert_file: ""
   tls_key_file: ""
-database:
-  dsn: "user:password@tcp(localhost:23306)/personal_website?parseTime=true"
-  max_open_conns: 10
-  max_idle_conns: 5
-  conn_max_lifetime: 30m
-  skip_ping_on_start: true
-  migrations_enable: false
+firestore:
+  project_id: "your-gcp-project"
+  database_id: "(default)"
+  collection_prefix: ""
+  emulator_host: ""
 auth:
   jwt_secret: "local-dev-secret-change-me"
   issuer: "personal-website"

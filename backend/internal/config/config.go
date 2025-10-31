@@ -17,13 +17,11 @@ type ServerConfig struct {
 	TLSKeyFile     string   `mapstructure:"tls_key_file"`
 }
 
-type DatabaseConfig struct {
-	DSN              string        `mapstructure:"dsn"`
-	MaxOpenConns     int           `mapstructure:"max_open_conns"`
-	MaxIdleConns     int           `mapstructure:"max_idle_conns"`
-	ConnMaxLifetime  time.Duration `mapstructure:"conn_max_lifetime"`
-	SkipPingOnStart  bool          `mapstructure:"skip_ping_on_start"`
-	MigrationsEnable bool          `mapstructure:"migrations_enable"`
+type FirestoreConfig struct {
+	ProjectID        string `mapstructure:"project_id"`
+	DatabaseID       string `mapstructure:"database_id"`
+	CollectionPrefix string `mapstructure:"collection_prefix"`
+	EmulatorHost     string `mapstructure:"emulator_host"`
 }
 
 type AuthConfig struct {
@@ -109,15 +107,15 @@ type LoggingConfig struct {
 }
 
 type AppConfig struct {
-	Server   ServerConfig      `mapstructure:"server"`
-	Database DatabaseConfig    `mapstructure:"database"`
-	Auth     AuthConfig        `mapstructure:"auth"`
-	Google   GoogleOAuthConfig `mapstructure:"google"`
-	Contact  ContactConfig     `mapstructure:"contact"`
-	Booking  BookingConfig     `mapstructure:"booking"`
-	Security SecurityConfig    `mapstructure:"security"`
-	Metrics  MetricsConfig     `mapstructure:"metrics"`
-	Logging  LoggingConfig     `mapstructure:"logging"`
+	Server    ServerConfig      `mapstructure:"server"`
+	Firestore FirestoreConfig   `mapstructure:"firestore"`
+	Auth      AuthConfig        `mapstructure:"auth"`
+	Google    GoogleOAuthConfig `mapstructure:"google"`
+	Contact   ContactConfig     `mapstructure:"contact"`
+	Booking   BookingConfig     `mapstructure:"booking"`
+	Security  SecurityConfig    `mapstructure:"security"`
+	Metrics   MetricsConfig     `mapstructure:"metrics"`
+	Logging   LoggingConfig     `mapstructure:"logging"`
 }
 
 var Module = fx.Module("config",
@@ -139,12 +137,10 @@ func load() (*AppConfig, error) {
 	v.SetDefault("server.trusted_proxies", []string{})
 	v.SetDefault("server.tls_cert_file", "")
 	v.SetDefault("server.tls_key_file", "")
-	v.SetDefault("database.dsn", "")
-	v.SetDefault("database.max_open_conns", 10)
-	v.SetDefault("database.max_idle_conns", 5)
-	v.SetDefault("database.conn_max_lifetime", 30*time.Minute)
-	v.SetDefault("database.skip_ping_on_start", true)
-	v.SetDefault("database.migrations_enable", false)
+	v.SetDefault("firestore.project_id", "")
+	v.SetDefault("firestore.database_id", "(default)")
+	v.SetDefault("firestore.collection_prefix", "")
+	v.SetDefault("firestore.emulator_host", "")
 	v.SetDefault("auth.jwt_secret", "local-dev-secret-change-me")
 	v.SetDefault("auth.issuer", "personal-website")
 	v.SetDefault("auth.audience", []string{"personal-website-admin"})

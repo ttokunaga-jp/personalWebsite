@@ -130,7 +130,7 @@ const canonicalProfileEn: ProfileResponse = {
           level: "advanced",
         },
         { id: "terraform", name: "Terraform", level: "intermediate" },
-        { id: "mysql", name: "MySQL / Cloud SQL", level: "advanced" },
+        { id: "firestore", name: "Cloud Firestore", level: "advanced" },
         {
           id: "elasticsearch",
           name: "Elasticsearch / Qdrant",
@@ -285,7 +285,7 @@ const canonicalProfileJa: ProfileResponse = {
           level: "advanced",
         },
         { id: "terraform", name: "Terraform", level: "intermediate" },
-        { id: "mysql", name: "MySQL / Cloud SQL", level: "advanced" },
+        { id: "firestore", name: "Cloud Firestore", level: "advanced" },
         {
           id: "elasticsearch",
           name: "Elasticsearch / Qdrant",
@@ -343,7 +343,7 @@ const canonicalProjectsEn: Project[] = [
       "LangChain",
       "Docling",
       "Cloud Run",
-      "MySQL",
+      "Firestore",
     ],
     category: "Education",
     tags: ["RAG", "Education", "GenAI"],
@@ -400,7 +400,7 @@ const canonicalProjectsEn: Project[] = [
     subtitle: "Go API + React SPA deployed on Cloud Run",
     description:
       "End-to-end portfolio stack featuring public content, admin workflows, booking automation, and CI/CD (GitHub Actions → Cloud Build). Infrastructure codified with Terraform for multi-environment rollouts.",
-    techStack: ["Go", "TypeScript", "React", "MySQL", "Cloud Run", "Terraform"],
+    techStack: ["Go", "TypeScript", "React", "Firestore", "Cloud Run", "Terraform"],
     category: "Portfolio",
     tags: ["Full-stack", "CI/CD", "Infrastructure"],
     period: {
@@ -432,7 +432,7 @@ const canonicalProjectsJa: Project[] = [
       "LangChain",
       "Docling",
       "Cloud Run",
-      "MySQL",
+      "Firestore",
     ],
     category: "Education",
     tags: ["RAG", "Education", "GenAI"],
@@ -489,7 +489,7 @@ const canonicalProjectsJa: Project[] = [
     subtitle: "Cloud Run 上の Go API + React SPA",
     description:
       "Go (Gin) と React SPA で構築した個人ポートフォリオ。公開サイトと管理 GUI を分離し、予約フォーム、Google OAuth + JWT 認証、Cloud Build → Cloud Run の CI/CD、Terraform による IaC を整備。",
-    techStack: ["Go", "TypeScript", "React", "MySQL", "Cloud Run", "Terraform"],
+    techStack: ["Go", "TypeScript", "React", "Firestore", "Cloud Run", "Terraform"],
     category: "Portfolio",
     tags: ["Full-stack", "CI/CD", "Infrastructure"],
     period: {

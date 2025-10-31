@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	"cloud.google.com/go/firestore"
 	"go.uber.org/fx"
 
 	"github.com/takumi/personal-website/internal/calendar"
 	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/handler"
-	"github.com/takumi/personal-website/internal/infra/database"
+	firestoredb "github.com/takumi/personal-website/internal/infra/firestore"
 	"github.com/takumi/personal-website/internal/infra/google"
 	"github.com/takumi/personal-website/internal/logging"
 	"github.com/takumi/personal-website/internal/mail"
@@ -27,7 +27,7 @@ import (
 
 var Module = fx.Module("di",
 	fx.Provide(
-		database.NewMySQLClient,
+		firestoredb.NewClient,
 		provideAuthConfig,
 		auth.NewJWTIssuer,
 		auth.NewStateManager,
@@ -95,16 +95,16 @@ func provideHTTPClient() *http.Client {
 	}
 }
 
-func provideGoogleTokenStore(db *sqlx.DB, cfg *config.AppConfig) (google.TokenStore, error) {
-	if db == nil || cfg == nil {
-		log.Printf("google token store: database not available (db=%v cfg=%v)", db != nil, cfg != nil)
+func provideGoogleTokenStore(client *firestore.Client, cfg *config.AppConfig) (google.TokenStore, error) {
+	if client == nil || cfg == nil {
+		log.Printf("google token store: firestore client not available (client=%v cfg=%v)", client != nil, cfg != nil)
 		return nil, nil
 	}
 	if cfg.Auth.StateSecret == "" {
 		log.Printf("google token store: state secret not configured")
 		return nil, nil
 	}
-	store, err := google.NewMySQLTokenStore(db, cfg.Auth.StateSecret)
+	store, err := google.NewFirestoreTokenStore(client, cfg.Firestore.CollectionPrefix, cfg.Auth.StateSecret)
 	if err != nil {
 		return nil, err
 	}

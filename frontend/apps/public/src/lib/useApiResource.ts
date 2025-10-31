@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type UseApiResourceState<T> = {
   data: T | null;
@@ -10,23 +10,50 @@ export type UseApiResourceResult<T> = UseApiResourceState<T> & {
   refetch: () => void;
 };
 
+type UseApiResourceOptions<T> = {
+  initialData?: T | (() => T);
+  skip?: boolean;
+};
+
 export function useApiResource<T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
+  options?: UseApiResourceOptions<T>,
 ): UseApiResourceResult<T> {
-  const [state, setState] = useState<UseApiResourceState<T>>({
-    data: null,
-    isLoading: true,
-    error: null,
-  });
+  const { initialData: initialDataOption, skip = false } = options ?? {};
+  const initialDataRef = useRef<T | null>();
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  const initialData = useMemo(() => {
+    if (initialDataRef.current !== undefined) {
+      return initialDataRef.current;
+    }
+    if (typeof initialDataOption === "function") {
+      initialDataRef.current = (initialDataOption as () => T)();
+    } else if (initialDataOption !== undefined) {
+      initialDataRef.current = initialDataOption ?? null;
+    } else {
+      initialDataRef.current = null;
+    }
+    return initialDataRef.current;
+  }, [initialDataOption]);
+
+  const [state, setState] = useState<UseApiResourceState<T>>({
+    data: initialData,
+    isLoading: !skip && !initialData,
+    error: null,
+  });
+
   const runFetch = useCallback(async () => {
+    if (skip) {
+      return;
+    }
+
     abortControllerRef.current?.abort();
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
     setState((previous) => ({
-      data: previous.data,
+      data: previous.data ?? initialData,
       isLoading: true,
       error: null,
     }));
@@ -43,25 +70,34 @@ export function useApiResource<T>(
     } catch (error) {
       if (!abortController.signal.aborted) {
         setState({
-          data: null,
+          data: initialData,
           isLoading: false,
           error: error instanceof Error ? error : new Error("Unknown error"),
         });
       }
     }
-  }, [fetcher]);
+  }, [fetcher, initialData, skip]);
 
   useEffect(() => {
-    runFetch();
+    if (skip) {
+      return () => {
+        abortControllerRef.current?.abort();
+      };
+    }
+
+    void runFetch();
 
     return () => {
       abortControllerRef.current?.abort();
     };
-  }, [runFetch]);
+  }, [runFetch, skip]);
 
   const refetch = useCallback(() => {
+    if (skip) {
+      return;
+    }
     void runFetch();
-  }, [runFetch]);
+  }, [runFetch, skip]);
 
   return {
     ...state,

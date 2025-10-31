@@ -5,7 +5,7 @@ DOCKER_COMPOSE ?= docker compose
 GCLOUD ?= gcloud
 CLOUD_BUILD_CONFIG ?= deploy/cloudbuild/cloudbuild.yaml
 
-.PHONY: deps deps-backend deps-frontend lint lint-backend lint-frontend test test-backend test-frontend build build-backend build-frontend fmt fmt-backend fmt-frontend ci cloudbuild up up-detached stop down clean smoke-backend
+.PHONY: deps deps-backend deps-frontend lint lint-backend lint-frontend test test-backend test-frontend test-perf build build-backend build-frontend fmt fmt-backend fmt-frontend ci cloudbuild up up-detached stop down clean smoke-backend
 
 deps: deps-backend deps-frontend
 
@@ -43,6 +43,13 @@ test-frontend:
 		command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) test || \
 		(command -v corepack >/dev/null 2>&1 && corepack pnpm test) || \
 		npx pnpm@8.15.4 test; \
+	}
+
+test-perf:
+	cd frontend && { \
+		command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) test:perf || \
+		(command -v corepack >/dev/null 2>&1 && corepack pnpm test:perf) || \
+		npx pnpm@8.15.4 test:perf; \
 	}
 
 smoke-backend:

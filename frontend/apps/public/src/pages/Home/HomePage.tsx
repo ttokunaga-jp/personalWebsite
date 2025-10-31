@@ -2,6 +2,7 @@ import { apiClient } from "@shared/lib/api-client";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
+import { getCanonicalProfile } from "../../modules/profile-content";
 import { useProfileResource } from "../../modules/public-api";
 import type { SocialLink } from "../../modules/public-api";
 import { formatDateRange } from "../../utils/date";
@@ -12,13 +13,19 @@ type HealthResponse = {
 };
 
 export function HomePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     data: profile,
     isLoading: isProfileLoading,
     error: profileError,
   } = useProfileResource();
   const [status, setStatus] = useState<string>("loading");
+
+  const canonicalProfile = useMemo(
+    () => getCanonicalProfile(i18n.language),
+    [i18n.language],
+  );
+  const effectiveProfile = profile ?? canonicalProfile;
 
   useEffect(() => {
     let subscribed = true;
@@ -48,7 +55,7 @@ export function HomePage() {
   }, []);
 
   const primaryAffiliation = useMemo(() => {
-    const affiliations = profile?.affiliations ?? [];
+    const affiliations = effectiveProfile.affiliations ?? [];
     if (!affiliations.length) {
       return null;
     }
@@ -57,34 +64,34 @@ export function HomePage() {
       affiliations.at(0) ??
       null
     );
-  }, [profile]);
+  }, [effectiveProfile]);
 
   const featuredLinks = useMemo<SocialLink[]>(() => {
-    if (!profile?.socialLinks) {
+    if (!effectiveProfile?.socialLinks) {
       return [];
     }
 
-    return profile.socialLinks.filter((link) =>
+    return effectiveProfile.socialLinks.filter((link) =>
       ["github", "x", "twitter", "linkedin", "email", "website"].includes(
         link.platform,
       ),
     );
-  }, [profile]);
+  }, [effectiveProfile]);
 
-  const showSocialSkeleton = isProfileLoading && featuredLinks.length === 0;
+  const showSocialSkeleton = isProfileLoading && !profile && featuredLinks.length === 0;
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-12 px-4 py-16 sm:px-8 lg:px-12">
-      <header className="flex flex-col gap-6 text-center md:text-left">
+      <header className="flex min-h-[14rem] flex-col justify-center gap-6 text-center md:text-left">
         <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-900 dark:text-slate-100">
           {t("home.hero.tagline")}
         </p>
         <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-50 sm:text-5xl lg:text-6xl">
-          {profile?.headline ?? t("home.hero.title")}
+          {effectiveProfile.headline ?? t("home.hero.title")}
         </h1>
         <p className="text-lg leading-relaxed text-slate-600 dark:text-slate-300 md:max-w-3xl md:text-left md:leading-relaxed">
-          {profile?.summary ? (
-            profile.summary
+          {effectiveProfile.summary ? (
+            effectiveProfile.summary
           ) : (
             <Trans i18nKey="home.hero.description" />
           )}
@@ -102,7 +109,7 @@ export function HomePage() {
                 {t("home.about.name")}
               </p>
               <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {profile?.name ?? t("home.about.fallbackName")}
+                {effectiveProfile.name ?? t("home.about.fallbackName")}
               </p>
             </div>
             <div>
@@ -110,7 +117,7 @@ export function HomePage() {
                 {t("home.about.location")}
               </p>
               <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {profile?.location ?? t("home.about.fallbackLocation")}
+                {effectiveProfile.location ?? t("home.about.fallbackLocation")}
               </p>
             </div>
           </div>
@@ -120,7 +127,11 @@ export function HomePage() {
             </p>
             <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
               {isProfileLoading && !primaryAffiliation ? (
-                <span className="inline-flex h-4 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="flex flex-col gap-2">
+                  <span className="block h-4 w-48 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                  <span className="block h-4 w-60 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                  <span className="block h-3 w-40 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                </div>
               ) : primaryAffiliation ? (
                 <>
                   <span className="font-semibold text-slate-900 dark:text-slate-100">
@@ -150,13 +161,15 @@ export function HomePage() {
               {t("home.about.communities")}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {isProfileLoading && !profile && (
+              {isProfileLoading &&
+              !profile &&
+              !(effectiveProfile.communities?.length ?? 0) ? (
                 <>
                   <span className="inline-flex h-6 w-16 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
                   <span className="inline-flex h-6 w-20 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
                 </>
-              )}
-              {profile?.communities?.map((community) => (
+              ) : null}
+              {effectiveProfile.communities?.map((community) => (
                 <span
                   key={community}
                   className="inline-flex items-center rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200"
@@ -164,7 +177,7 @@ export function HomePage() {
                   {community}
                 </span>
               ))}
-              {!isProfileLoading && !profile?.communities?.length ? (
+              {!isProfileLoading && !effectiveProfile.communities?.length ? (
                 <span className="text-sm text-slate-500 dark:text-slate-400">
                   {t("home.about.communitiesFallback")}
                 </span>

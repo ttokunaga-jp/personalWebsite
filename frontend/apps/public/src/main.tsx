@@ -7,11 +7,28 @@ import "./styles.css";
 import "./modules/i18n";
 
 async function bootstrap() {
-  ReactDOM.createRoot(document.getElementById("root")!).render(
+  const rootElement = document.getElementById("root");
+  if (!rootElement) {
+    throw new Error("Root element #root not found");
+  }
+
+  const root = ReactDOM.createRoot(rootElement);
+
+  root.render(
     <React.StrictMode>
       <App />
     </React.StrictMode>,
   );
+
+  const markAppLoaded = () => {
+    rootElement.setAttribute("data-app-loaded", "true");
+  };
+
+  if (typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(markAppLoaded);
+  } else {
+    window.setTimeout(markAppLoaded, 0);
+  }
 
   if (import.meta.env.MODE !== "test") {
     const schedulePreload = () => {

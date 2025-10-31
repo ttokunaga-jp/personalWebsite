@@ -1,9 +1,9 @@
 # 目的
-- 改訂後要件（管理画面非表示、SSO、予約前後30分除外、レスポンシブ、追加セキュリティ等）を満たす Go + React + MySQL + GCP ベースの全体アーキテクチャを定義する。
+- 改訂後要件（管理画面非表示、SSO、予約前後30分除外、レスポンシブ、追加セキュリティ等）を満たす Go + React + Firestore + GCP ベースの全体アーキテクチャを定義する。
 - フロント・バックエンド・インフラ・外部連携を通した責務分割と依存関係を文書化し、後続フェーズの実装・レビュー・検証を円滑にする。
 
 # 実装内容
-- **システム全体構成**：Cloud Run 上でフロント SPA と Go API を個別デプロイし、Cloud SQL(MySQL) と Cloud Storage をバックエンドに据える。Cloudflare で DNS/HTTPS 終端、Terraform で IaC 管理。
+- **システム全体構成**：Cloud Run 上でフロント SPA と Go API を個別デプロイし、Cloud Firestore と Cloud Storage をバックエンドに据える。Cloudflare で DNS/HTTPS 終端、Terraform で IaC 管理。
 - **モジュール分割（Go API）**：`handler`（HTTP 入出力 & 認証）、`usecase`（アプリケーションロジック）、`repository`（DB・外部 API）、`domain`（エンティティ）、`infrastructure`（DI コンテナ、設定、クライアント管理）。
 - **モジュール分割（React SPA）**：`apps/public` と `apps/admin` をルーティングで分岐し、共通 UI / i18n / API クライアントは `packages/shared` に集約。 `/admin` のビルドは Guard で保護し、通常ナビゲーションから除外。
 - **認証・認可**：Cloudflare で HTTPS 強制。Google OAuth 2.0 を Cloud Run API に設定し、認証成功時に短命の JWT+Refresh Token を発行。管理 API は JWT とロールで保護。公開 API は IP Rate Limiting + ReCAPTCHA で濫用防止。
@@ -36,7 +36,7 @@ flowchart TD
     end
 
     subgraph Data["Data Stores"]
-        MySQL["Cloud SQL (MySQL)"]
+        Firestore["Cloud Firestore"]
         Storage["Cloud Storage"]
         Cache["Memorystore (Redis)"]
     end
@@ -52,7 +52,7 @@ flowchart TD
     React -->|REST / JSON| Handler
     Handler --> Usecase --> Domain
     Usecase --> Repo
-    Repo -->|SQL| MySQL
+    Repo -->|Document API| Firestore
     Repo -->|Signed URL| Storage
     Repo -->|Calendar REST| GoogleCalendar
     Handler -->|JWT| GoogleOAuth
@@ -68,14 +68,14 @@ sequenceDiagram
     participant UC as Usecase (ReservationService)
     participant Repo as Repository (MeetingsRepo)
     participant Calendar as Google Calendar API
-    participant DB as Cloud SQL (meetings)
+    participant DB as Cloud Firestore (meetings)
 
     User->>SPA: Submit reservation (form, preferred slot)
     SPA->>API: POST /api/reservations (tokenless, ReCAPTCHA token)
     API->>API: Validate ReCAPTCHA, Rate Limit, Input
     API->>UC: Request booking
     UC->>Repo: Query blacklist / availability
-    Repo->>DB: SELECT conflicting slots ±30min
+    Repo->>DB: Query conflicting slots ±30min
     DB-->>Repo: Conflicts result
     UC->>Calendar: Check Calendar availability (±30min window)
     Calendar-->>UC: Availability response
@@ -140,8 +140,8 @@ graph LR
   /ops
     makefile targets, scripts
   ```
-- **環境変数**：`APP_ENV`, `PORT`, `DATABASE_DSN`, `REDIS_URI`, `OAUTH_CLIENT_ID/SECRET`, `JWT_SIGNING_KEY`, `GOOGLE_API_CREDENTIALS_JSON`, `RECAPTCHA_SECRET`, `RATE_LIMIT_RPS`, `CACHE_TTL_SECONDS` 等を Secret Manager で管理し Cloud Run に注入。
-- **ネットワーク構成**：Cloudflare → (HTTPS) → Cloud Run → Serverless VPC Connector → Cloud SQL。Cloud SQL には IAM DB Auth で接続。Memorystore/Cloud Storage も VPC 経由。
+- **環境変数**：`APP_ENV`, `PORT`, `APP_FIRESTORE_PROJECT_ID`, `APP_GOOGLE_CLIENT_ID/SECRET`, `APP_AUTH_JWT_SECRET`, `APP_SECURITY_CSRF_SIGNING_KEY`, `APP_BOOKING_*`, `RECAPTCHA_SECRET`, `RATE_LIMIT_RPS`, `CACHE_TTL_SECONDS` 等を Secret Manager で管理し Cloud Run に注入。
+- **ネットワーク構成**：Cloudflare → (HTTPS) → Cloud Run → Serverless VPC Connector → Firestore / Cloud Storage。Firestore には IAM 認証で接続。Memorystore/Cloud Storage も VPC 経由。
 - **CI/CD**：GitHub Actions → Cloud Build。Actions で lint/test。Terraform Plan/Apply は承認付き。Cloud Build が Cloud Run/Storage へデプロイ。Artifact Registry にコンテナ保管。
 - **セキュリティ設定**：Cloud Armor で WAF ルール、OWASP Top10 対応の Security Middleware（Helmet 相当）、JWT 署名鍵ローテーション。Cloud Run ingress を internal + Cloudflare 経由に限定。
 

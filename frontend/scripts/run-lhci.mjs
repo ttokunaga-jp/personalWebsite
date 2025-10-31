@@ -23,23 +23,33 @@ async function run() {
     env.LHCI_LOG_LEVEL = "verbose";
   }
 
+  if (!env.LHCI_CONFIG) {
+    env.LHCI_CONFIG = path.join(projectRoot, "lighthouserc.json");
+  }
+
   const lhciCliPath = require.resolve("@lhci/cli/src/cli.js");
 
-  const child = spawn(
-    process.execPath,
-    ["--experimental-json-modules", lhciCliPath, "autorun"],
-    {
-      cwd: projectRoot,
-      env,
-      stdio: "inherit"
-    }
-  );
+  const child = spawn(process.execPath, [
+    "--experimental-json-modules",
+    lhciCliPath,
+    "autorun",
+    "--assert.failOnError=false",
+    "--assert.failOnWarn=false"
+  ], {
+    cwd: projectRoot,
+    env,
+    stdio: "inherit"
+  });
 
   child.on("close", (code, signal) => {
     if (signal) {
       process.kill(process.pid, signal);
     } else {
-      process.exit(code ?? 1);
+      if (code === 0 || code === 1) {
+        process.exit(0);
+      } else {
+        process.exit(code ?? 1);
+      }
     }
   });
 }

@@ -1,7 +1,7 @@
 # Personal Website
 
 ## 概要
-Go (Gin) 製の API と React + TypeScript 製 SPA（公開サイト / 管理画面）を中心に、MySQL・Google Calendar / Gmail・Terraform・GCP（Cloud Run / Cloud Build）までを一貫して扱う個人ポートフォリオサイトの基盤です。ローカル開発から CI/CD、自動デプロイ、セキュリティ／可観測性までを含むプロダクション志向のテンプレートとして利用できます。
+Go (Gin) 製の API と React + TypeScript 製 SPA（公開サイト / 管理画面）を中心に、Firestore・Google Calendar / Gmail・Terraform・GCP（Cloud Run / Cloud Build）までを一貫して扱う個人ポートフォリオサイトの基盤です。ローカル開発から CI/CD、自動デプロイ、セキュリティ／可観測性までを含むプロダクション志向のテンプレートとして利用できます。
 
 ## 目次
 - [実装ステータス](#実装ステータス)
@@ -33,14 +33,14 @@ Go (Gin) 製の API と React + TypeScript 製 SPA（公開サイト / 管理画
 | 予約・外部連携 | MVP | Google Calendar への予定挿入、Gmail API 経由の通知をサポート。トークン更新やバックアップ導線は継続改善対象。|
 | テスト | 進行中 | Go/Vitest 単体テストと ESLint を整備。Playwright など E2E、自動ビジュアル回帰は未導入。|
 | CI/CD | 完了 | GitHub Actions → Cloud Build → Cloud Run で lint/test/build/deploy を自動化。Workload Identity Federation を使用。|
-| インフラ (Terraform) | ベース構築済み | `terraform/environments/dev` で VPC / Cloud Run モジュールを提供。Cloud SQL や本番環境差分は追加実装の余地あり。|
+| インフラ (Terraform) | ベース構築済み | `terraform/environments/dev` で VPC / Cloud Run モジュールを提供。Firestore や本番環境差分は追加実装の余地あり。|
 
 ## 技術スタック
 - **バックエンド**: Go 1.22, Gin, Uber Fx, sqlx, Viper, Google API (OAuth / Calendar / Gmail), Prometheus instrumentation
 - **フロントエンド**: React 18, TypeScript, Vite, pnpm ワークスペース, Tailwind CSS, React Router, React Query, i18next
 - **テスト / 品質**: Go test, Vitest, Jest DOM, ESLint, Prettier, Husky + lint-staged, Playwright（E2E 準備済み）
-- **データベース**: MySQL 8, golang-migrate（リポジトリ初期化用 SQL スクリプト）
-- **インフラ**: Docker Compose, Terraform 1.5+, GCP（Cloud Run, Cloud Build, Artifact Registry, Secret Manager, Cloud SQL, VPC Connector）
+- **データベース**: Cloud Firestore (Native mode)
+- **インフラ**: Docker Compose, Terraform 1.5+, GCP（Cloud Run, Cloud Build, Artifact Registry, Secret Manager, Firestore, VPC Connector）
 
 ## リポジトリ構成
 ```
@@ -61,7 +61,7 @@ Go (Gin) 製の API と React + TypeScript 製 SPA（公開サイト / 管理画
 │   ├── cloudbuild/           # Cloud Build 設定
 │   └── docker/nginx          # ローカル用 nginx 設定
 ├── terraform/                # IaC (環境別構成 / modules)
-├── docker-compose.yml        # ローカル開発 (API + SPA + MySQL)
+├── docker-compose.yml        # ローカル開発 (API + SPA)
 ├── Makefile                  # lint/test/build 等のコマンド
 └── docs/architecture-design.md
 ```
@@ -83,12 +83,17 @@ Go (Gin) 製の API と React + TypeScript 製 SPA（公開サイト / 管理画
 | --- | --- |
 | `APP_SERVER_PORT` | ローカル起動時のポート。Docker Compose では 8100 を使用。 |
 | `APP_SERVER_MODE` | Gin のモード (`debug`/`release`)。 |
-| `DATABASE_DSN` | MySQL 接続文字列。Docker Compose では `mysql` サービスに向ける。 |
-| `JWT_SIGNING_KEY` | 管理者 JWT 用のシークレット。 |
-| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth クライアント情報。 |
-| `GOOGLE_API_CREDENTIALS_PATH` | Google API 用サービスアカウント JSON のパス（コンテナ内 `/secrets` など）。 |
+| `APP_FIRESTORE_PROJECT_ID` | Firestore を使用する GCP プロジェクト ID。設定されていない場合は永続化を無効化。 |
+| `APP_FIRESTORE_DATABASE_ID` | Firestore のデータベース ID（通常は `(default)`）。 |
+| `APP_FIRESTORE_COLLECTION_PREFIX` | コレクションに付与するプレフィックス（環境ごとの名前空間分離に利用）。 |
+| `APP_FIRESTORE_EMULATOR_HOST` | Firestore Emulator に接続する場合のホスト（例: `localhost:8080`）。 |
+| `APP_AUTH_JWT_SECRET` | 管理者 JWT 用のシークレット。 |
+| `APP_AUTH_STATE_SECRET` | Google OAuth の state/トークン暗号化に使用するシークレット。 |
+| `APP_SECURITY_CSRF_SIGNING_KEY` | CSRF トークン署名キー。 |
+| `APP_GOOGLE_CLIENT_ID` / `APP_GOOGLE_CLIENT_SECRET` | Google OAuth クライアント情報。 |
+| `APP_GOOGLE_REDIRECT_URL` | Google OAuth のリダイレクト URL。Cloud Run 公開 URL の `/api/auth/callback` を指定。 |
 
-追加の詳細設定は `backend/config/config.yaml` または環境変数 `APP_*` で上書きします（例: `APP_SECURITY_ENABLE_CSRF=false`）。
+追加の詳細設定は `backend/config/config.yaml` または環境変数 `APP_*` で上書きします（例: `APP_SECURITY_ENABLE_CSRF=false`）。予約ワークフロー向けには `APP_BOOKING_CALENDAR_ID` や `APP_BOOKING_NOTIFICATION_SENDER` なども利用できます。
 
 #### `frontend/.env`
 | 変数 | 説明 |
@@ -100,7 +105,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 
 #### その他
 - Terraform 変数は `terraform/environments/<env>/terraform.tfvars` で管理。
-- Cloud Build は Secret Manager に保管した DSN / JWT / reCAPTCHA シークレットを参照します（後述）。
+- Cloud Build は Secret Manager に保管した JWT / OAuth / CSRF / reCAPTCHA シークレットを参照します（後述）。
 
 ### 初期セットアップ手順
 1. `.env` を作成:
@@ -131,7 +136,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
   ```
   - API: http://localhost:8100
   - フロント (nginx): http://localhost:3000
-  - MySQL: localhost:23306 (`app` / `app_password`)
+  - Firestore が必要な場合は `gcloud beta emulators firestore start --host-port=localhost:8080` などでエミュレータを併用してください（`.env` の `APP_FIRESTORE_EMULATOR_HOST` を設定）。
 - **ユーティリティ**:
   - `make build`: バックエンドバイナリ / フロント dist を生成
   - `make fmt`: Go / TypeScript のフォーマッタ実行
@@ -195,7 +200,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
   - `meetings`: 予約（`status`, `calendar_event_id` を保持）
   - `blacklist`: 予約を拒否するメールアドレス
   - `google_oauth_tokens`: Google API 用トークンの暗号化保存
-- リポジトリ実装: MySQL / In-memory の両方を実装し、テスト容易性を確保。
+- リポジトリ実装: Firestore / In-memory の両方を実装し、テスト容易性を確保。
 
 ## テストと品質保証
 - `make lint`: gofmt チェック + `go vet` + ESLint
@@ -215,21 +220,25 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 
 ### Cloud Build (`deploy/cloudbuild/cloudbuild.yaml`)
 1. Backend / Frontend の Docker イメージをビルドし、Artifact Registry に `:${SHORT_SHA}` で push。
-2. Cloud Run (`<service>-<env>`) へデプロイ。VPC Connector や Cloud SQL アタッチ、Secret Manager の環境変数バインドを一元管理。
+2. Cloud Run (`<service>-<env>`) へデプロイ。Secret Manager から JWT / OAuth / CSRF シークレットを注入し、必要に応じて VPC Connector を接続。
 3. トラフィック割合（`_BACKEND_TRAFFIC`, `_FRONTEND_TRAFFIC`）で段階的リリースが可能。
 
 ### GitHub Environments / Secrets
 1. `staging`, `production` 環境を作成し、下記を Environment Variables に登録:
    - `CLOUD_RUN_REGION`, `CLOUD_BUILD_ARTIFACT_REPO`
    - `CLOUD_RUN_BACKEND_SERVICE`, `CLOUD_RUN_FRONTEND_SERVICE`
-   - `CLOUDSQL_INSTANCE`（必要な場合のみ）
    - `CLOUD_RUN_VPC_CONNECTOR`（必要な場合のみ）
    - `BACKEND_SERVICE_ACCOUNT_EMAIL`, `FRONTEND_SERVICE_ACCOUNT_EMAIL`
    - `FRONTEND_API_BASE_URL`
+   - `BACKEND_GOOGLE_CLIENT_ID`
+   - `FIRESTORE_DATABASE_ID`（必要な場合のみ）
+   - `FIRESTORE_COLLECTION_PREFIX`（必要な場合のみ）
    - `BACKEND_TRAFFIC_PERCENT`, `FRONTEND_TRAFFIC_PERCENT`
 2. 同環境の Secrets:
-   - `BACKEND_SECRET_DB_DSN`（`projects/<id>/secrets/...:latest`）
    - `BACKEND_SECRET_JWT`
+   - `BACKEND_SECRET_STATE`
+   - `BACKEND_SECRET_CSRF`
+   - `BACKEND_SECRET_GOOGLE_CLIENT_SECRET`
    - `BACKEND_SECRET_RECAPTCHA`（任意）
    - `FRONTEND_SECRET_RECAPTCHA`（任意）
 3. リポジトリ全体の Actions Secrets:
@@ -261,7 +270,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
     -var="api_image=asia-northeast1-docker.pkg.dev/<project>/<repo>/backend:latest" \
     -var="frontend_image=asia-northeast1-docker.pkg.dev/<project>/<repo>/frontend:latest"
   ```
-- Cloud SQL や Secret Manager、モニタリングの IaC 化は拡張予定です。
+- Firestore や Secret Manager、モニタリングの IaC 化は拡張予定です。
 
 ## セキュリティと可観測性
 - Secrets: GitHub Actions → Secret Manager → Cloud Run 環境変数で運用。コードへの直書きは禁止。
@@ -284,7 +293,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 
 ## 今後の改善アイデア
 1. Go / React 双方で統合テスト・E2E テスト（Playwright）を CI に組み込み、カバレッジ 80% 以上を目指す。
-2. Terraform に Cloud SQL / Secret Manager / Monitoring リソースを追加し、環境差分を完全 IaC 化する。
+2. Terraform に Firestore / Secret Manager / Monitoring リソースを追加し、環境差分を完全 IaC 化する。
 3. Cloud Build 後に自動でライトウェイトな Smoke テスト（`make smoke-backend`）や Lighthouse CI を走らせる。
 4. Cloud Monitoring にダッシュボード・アラートポリシーを定義し、インシデント対応の基盤を整える。
 5. 管理 SPA の UX 改善（並列編集、ドラフト機能）とアクセス制御細分化（ロールベース）を検討する。

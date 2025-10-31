@@ -8,15 +8,19 @@ substitutions:
   _ARTIFACT_REPO: personal-website
   _BACKEND_SERVICE: personal-website-api
   _FRONTEND_SERVICE: personal-website-frontend
-  _CLOUDSQL_INSTANCE: ""
   _VPC_CONNECTOR: ""
   _BACKEND_SERVICE_ACCOUNT: ""
   _FRONTEND_SERVICE_ACCOUNT: ""
-  _BACKEND_SECRET_DB_DSN: ""
   _BACKEND_SECRET_JWT: ""
+  _BACKEND_SECRET_STATE: ""
+  _BACKEND_SECRET_CSRF: ""
+  _BACKEND_GOOGLE_CLIENT_ID: ""
+  _BACKEND_SECRET_GOOGLE_CLIENT_SECRET: ""
   _BACKEND_SECRET_RECAPTCHA: ""
   _FRONTEND_SECRET_RECAPTCHA: ""
   _FRONTEND_API_BASE_URL: ""
+  _FIRESTORE_DATABASE_ID: "(default)"
+  _FIRESTORE_COLLECTION_PREFIX: ""
   _BACKEND_TRAFFIC: "100"
   _FRONTEND_TRAFFIC: "100"
 
@@ -69,8 +73,28 @@ steps:
           exit 1
         fi
 
-        if [[ -z "${_BACKEND_SECRET_DB_DSN}" || -z "${_BACKEND_SECRET_JWT}" ]]; then
-          echo "Backend secret substitutions are required." >&2
+        if [[ -z "${_BACKEND_SECRET_JWT}" ]]; then
+          echo "Backend JWT secret substitution is required." >&2
+          exit 1
+        fi
+
+        if [[ -z "${_BACKEND_SECRET_STATE}" ]]; then
+          echo "Backend state secret substitution is required." >&2
+          exit 1
+        fi
+
+        if [[ -z "${_BACKEND_GOOGLE_CLIENT_ID}" ]]; then
+          echo "Backend Google client ID substitution is required." >&2
+          exit 1
+        fi
+
+        if [[ -z "${_BACKEND_SECRET_GOOGLE_CLIENT_SECRET}" ]]; then
+          echo "Backend Google client secret substitution is required." >&2
+          exit 1
+        fi
+
+        if [[ -z "${_BACKEND_SECRET_CSRF}" ]]; then
+          echo "Backend CSRF secret substitution is required." >&2
           exit 1
         fi
 
@@ -91,16 +115,12 @@ steps:
           --service-account="${_BACKEND_SERVICE_ACCOUNT}"
           --execution-environment=gen2
           --no-allow-unauthenticated
-          --set-env-vars="GIN_MODE=release,ENV=${_ENV}"
-          --set-secrets="DB_DSN=${_BACKEND_SECRET_DB_DSN},JWT_SECRET=${_BACKEND_SECRET_JWT}"
+          --set-env-vars="GIN_MODE=release,ENV=${_ENV},APP_FIRESTORE_PROJECT_ID=${PROJECT_ID},APP_FIRESTORE_DATABASE_ID=${_FIRESTORE_DATABASE_ID},APP_FIRESTORE_COLLECTION_PREFIX=${_FIRESTORE_COLLECTION_PREFIX},APP_GOOGLE_CLIENT_ID=${_BACKEND_GOOGLE_CLIENT_ID}"
+          --set-secrets="APP_AUTH_JWT_SECRET=${_BACKEND_SECRET_JWT},APP_AUTH_STATE_SECRET=${_BACKEND_SECRET_STATE},APP_SECURITY_CSRF_SIGNING_KEY=${_BACKEND_SECRET_CSRF},APP_GOOGLE_CLIENT_SECRET=${_BACKEND_SECRET_GOOGLE_CLIENT_SECRET}"
           --set-traffic="latest=${BACKEND_TRAFFIC}"
           --quiet
           --max-instances=3
         )
-
-        if [[ -n "${_CLOUDSQL_INSTANCE}" ]]; then
-          BACKEND_CMD+=(--add-cloudsql-instances="${_CLOUDSQL_INSTANCE}")
-        fi
 
         if [[ -n "${_BACKEND_SECRET_RECAPTCHA}" ]]; then
           BACKEND_CMD+=(--set-secrets="G_RECAPTCHA_SECRET=${_BACKEND_SECRET_RECAPTCHA}")

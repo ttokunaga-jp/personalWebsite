@@ -126,11 +126,6 @@ steps:
           exit 1
         fi
 
-        if [[ -z "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}" ]]; then
-          echo "Backend admin allowed domains secret substitution is required." >&2
-          exit 1
-        fi
-
         if [[ -z "${_FRONTEND_API_BASE_URL}" ]]; then
           echo "Frontend public API base URL substitution is required." >&2
           exit 1
@@ -149,7 +144,6 @@ steps:
         }
 
         BACKEND_SECRET_ADMIN_ALLOWED_EMAILS_REF="$(ensure_secret_ref "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}")"
-        BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF="$(ensure_secret_ref "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}")"
 
         BACKEND_CMD=(
           gcloud run deploy "${_BACKEND_SERVICE}-${_ENV}"
@@ -162,11 +156,18 @@ steps:
           --no-allow-unauthenticated
           --set-env-vars="GIN_MODE=release,ENV=${_ENV},APP_FIRESTORE_PROJECT_ID=${PROJECT_ID},APP_FIRESTORE_DATABASE_ID=${_FIRESTORE_DATABASE_ID},APP_FIRESTORE_COLLECTION_PREFIX=${_FIRESTORE_COLLECTION_PREFIX},APP_GOOGLE_CLIENT_ID=${_BACKEND_GOOGLE_CLIENT_ID}"
           --set-secrets="APP_AUTH_JWT_SECRET=${_BACKEND_SECRET_JWT},APP_AUTH_STATE_SECRET=${_BACKEND_SECRET_STATE},APP_SECURITY_CSRF_SIGNING_KEY=${BACKEND_SECRET_CSRF},APP_GOOGLE_CLIENT_SECRET=${_BACKEND_SECRET_GOOGLE_CLIENT_SECRET}"
-          --update-secrets="APP_AUTH_ADMIN_ALLOWED_EMAILS=${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS_REF},APP_AUTH_ADMIN_ALLOWED_DOMAINS=${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF}"
+          --update-secrets="APP_AUTH_ADMIN_ALLOWED_EMAILS=${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS_REF}"
           --set-traffic="latest=${BACKEND_TRAFFIC}"
           --quiet
           --max-instances=3
         )
+
+        if [[ -n "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}" ]]; then
+          BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF="$(ensure_secret_ref "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}")"
+          BACKEND_CMD+=(--update-secrets="APP_AUTH_ADMIN_ALLOWED_DOMAINS=${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF}")
+        else
+          BACKEND_CMD+=(--remove-secrets="APP_AUTH_ADMIN_ALLOWED_DOMAINS")
+        fi
 
         if [[ -n "${_BACKEND_SECRET_RECAPTCHA}" ]]; then
           BACKEND_CMD+=(--set-secrets="G_RECAPTCHA_SECRET=${_BACKEND_SECRET_RECAPTCHA}")

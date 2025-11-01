@@ -56,6 +56,11 @@ jobs:
           version: 8.15.4
           run_install: false
 
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
       - name: Cache pnpm store
         uses: actions/cache@v4
         with:
@@ -66,6 +71,12 @@ jobs:
 
       - name: Install dependencies
         run: make deps
+
+      - name: Terraform validate
+        working-directory: terraform/environments/dev
+        run: |
+          terraform init -backend=false
+          terraform validate
 
       - name: Run lint
         run: make lint

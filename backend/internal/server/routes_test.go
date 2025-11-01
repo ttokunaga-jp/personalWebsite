@@ -84,6 +84,7 @@ func TestRegisterRoutes(t *testing.T) {
 		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
+		handler.NewAdminAuthHandler(&stubAdminAuthService{}),
 		jwtMiddleware,
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
@@ -434,6 +435,7 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
+		handler.NewAdminAuthHandler(&stubAdminAuthService{}),
 		jwtMiddleware,
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
@@ -461,6 +463,23 @@ func (s *stubAuthService) HandleCallback(context.Context, string, string) (*auth
 		Token:       "stub-token",
 		ExpiresAt:   123,
 		RedirectURI: "/admin",
+	}, nil
+}
+
+type stubAdminAuthService struct{}
+
+func (s *stubAdminAuthService) StartLogin(context.Context, string) (*auth.AdminLoginResult, error) {
+	return &auth.AdminLoginResult{
+		AuthURL: "",
+		State:   "admin-stub-state",
+	}, nil
+}
+
+func (s *stubAdminAuthService) HandleCallback(context.Context, string, string) (*auth.AdminCallbackResult, error) {
+	return &auth.AdminCallbackResult{
+		Token:        "admin-stub-token",
+		ExpiresAt:    456,
+		RedirectPath: "/admin",
 	}, nil
 }
 

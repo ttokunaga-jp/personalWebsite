@@ -1,0 +1,29 @@
+server:
+  port: "8100"
+  mode: "release"
+
+auth:
+  jwt_secret: "change-me-in-production"
+  issuer: "personal-website"
+  audience:
+    - "personal-website-admin"
+  access_token_ttl_minutes: 60
+  state_secret: "replace-with-random-string"
+  state_ttl_seconds: 300
+  admin:
+    default_redirect_uri: "/admin"
+    allowed_emails:
+      - "admin@example.com"
+    allowed_domains:
+      - "example.com"
+
+google:
+  client_id: "your-google-oauth-client-id"
+  client_secret: "your-google-oauth-client-secret"
+  redirect_url: "https://localhost:8100/api/admin/auth/callback"
+  scopes:
+    - "openid"
+    - "email"
+    - "profile"
+    - "https://www.googleapis.com/auth/userinfo.email"
+    - "https://www.googleapis.com/auth/userinfo.profile"

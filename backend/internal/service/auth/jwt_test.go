@@ -24,7 +24,7 @@ func TestClaimsHasRole(t *testing.T) {
 	issuer, err := NewJWTIssuer(appCfg)
 	require.NoError(t, err)
 
-	token, _, err := issuer.Issue(context.Background(), "user-1", "user@example.com")
+	token, _, err := issuer.Issue(context.Background(), "user-1", "user@example.com", "admin")
 	require.NoError(t, err)
 
 	verifier := NewJWTVerifier(appCfg.Auth)

@@ -92,6 +92,10 @@
 | `APP_SECURITY_CSRF_SIGNING_KEY` | CSRF トークン署名キー。 |
 | `APP_GOOGLE_CLIENT_ID` / `APP_GOOGLE_CLIENT_SECRET` | Google OAuth クライアント情報。 |
 | `APP_GOOGLE_REDIRECT_URL` | Google OAuth のリダイレクト URL。Cloud Run 公開 URL の `/api/auth/callback` を指定。 |
+| `APP_AUTH_ADMIN_ALLOWED_EMAILS` | 管理画面へアクセス可能なメールアドレスのリスト（カンマ区切り）。Secret Manager 経由で注入します。 |
+| `APP_ADMIN_ALLOWED_EMAILS` | `APP_AUTH_ADMIN_ALLOWED_EMAILS` の互換エイリアス。Terraform / Cloud Run で同一シークレットを共有。 |
+| `APP_AUTH_ADMIN_DEFAULT_REDIRECT_URI` | OAuth コールバック後にリダイレクトする管理 SPA のパス。既定は `/admin`。 |
+| `APP_ADMIN_REDIRECT_URI` | 管理 SPA が利用するリダイレクト URI の公開名。Cloud Run URL（例: `https://<service>.run.app/admin`）を設定。 |
 | `DB_DRIVER` | `mysql` または `firestore` を指定。データストア切替に使用。 |
 | `DB_USER` | 接続に使用する MySQL ユーザー名（Cloud SQL の IAM DB User など）。 |
 | `DB_PASSWORD` | `DB_USER` に対応するパスワード。Cloud Build / Secret Manager 経由で注入。 |
@@ -128,6 +132,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
    ```bash
    cd frontend && pnpm prepare
    ```
+   Firestore / Cloud SQL の切替は [データストア切り替え](#データストア切り替え) を参照してください。
 
 ## ローカル開発
 - **バックエンドのみ起動**: `cd backend && go run ./cmd/server`
@@ -143,9 +148,26 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
   - フロント (nginx): http://localhost:3000
   - MySQL（Cloud SQL 互換）を別途起動し、`deploy/mysql/schema.sql` を適用して初期データベースを作成してください。Cloud SQL Proxy を利用する場合は `/cloudsql` ソケットをマウントし、`DB_INSTANCE_CONNECTION_NAME` を設定します。Firestore Token Store を利用する場合のみ `APP_FIRESTORE_*` を設定してください。
 - **ユーティリティ**:
-  - `make build`: バックエンドバイナリ / フロント dist を生成
-  - `make fmt`: Go / TypeScript のフォーマッタ実行
-  - `make smoke-backend`: API スモークテスト（`BASE_URL` や `TOKEN` でカスタマイズ可）
+- `make build`: バックエンドバイナリ / フロント dist を生成
+- `make fmt`: Go / TypeScript のフォーマッタ実行
+- `make smoke-backend`: API スモークテスト（`BASE_URL` や `TOKEN` でカスタマイズ可）
+
+## 管理者ログイン手順
+1. **Google Cloud Console でリダイレクト URI を登録**  
+   GCP プロジェクトの *APIs & Services > Credentials* から対象の OAuth 2.0 クライアント ID を開き、*Authorized redirect URIs* に `https://<Cloud Run サービス名>.run.app/api/admin/auth/callback` を追加します（ステージング / 本番など環境ごとに登録してください）。
+2. **管理者メールアドレスのシークレットを作成**  
+   Secret Manager で `APP_AUTH_ADMIN_ALLOWED_EMAILS` 用のシークレットを作成し、許可するメールアドレスをカンマ区切りで保存します（例: `admin@example.com,lead@example.com`）。Terraform では同じ値を `APP_ADMIN_ALLOWED_EMAILS` としても注入します。
+3. **Terraform 変数を更新**  
+   `terraform/environments/<env>/terraform.tfvars` に以下を追記します。
+   ```hcl
+   admin_redirect_uri             = "https://<Cloud Run サービス>/admin"
+   admin_allowed_emails_secret    = "projects/<project>/secrets/<secret-name>"
+   ```
+   既存の `api_secret_env` / `api_additional_env` を併用している場合もマージされます。
+4. **デプロイ後に Cloud Run の URL を確認**  
+   `terraform apply` もしくは Cloud Build 経由でデプロイした後、Cloud Run の管理画面で URL を確認し、README の手順に沿って SPA の `VITE_API_BASE_URL` と `APP_ADMIN_REDIRECT_URI` を調整してください。
+
+管理者ログイン時のフローハッシュ解析やセッション維持ロジックは `frontend/apps/admin/src/modules/auth-session.tsx` と `@personal-website/shared` の Axios インターセプタで管理しています。
 
 ## フロントエンド
 

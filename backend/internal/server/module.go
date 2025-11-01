@@ -32,13 +32,14 @@ func newHTTPServer(
 	contactHandler *handler.ContactHandler,
 	bookingHandler *handler.BookingHandler,
 	authHandler *handler.AuthHandler,
+	adminAuthHandler *handler.AdminAuthHandler,
 	jwtMiddleware *middleware.JWTMiddleware,
 	adminHandler *handler.AdminHandler,
 	adminGuard *middleware.AdminGuard,
 	securityHandler *handler.SecurityHandler,
 	metrics *telemetry.Metrics,
 ) *http.Server {
-	registerRoutes(engine, healthHandler, profileHandler, projectHandler, researchHandler, contactHandler, bookingHandler, authHandler, jwtMiddleware, adminHandler, adminGuard, securityHandler)
+	registerRoutes(engine, healthHandler, profileHandler, projectHandler, researchHandler, contactHandler, bookingHandler, authHandler, adminAuthHandler, jwtMiddleware, adminHandler, adminGuard, securityHandler)
 	if metrics != nil {
 		metrics.Register(engine)
 	}

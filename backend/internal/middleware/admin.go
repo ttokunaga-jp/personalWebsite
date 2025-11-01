@@ -41,7 +41,7 @@ func (g *AdminGuard) RequireAdmin() gin.HandlerFunc {
 		}
 
 		if !claims.HasRole("admin") {
-			appErr := errs.New(errs.CodeUnauthorized, http.StatusForbidden, "admin role required", nil)
+			appErr := errs.New(errs.CodeForbidden, http.StatusForbidden, "admin role required", nil)
 			c.AbortWithStatusJSON(appErr.Status, gin.H{
 				"error":   appErr.Code,
 				"message": appErr.Message,

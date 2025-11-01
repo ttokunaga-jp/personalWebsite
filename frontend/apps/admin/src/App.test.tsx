@@ -2,6 +2,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
 
 import App from "./App";
+import { DomainError } from "./modules/admin-api";
+import {
+  AuthSessionProvider,
+  clearToken,
+  setToken as persistToken,
+} from "./modules/auth-session";
 
 const apiMocks = vi.hoisted(() => ({
   health: vi.fn(),
@@ -25,11 +31,16 @@ const apiMocks = vi.hoisted(() => ({
   deleteBlog: vi.fn(),
   deleteMeeting: vi.fn(),
   deleteBlacklist: vi.fn(),
+  session: vi.fn(),
 }));
 
-vi.mock("./modules/admin-api", () => ({
-  adminApi: apiMocks,
-}));
+vi.mock("./modules/admin-api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./modules/admin-api")>();
+  return {
+    ...actual,
+    adminApi: apiMocks,
+  };
+});
 
 const {
   health: healthMock,
@@ -39,10 +50,14 @@ const {
   listBlogs: blogsMock,
   listMeetings: meetingsMock,
   listBlacklist: blacklistMock,
+  session: sessionMock,
 } = apiMocks;
 
 describe("Admin App", () => {
   beforeEach(() => {
+    clearToken();
+    window.sessionStorage.clear();
+    window.location.hash = "";
     healthMock.mockResolvedValue({ data: { status: "ok" } });
     summaryMock.mockResolvedValue({
       data: {
@@ -127,6 +142,7 @@ describe("Admin App", () => {
         },
       ],
     });
+    sessionMock.mockResolvedValue({ data: { active: true } });
   });
 
   afterEach(() => {
@@ -134,7 +150,13 @@ describe("Admin App", () => {
   });
 
   it("renders dashboard title", async () => {
-    render(<App />);
+    persistToken("test-token");
+
+    render(
+      <AuthSessionProvider>
+        <App />
+      </AuthSessionProvider>,
+    );
 
     await waitFor(() => {
       expect(healthMock).toHaveBeenCalled();
@@ -146,9 +168,13 @@ describe("Admin App", () => {
   });
 
   it("blocks access when health check returns 401", async () => {
-    healthMock.mockRejectedValueOnce({ response: { status: 401 } });
+    healthMock.mockRejectedValueOnce(new DomainError(401, "unauthorized"));
 
-    render(<App />);
+    render(
+      <AuthSessionProvider>
+        <App />
+      </AuthSessionProvider>,
+    );
 
     await waitFor(() => {
       expect(screen.getByText(/Sign in required/i)).toBeInTheDocument();
@@ -156,4 +182,5 @@ describe("Admin App", () => {
 
     expect(summaryMock).not.toHaveBeenCalled();
   });
+
 });

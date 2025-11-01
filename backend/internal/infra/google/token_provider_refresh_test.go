@@ -3,8 +3,10 @@ package google
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
-	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +15,12 @@ import (
 	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/service/auth"
 )
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 type stubTokenStore struct {
 	record *TokenRecord
@@ -47,25 +55,38 @@ func TestRefreshingTokenProviderRefreshesWhenExpired(t *testing.T) {
 		},
 	}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	transport := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.NoError(t, r.ParseForm())
-		require.Equal(t, "refresh-token", r.FormValue("refresh_token"))
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.NoError(t, r.Body.Close())
+
+		values, err := url.ParseQuery(string(body))
+		require.NoError(t, err)
+		require.Equal(t, "refresh-token", values.Get("refresh_token"))
+
+		payload, err := json.Marshal(map[string]any{
 			"access_token":  "new-token",
 			"expires_in":    3600,
 			"refresh_token": "refresh-token",
 		})
-	}))
-	t.Cleanup(server.Close)
+		require.NoError(t, err)
+
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(string(payload))),
+			Request:    r,
+		}, nil
+	})
 
 	cfg := config.GoogleOAuthConfig{
 		ClientID:     "client",
 		ClientSecret: "secret",
-		TokenURL:     server.URL,
+		TokenURL:     "https://example.com/token",
 	}
 
-	provider, err := NewRefreshingTokenProvider(cfg, store, server.Client())
+	provider, err := NewRefreshingTokenProvider(cfg, store, &http.Client{Transport: transport})
 	require.NoError(t, err)
 
 	token, err := provider.AccessToken(context.Background())

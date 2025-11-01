@@ -16,6 +16,7 @@ func registerRoutes(
 	contactHandler *handler.ContactHandler,
 	bookingHandler *handler.BookingHandler,
 	authHandler *handler.AuthHandler,
+	adminAuthHandler *handler.AdminAuthHandler,
 	jwtMiddleware *middleware.JWTMiddleware,
 	adminHandler *handler.AdminHandler,
 	adminGuard *middleware.AdminGuard,
@@ -37,6 +38,12 @@ func registerRoutes(
 		if securityHandler != nil {
 			api.GET("/security/csrf", securityHandler.IssueCSRFToken)
 		}
+	}
+
+	adminAuth := api.Group("/admin/auth")
+	{
+		adminAuth.GET("/login", adminAuthHandler.Login)
+		adminAuth.GET("/callback", adminAuthHandler.Callback)
 	}
 
 	publicV1 := api.Group("/v1/public")

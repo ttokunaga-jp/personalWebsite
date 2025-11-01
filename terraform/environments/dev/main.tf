@@ -162,6 +162,10 @@ module "api" {
       DB_INSTANCE_CONNECTION_NAME = module.cloudsql.instance_connection_name
       STORAGE_BUCKET              = module.assets_bucket.bucket_name
     },
+    trimspace(var.admin_redirect_uri) != "" ? {
+      APP_ADMIN_REDIRECT_URI             = var.admin_redirect_uri
+      APP_AUTH_ADMIN_DEFAULT_REDIRECT_URI = var.admin_redirect_uri
+    } : {},
     var.api_additional_env
   )
   secret_env_vars = merge(
@@ -171,6 +175,16 @@ module "api" {
         version = "latest"
       }
     },
+    trimspace(var.admin_allowed_emails_secret) != "" ? {
+      APP_ADMIN_ALLOWED_EMAILS = {
+        secret  = var.admin_allowed_emails_secret
+        version = "latest"
+      }
+      APP_AUTH_ADMIN_ALLOWED_EMAILS = {
+        secret  = var.admin_allowed_emails_secret
+        version = "latest"
+      }
+    } : {},
     var.api_secret_env
   )
   service_account_roles = concat(

@@ -17,6 +17,8 @@ substitutions:
   _BACKEND_GOOGLE_CLIENT_ID: ""
   _BACKEND_SECRET_GOOGLE_CLIENT_SECRET: ""
   _BACKEND_SECRET_RECAPTCHA: ""
+  _BACKEND_SECRET_ADMIN_ALLOWED_EMAILS: ""
+  _BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS: ""
   _FRONTEND_SECRET_RECAPTCHA: ""
   _FRONTEND_API_BASE_URL: ""
   _FIRESTORE_DATABASE_ID: "(default)"
@@ -72,6 +74,8 @@ steps:
         FRONTEND_SERVICE_ACCOUNT="${_FRONTEND_SERVICE_ACCOUNT}"
         BACKEND_SECRET_STATE="${_BACKEND_SECRET_STATE}"
         BACKEND_SECRET_CSRF="${_BACKEND_SECRET_CSRF}"
+        BACKEND_SECRET_ADMIN_ALLOWED_EMAILS="${_BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}"
+        BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS="${_BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}"
 
         if [[ -z "${BACKEND_SERVICE_ACCOUNT}" && -n "${FRONTEND_SERVICE_ACCOUNT}" ]]; then
           echo "Backend service account substitution missing. Reusing frontend service account." >&2
@@ -117,6 +121,16 @@ steps:
           exit 1
         fi
 
+        if [[ -z "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}" ]]; then
+          echo "Backend admin allowed emails secret substitution is required." >&2
+          exit 1
+        fi
+
+        if [[ -z "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}" ]]; then
+          echo "Backend admin allowed domains secret substitution is required." >&2
+          exit 1
+        fi
+
         if [[ -z "${_FRONTEND_API_BASE_URL}" ]]; then
           echo "Frontend public API base URL substitution is required." >&2
           exit 1
@@ -124,6 +138,18 @@ steps:
 
         BACKEND_TRAFFIC="${_BACKEND_TRAFFIC:-100}"
         FRONTEND_TRAFFIC="${_FRONTEND_TRAFFIC:-100}"
+
+        ensure_secret_ref() {
+          local ref="$1"
+          if [[ "${ref}" == *":"* ]]; then
+            printf '%s' "${ref}"
+          else
+            printf '%s:latest' "${ref}"
+          fi
+        }
+
+        BACKEND_SECRET_ADMIN_ALLOWED_EMAILS_REF="$(ensure_secret_ref "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}")"
+        BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF="$(ensure_secret_ref "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}")"
 
         BACKEND_CMD=(
           gcloud run deploy "${_BACKEND_SERVICE}-${_ENV}"
@@ -136,6 +162,7 @@ steps:
           --no-allow-unauthenticated
           --set-env-vars="GIN_MODE=release,ENV=${_ENV},APP_FIRESTORE_PROJECT_ID=${PROJECT_ID},APP_FIRESTORE_DATABASE_ID=${_FIRESTORE_DATABASE_ID},APP_FIRESTORE_COLLECTION_PREFIX=${_FIRESTORE_COLLECTION_PREFIX},APP_GOOGLE_CLIENT_ID=${_BACKEND_GOOGLE_CLIENT_ID}"
           --set-secrets="APP_AUTH_JWT_SECRET=${_BACKEND_SECRET_JWT},APP_AUTH_STATE_SECRET=${_BACKEND_SECRET_STATE},APP_SECURITY_CSRF_SIGNING_KEY=${BACKEND_SECRET_CSRF},APP_GOOGLE_CLIENT_SECRET=${_BACKEND_SECRET_GOOGLE_CLIENT_SECRET}"
+          --update-secrets="APP_AUTH_ADMIN_ALLOWED_EMAILS=${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS_REF},APP_AUTH_ADMIN_ALLOWED_DOMAINS=${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF}"
           --set-traffic="latest=${BACKEND_TRAFFIC}"
           --quiet
           --max-instances=3

@@ -189,8 +189,11 @@ const expectedResources = {
         title: "Management console",
         description:
           "Authenticated administrators can manage content, reservations, and blacklists from the dedicated UI.",
-        placeholder:
-          "Guard this route using JWT and Google SSO once the auth flow is implemented.",
+        loginCallout:
+          "Continue to the secure admin workspace to curate content and respond to booking requests.",
+        loginCta: "Sign in with Google",
+        loginHelp:
+          "You'll authenticate with Google SSO. Only allow-listed administrator accounts can access the console, and you will be redirected back to the dashboard after signing in.",
       },
       footer: {
         copyright: "Takumi Tokunaga. All rights reserved.",
@@ -387,7 +390,11 @@ const expectedResources = {
         title: "管理者コンソール",
         description:
           "認証済み管理者がコンテンツ、予約、ブラックリストを管理する UI を提供します。",
-        placeholder: "Google SSO + JWT 連携後にアクセス制御を実装します。",
+        loginCallout:
+          "管理者専用コンソールにサインインし、コンテンツ更新や予約対応を行えます。",
+        loginCta: "Google でサインイン",
+        loginHelp:
+          "Google SSO を利用し、許可された管理者アカウントのみがアクセスできます。認証後は管理コンソールに自動的に戻ります。",
       },
       footer: {
         copyright: "Takumi Tokunaga. All rights reserved.",

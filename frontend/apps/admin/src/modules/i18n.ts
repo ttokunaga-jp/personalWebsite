@@ -25,6 +25,9 @@ const resources = {
       "auth.requiredDescription":
         "You need to authenticate with your administrator Google account to view this console.",
       "auth.signIn": "Continue with Google",
+      "auth.signOut": "Sign out",
+      "auth.supportPrompt": "Need access or facing issues?",
+      "auth.contactSupport": "Contact support",
     },
   },
   ja: {
@@ -50,6 +53,9 @@ const resources = {
       "auth.requiredDescription":
         "管理者用の Google アカウントで認証すると、このコンソールを表示できます。",
       "auth.signIn": "Google で続行",
+      "auth.signOut": "サインアウト",
+      "auth.supportPrompt": "アクセス権限については、サポートまでお問い合わせください。",
+      "auth.contactSupport": "サポートに連絡",
     },
   },
 };

@@ -27,7 +27,7 @@ func TestJWTIssuerIssueSuccess(t *testing.T) {
 	fixed := time.Now().Truncate(time.Second)
 	jwtIss.now = func() time.Time { return fixed }
 
-	token, expiresAt, err := issuer.Issue(context.Background(), "google-123", "user@example.com")
+	token, expiresAt, err := issuer.Issue(context.Background(), "google-123", "user@example.com", "admin", "editor")
 	require.NoError(t, err)
 	require.NotEmpty(t, token)
 	require.Equal(t, fixed.Add(30*time.Minute), expiresAt)
@@ -38,6 +38,7 @@ func TestJWTIssuerIssueSuccess(t *testing.T) {
 	require.Equal(t, "google-123", claims.Subject)
 	require.Equal(t, "user@example.com", claims.Email)
 	require.True(t, claims.HasRole("admin"))
+	require.True(t, claims.HasRole("editor"))
 }
 
 func TestJWTIssuerRequiresSubject(t *testing.T) {
@@ -51,7 +52,7 @@ func TestJWTIssuerRequiresSubject(t *testing.T) {
 	issuer, err := NewJWTIssuer(cfg)
 	require.NoError(t, err)
 
-	_, _, err = issuer.Issue(context.Background(), "", "")
+	_, _, err = issuer.Issue(context.Background(), "", "", "admin")
 	require.Error(t, err)
 }
 
@@ -67,7 +68,7 @@ func TestJWTIssuerDisabled(t *testing.T) {
 	issuer, err := NewJWTIssuer(cfg)
 	require.NoError(t, err)
 
-	token, expiresAt, err := issuer.Issue(context.Background(), "ignored", "")
+	token, expiresAt, err := issuer.Issue(context.Background(), "ignored", "", "admin")
 	require.NoError(t, err)
 	require.Equal(t, "development-token", token)
 	require.True(t, expiresAt.After(time.Now()))

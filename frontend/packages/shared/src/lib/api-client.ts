@@ -16,6 +16,22 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
+type TokenProvider = () => string | null;
+type UnauthorizedHandler = () => void;
+
+let tokenProvider: TokenProvider | null = null;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function registerAuthTokenProvider(provider: TokenProvider | null): void {
+  tokenProvider = provider;
+}
+
+export function registerAuthTokenInvalidator(
+  handler: UnauthorizedHandler | null,
+): void {
+  unauthorizedHandler = handler;
+}
+
 type CsrfAwareRequestConfig = AxiosRequestConfig & {
   _csrfRetry?: boolean;
 };
@@ -37,8 +53,28 @@ function setHeader(
   (config.headers as RawAxiosRequestHeaders)[key] = value;
 }
 
+function removeHeader(config: AxiosRequestConfig, key: string): void {
+  if (!config.headers) {
+    return;
+  }
+
+  if (config.headers instanceof AxiosHeaders) {
+    config.headers.delete(key);
+    return;
+  }
+
+  delete (config.headers as RawAxiosRequestHeaders)[key];
+}
+
 apiClient.interceptors.request.use(async (config) => {
   config.withCredentials = true;
+
+  const sessionToken = tokenProvider?.() ?? null;
+  if (sessionToken) {
+    setHeader(config, "Authorization", `Bearer ${sessionToken}`);
+  } else {
+    removeHeader(config, "Authorization");
+  }
 
   const method = (config.method ?? "get").toLowerCase();
   if (!SAFE_METHODS.has(method)) {
@@ -55,7 +91,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Placeholder for auth refresh logic.
+      if (typeof unauthorizedHandler === "function") {
+        unauthorizedHandler();
+      }
     }
 
     const csrfConfig = error.config as CsrfAwareRequestConfig | undefined;

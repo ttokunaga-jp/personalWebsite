@@ -451,6 +451,18 @@ variable "api_secret_env" {
   default = {}
 }
 
+variable "admin_redirect_uri" {
+  description = "Redirect URI used by the admin authentication callback (e.g. https://<service>.run.app/admin)"
+  type        = string
+  default     = "/admin"
+}
+
+variable "admin_allowed_emails_secret" {
+  description = "Secret Manager resource name containing the comma-separated list of admin-allowed emails"
+  type        = string
+  default     = ""
+}
+
 variable "api_additional_roles" {
   description = "Additional IAM roles for the API service account"
   type        = list(string)

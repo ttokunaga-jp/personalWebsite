@@ -14,6 +14,7 @@ const (
 	CodeNotFound     ErrorCode = "not_found"
 	CodeInvalidInput ErrorCode = "invalid_input"
 	CodeUnauthorized ErrorCode = "unauthorized"
+	CodeForbidden    ErrorCode = "forbidden"
 	CodeConflict     ErrorCode = "conflict"
 )
 

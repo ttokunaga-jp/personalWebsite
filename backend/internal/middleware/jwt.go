@@ -25,6 +25,11 @@ func (m *JWTMiddleware) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		token := extractBearerToken(authHeader)
+		if token == "" {
+			if cookie, err := c.Cookie("ps_admin_jwt"); err == nil {
+				token = strings.TrimSpace(cookie)
+			}
+		}
 		claims, err := m.verifier.Verify(c.Request.Context(), token)
 		if err != nil {
 			appErr := errs.From(err)

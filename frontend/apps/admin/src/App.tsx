@@ -1,7 +1,12 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { adminApi } from "./modules/admin-api";
+import { adminApi, DomainError } from "./modules/admin-api";
+import {
+  extractTokenFromHash,
+  getToken,
+  useAuthSession,
+} from "./modules/auth-session";
 import type {
   AdminProject,
   AdminResearch,
@@ -66,17 +71,12 @@ const emptyBlacklistForm = {
 
 type AuthState = "checking" | "authenticated" | "unauthorized";
 
-const isUnauthorizedError = (error: unknown): boolean => {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-
-  const response = (error as { response?: { status?: number } }).response;
-  return typeof response?.status === "number" && response.status === 401;
-};
+const isUnauthorizedError = (error: unknown): boolean =>
+  error instanceof DomainError && error.status === 401;
 
 function App() {
   const { t } = useTranslation();
+  const { token, setToken: storeToken, clearToken } = useAuthSession();
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [status, setStatus] = useState("unknown");
   const [summary, setSummary] = useState<AdminSummary | null>(null);
@@ -95,6 +95,7 @@ function App() {
   const [blacklistForm, setBlacklistForm] = useState({ ...emptyBlacklistForm });
 
   const handleUnauthorized = useCallback(() => {
+    clearToken();
     setAuthState("unauthorized");
     setLoading(false);
     setSummary(null);
@@ -104,7 +105,7 @@ function App() {
     setMeetings([]);
     setBlacklist([]);
     setError(null);
-  }, []);
+  }, [clearToken]);
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
@@ -160,8 +161,67 @@ function App() {
   }, [handleUnauthorized]);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const tokenFromHash = extractTokenFromHash(window.location.hash);
+    if (!tokenFromHash) {
+      return;
+    }
+
+    storeToken(tokenFromHash);
+    setAuthState("authenticated");
     void refreshAll();
-  }, [refreshAll]);
+    const cleanUrl = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(null, "", cleanUrl);
+  }, [refreshAll, storeToken]);
+
+  useEffect(() => {
+    if (authState !== "checking") {
+      return;
+    }
+
+    if (token) {
+      setAuthState("authenticated");
+      void refreshAll();
+    } else {
+      handleUnauthorized();
+    }
+  }, [authState, token, refreshAll, handleUnauthorized]);
+
+  useEffect(() => {
+    if (authState !== "authenticated") {
+      return;
+    }
+
+    const currentToken = token ?? getToken();
+    if (currentToken == null || currentToken === "") {
+      handleUnauthorized();
+    }
+  }, [authState, token, handleUnauthorized]);
+
+  useEffect(() => {
+    if (authState !== "authenticated") {
+      return;
+    }
+
+    const poll = async () => {
+      try {
+        await adminApi.session();
+      } catch (err) {
+        if (isUnauthorizedError(err)) {
+          handleUnauthorized();
+        } else {
+          console.error(err);
+        }
+      }
+    };
+
+    void poll();
+    const intervalId = window.setInterval(poll, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, [authState, handleUnauthorized]);
 
   const run = useCallback(
     async (operation: () => Promise<unknown>) => {
@@ -179,6 +239,14 @@ function App() {
     },
     [refreshAll, handleUnauthorized],
   );
+
+  const logout = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const cleanUrl = `${window.location.pathname}${window.location.search}`;
+      window.history.replaceState(null, "", cleanUrl);
+    }
+    handleUnauthorized();
+  }, [handleUnauthorized]);
 
   const handleCreateProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -345,6 +413,8 @@ function App() {
   if (authState === "unauthorized") {
     const loginUrl =
       import.meta.env.VITE_ADMIN_LOGIN_URL ?? "/api/admin/auth/login";
+    const supportEmail =
+      import.meta.env.VITE_ADMIN_SUPPORT_EMAIL ?? "support@example.com";
 
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
@@ -362,6 +432,16 @@ function App() {
           >
             {t("auth.signIn")}
           </button>
+          <p className="mt-4 text-xs text-slate-500">
+            {t("auth.supportPrompt")}{" "}
+            <a
+              className="font-medium text-slate-700 underline hover:text-slate-900"
+              href={`mailto:${supportEmail}`}
+              rel="noreferrer"
+            >
+              {t("auth.contactSupport")}
+            </a>
+          </p>
         </div>
       </div>
     );
@@ -370,8 +450,19 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-100">
       <header className="bg-slate-900 p-6 text-white">
-        <h1 className="text-2xl font-bold">{t("dashboard.title")}</h1>
-        <p className="text-sm text-slate-300">{t("dashboard.subtitle")}</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">{t("dashboard.title")}</h1>
+            <p className="text-sm text-slate-300">{t("dashboard.subtitle")}</p>
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            className="inline-flex items-center justify-center rounded-md bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          >
+            {t("auth.signOut")}
+          </button>
+        </div>
       </header>
       <main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">

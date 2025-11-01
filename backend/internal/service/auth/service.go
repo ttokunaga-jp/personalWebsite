@@ -130,7 +130,7 @@ func (s *service) HandleCallback(ctx context.Context, state, code string) (*Call
 	}
 
 	if s.authCfg.Disabled {
-		token, expiresAt, err := s.issuer.Issue(ctx, "disabled-auth", "")
+		token, expiresAt, err := s.issuer.Issue(ctx, "disabled-auth", "", "admin")
 		if err != nil {
 			return nil, err
 		}
@@ -168,7 +168,7 @@ func (s *service) HandleCallback(ctx context.Context, state, code string) (*Call
 		log.Printf("auth service: token saver not configured; skipping token persistence")
 	}
 
-	appToken, expiresAt, err := s.issuer.Issue(ctx, userInfo.Subject, userInfo.Email)
+	appToken, expiresAt, err := s.issuer.Issue(ctx, userInfo.Subject, userInfo.Email, "admin")
 	if err != nil {
 		return nil, err
 	}

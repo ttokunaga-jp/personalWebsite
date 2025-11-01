@@ -260,10 +260,6 @@ jobs:
             --labels="service=${BACKEND_SERVICE},stage=${DEPLOY_ENV},managed-by=github-actions"
           )
 
-          if [[ -z "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS:-}" ]]; then
-            BACKEND_CMD+=(--remove-secrets="APP_AUTH_ADMIN_ALLOWED_DOMAINS")
-          fi
-
           if [[ -n "${VPC}" ]]; then
             BACKEND_CMD+=(--vpc-connector="${VPC}")
           else
@@ -271,6 +267,17 @@ jobs:
           fi
 
           "${BACKEND_CMD[@]}"
+
+          if [[ -z "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS:-}" ]]; then
+            if ! gcloud run services update "${BACKEND_SERVICE}-${DEPLOY_ENV}" \
+              --project="${GCP_PROJECT_ID}" \
+              --region="${CLOUD_RUN_REGION}" \
+              --platform=managed \
+              --remove-secrets="APP_AUTH_ADMIN_ALLOWED_DOMAINS" \
+              --quiet; then
+              echo "Warning: APP_AUTH_ADMIN_ALLOWED_DOMAINS secret removal skipped (likely not previously set)." >&2
+            fi
+          fi
 
           if [[ "${BACKEND_TRAFFIC}" != "100" ]]; then
             echo "Warning: BACKEND_TRAFFIC_PERCENT=${BACKEND_TRAFFIC} is not currently applied. Update traffic manually via gcloud run services update-traffic." >&2

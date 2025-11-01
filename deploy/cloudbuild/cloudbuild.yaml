@@ -165,8 +165,6 @@ steps:
         if [[ -n "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}" ]]; then
           BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF="$(ensure_secret_ref "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}")"
           BACKEND_CMD+=(--update-secrets="APP_AUTH_ADMIN_ALLOWED_DOMAINS=${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF}")
-        else
-          BACKEND_CMD+=(--remove-secrets="APP_AUTH_ADMIN_ALLOWED_DOMAINS")
         fi
 
         if [[ -n "${_BACKEND_SECRET_RECAPTCHA}" ]]; then
@@ -180,6 +178,17 @@ steps:
         BACKEND_CMD+=(--labels="service=${_BACKEND_SERVICE},stage=${_ENV},managed-by=cloud-build")
 
         "${BACKEND_CMD[@]}"
+
+        if [[ -z "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}" ]]; then
+          if ! gcloud run services update "${_BACKEND_SERVICE}-${_ENV}" \
+            --project="$PROJECT_ID" \
+            --region="${_REGION}" \
+            --platform=managed \
+            --remove-secrets="APP_AUTH_ADMIN_ALLOWED_DOMAINS" \
+            --quiet; then
+            echo "Warning: APP_AUTH_ADMIN_ALLOWED_DOMAINS secret removal skipped (likely not previously set)." >&2
+          fi
+        fi
 
         FRONTEND_CMD=(
           gcloud run deploy "${_FRONTEND_SERVICE}-${_ENV}"

@@ -143,7 +143,44 @@ steps:
           fi
         }
 
+        require_secret_version() {
+          local ref="$1"
+          local identifier="${ref%:*}"
+          local version="${ref##*:}"
+          if [[ "${identifier}" == "${ref}" ]]; then
+            identifier="${ref}"
+            version="latest"
+          fi
+
+          local secret_project="${PROJECT_ID}"
+          local secret_name="${identifier}"
+
+          if [[ "${identifier}" == projects/*/secrets/* ]]; then
+            local remainder="${identifier#projects/}"
+            secret_project="${remainder%%/*}"
+            secret_name="${remainder#*/secrets/}"
+          fi
+
+          if ! gcloud secrets versions describe "${version}" \
+            --secret="${secret_name}" \
+            --project="${secret_project}" \
+            --quiet >/dev/null 2>&1; then
+            echo "Error: Secret ${secret_project}/${secret_name} (version ${version}) is not accessible. Create it in Secret Manager or grant access." >&2
+            exit 1
+          fi
+        }
+
+        BACKEND_SECRET_JWT_REF="$(ensure_secret_ref "${_BACKEND_SECRET_JWT}")"
+        BACKEND_SECRET_STATE_REF="$(ensure_secret_ref "${_BACKEND_SECRET_STATE}")"
+        BACKEND_SECRET_CSRF_REF="$(ensure_secret_ref "${BACKEND_SECRET_CSRF}")"
+        BACKEND_SECRET_GOOGLE_CLIENT_SECRET_REF="$(ensure_secret_ref "${_BACKEND_SECRET_GOOGLE_CLIENT_SECRET}")"
         BACKEND_SECRET_ADMIN_ALLOWED_EMAILS_REF="$(ensure_secret_ref "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}")"
+
+        require_secret_version "${BACKEND_SECRET_JWT_REF}"
+        require_secret_version "${BACKEND_SECRET_STATE_REF}"
+        require_secret_version "${BACKEND_SECRET_CSRF_REF}"
+        require_secret_version "${BACKEND_SECRET_GOOGLE_CLIENT_SECRET_REF}"
+        require_secret_version "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS_REF}"
 
         BACKEND_CMD=(
           gcloud run deploy "${_BACKEND_SERVICE}-${_ENV}"
@@ -155,7 +192,7 @@ steps:
           --execution-environment=gen2
           --no-allow-unauthenticated
           --set-env-vars="GIN_MODE=release,ENV=${_ENV},APP_FIRESTORE_PROJECT_ID=${PROJECT_ID},APP_FIRESTORE_DATABASE_ID=${_FIRESTORE_DATABASE_ID},APP_FIRESTORE_COLLECTION_PREFIX=${_FIRESTORE_COLLECTION_PREFIX},APP_GOOGLE_CLIENT_ID=${_BACKEND_GOOGLE_CLIENT_ID}"
-          --set-secrets="APP_AUTH_JWT_SECRET=${_BACKEND_SECRET_JWT},APP_AUTH_STATE_SECRET=${_BACKEND_SECRET_STATE},APP_SECURITY_CSRF_SIGNING_KEY=${BACKEND_SECRET_CSRF},APP_GOOGLE_CLIENT_SECRET=${_BACKEND_SECRET_GOOGLE_CLIENT_SECRET}"
+          --set-secrets="APP_AUTH_JWT_SECRET=${BACKEND_SECRET_JWT_REF},APP_AUTH_STATE_SECRET=${BACKEND_SECRET_STATE_REF},APP_SECURITY_CSRF_SIGNING_KEY=${BACKEND_SECRET_CSRF_REF},APP_GOOGLE_CLIENT_SECRET=${BACKEND_SECRET_GOOGLE_CLIENT_SECRET_REF}"
           --update-secrets="APP_AUTH_ADMIN_ALLOWED_EMAILS=${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS_REF}"
           --set-traffic="latest=${BACKEND_TRAFFIC}"
           --quiet
@@ -164,11 +201,14 @@ steps:
 
         if [[ -n "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}" ]]; then
           BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF="$(ensure_secret_ref "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}")"
+          require_secret_version "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF}"
           BACKEND_CMD+=(--update-secrets="APP_AUTH_ADMIN_ALLOWED_DOMAINS=${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF}")
         fi
 
         if [[ -n "${_BACKEND_SECRET_RECAPTCHA}" ]]; then
-          BACKEND_CMD+=(--set-secrets="G_RECAPTCHA_SECRET=${_BACKEND_SECRET_RECAPTCHA}")
+          BACKEND_SECRET_RECAPTCHA_REF="$(ensure_secret_ref "${_BACKEND_SECRET_RECAPTCHA}")"
+          require_secret_version "${BACKEND_SECRET_RECAPTCHA_REF}"
+          BACKEND_CMD+=(--set-secrets="G_RECAPTCHA_SECRET=${BACKEND_SECRET_RECAPTCHA_REF}")
         fi
 
         if [[ -n "${_VPC_CONNECTOR}" ]]; then
@@ -205,7 +245,9 @@ steps:
         )
 
         if [[ -n "${_FRONTEND_SECRET_RECAPTCHA}" ]]; then
-          FRONTEND_CMD+=(--set-secrets="VITE_RECAPTCHA_SECRET=${_FRONTEND_SECRET_RECAPTCHA}")
+          FRONTEND_SECRET_RECAPTCHA_REF="$(ensure_secret_ref "${_FRONTEND_SECRET_RECAPTCHA}")"
+          require_secret_version "${FRONTEND_SECRET_RECAPTCHA_REF}"
+          FRONTEND_CMD+=(--set-secrets="VITE_RECAPTCHA_SECRET=${FRONTEND_SECRET_RECAPTCHA_REF}")
         fi
 
         FRONTEND_CMD+=(--labels="service=${_FRONTEND_SERVICE},stage=${_ENV},managed-by=cloud-build")

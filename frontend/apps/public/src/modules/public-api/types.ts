@@ -127,7 +127,10 @@ export type AvailabilitySlot = {
 export type ContactAvailabilityResponse = {
   timezone: string;
   generatedAt: string;
-  slots: AvailabilitySlot[];
+  days: Array<{
+    date: string;
+    slots: AvailabilitySlot[];
+  }>;
 };
 
 export type ContactConfigResponse = {
@@ -141,13 +144,23 @@ export type CreateBookingPayload = {
   name: string;
   email: string;
   topic: string;
-  message: string;
-  slotId: string;
+  agenda: string;
+  startTime: string;
+  durationMinutes: number;
   recaptchaToken: string;
 };
 
-export type CreateBookingResponse = {
-  bookingId: string;
-  status: "pending" | "confirmed";
-  calendarUrl?: string;
+export type BookingResult = {
+  meeting: {
+    id: number;
+    name: string;
+    email: string;
+    datetime: string;
+    durationMinutes: number;
+    meetUrl: string;
+    calendarEventId: string;
+    status: "pending" | "confirmed" | "cancelled";
+    notes: string;
+  };
+  calendarEventId: string;
 };

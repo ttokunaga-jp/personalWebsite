@@ -10,8 +10,10 @@ type TimeWindow struct {
 
 // AvailabilitySlot describes a single bookable slot.
 type AvailabilitySlot struct {
-	Start time.Time `json:"start"`
-	End   time.Time `json:"end"`
+	ID         string    `json:"id"`
+	Start      time.Time `json:"start"`
+	End        time.Time `json:"end"`
+	IsBookable bool      `json:"isBookable"`
 }
 
 // AvailabilityDay aggregates slots for a calendar date.

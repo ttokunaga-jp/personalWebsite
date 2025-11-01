@@ -17,7 +17,7 @@ import type {
   ContactAvailabilityResponse,
   ContactConfigResponse,
   CreateBookingPayload,
-  CreateBookingResponse,
+  BookingResult,
   ProfileResponse,
   Project,
   ResearchEntry,
@@ -50,26 +50,32 @@ function createMockAvailability(): ContactAvailabilityResponse {
   const now = new Date();
   now.setMinutes(0, 0, 0);
 
-  const slots = Array.from({ length: 6 }).map((_, index) => {
-    const start = new Date(now);
-    start.setDate(start.getDate() + Math.floor(index / 2));
-    start.setHours(9 + (index % 3) * 2);
-
-    const end = new Date(start);
-    end.setHours(start.getHours() + 1);
-
-    return {
-      id: `mock-slot-${index + 1}`,
-      start: start.toISOString(),
-      end: end.toISOString(),
-      isBookable: index % 4 !== 0,
-    };
-  });
+  const days: ContactAvailabilityResponse["days"] = [];
+  for (let offset = 0; offset < 3; offset += 1) {
+    const base = new Date(now);
+    base.setDate(base.getDate() + offset);
+    const slots = Array.from({ length: 3 }).map((_, index) => {
+      const start = new Date(base);
+      start.setHours(9 + index * 2, 0, 0, 0);
+      const end = new Date(start);
+      end.setHours(start.getHours() + 1);
+      return {
+        id: start.toISOString(),
+        start: start.toISOString(),
+        end: end.toISOString(),
+        isBookable: true,
+      };
+    });
+    days.push({
+      date: base.toISOString().slice(0, 10),
+      slots,
+    });
+  }
 
   return {
     timezone: "Asia/Tokyo",
     generatedAt: new Date().toISOString(),
-    slots,
+    days,
   };
 }
 
@@ -85,13 +91,6 @@ function createMockContactConfig(): ContactConfigResponse {
     minimumLeadHours: 48,
     consentText:
       "Provided details are used only to coordinate the requested meeting. Expect a reply within two business days.",
-  };
-}
-
-function createMockBookingResponse(): CreateBookingResponse {
-  return {
-    bookingId: `mock-${Date.now()}`,
-    status: "pending",
   };
 }
 
@@ -167,13 +166,26 @@ export const publicApi = {
   },
   async createBooking(
     payload: CreateBookingPayload,
-  ): Promise<CreateBookingResponse> {
+  ): Promise<BookingResult> {
     if (USE_MOCK_PUBLIC_API) {
-      return createMockBookingResponse();
+      return {
+        meeting: {
+          id: Date.now(),
+          name: payload.name,
+          email: payload.email,
+          datetime: payload.startTime,
+          durationMinutes: payload.durationMinutes,
+          meetUrl: "",
+          calendarEventId: "",
+          status: "pending",
+          notes: payload.agenda,
+        },
+        calendarEventId: "",
+      };
     }
 
     const response = await apiClient.post<
-      ApiSuccessResponse<CreateBookingResponse>
+      ApiSuccessResponse<BookingResult>
     >(`${BASE_PATH}/contact/bookings`, payload);
     return unwrapData(response.data);
   },

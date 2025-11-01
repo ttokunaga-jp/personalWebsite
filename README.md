@@ -1,7 +1,7 @@
 # Personal Website
 
 ## 概要
-Go (Gin) 製の API と React + TypeScript 製 SPA（公開サイト / 管理画面）を中心に、Firestore・Google Calendar / Gmail・Terraform・GCP（Cloud Run / Cloud Build）までを一貫して扱う個人ポートフォリオサイトの基盤です。ローカル開発から CI/CD、自動デプロイ、セキュリティ／可観測性までを含むプロダクション志向のテンプレートとして利用できます。
+ Go (Gin) 製の API と React + TypeScript 製 SPA（公開サイト / 管理画面）を中心に、Cloud SQL（MySQL）・Google Calendar / Gmail・Terraform・GCP（Cloud Run / Cloud Build）までを一貫して扱う個人ポートフォリオサイトの基盤です。ローカル開発から CI/CD、自動デプロイ、セキュリティ／可観測性までを含むプロダクション志向のテンプレートとして利用できます。
 
 ## 目次
 - [実装ステータス](#実装ステータス)
@@ -33,14 +33,14 @@ Go (Gin) 製の API と React + TypeScript 製 SPA（公開サイト / 管理画
 | 予約・外部連携 | MVP | Google Calendar への予定挿入、Gmail API 経由の通知をサポート。トークン更新やバックアップ導線は継続改善対象。|
 | テスト | 進行中 | Go/Vitest 単体テストと ESLint を整備。Playwright など E2E、自動ビジュアル回帰は未導入。|
 | CI/CD | 完了 | GitHub Actions → Cloud Build → Cloud Run で lint/test/build/deploy を自動化。Workload Identity Federation を使用。|
-| インフラ (Terraform) | ベース構築済み | `terraform/environments/dev` で VPC / Cloud Run モジュールを提供。Firestore や本番環境差分は追加実装の余地あり。|
+| インフラ (Terraform) | ベース構築済み | `terraform/environments/dev` で VPC / Cloud Run / Cloud SQL モジュールを提供。本番環境差分や監視強化は追加実装の余地あり。|
 
 ## 技術スタック
 - **バックエンド**: Go 1.22, Gin, Uber Fx, sqlx, Viper, Google API (OAuth / Calendar / Gmail), Prometheus instrumentation
 - **フロントエンド**: React 18, TypeScript, Vite, pnpm ワークスペース, Tailwind CSS, React Router, React Query, i18next
 - **テスト / 品質**: Go test, Vitest, Jest DOM, ESLint, Prettier, Husky + lint-staged, Playwright（E2E 準備済み）
-- **データベース**: Cloud Firestore (Native mode)
-- **インフラ**: Docker Compose, Terraform 1.5+, GCP（Cloud Run, Cloud Build, Artifact Registry, Secret Manager, Firestore, VPC Connector）
+- **データベース**: MySQL (Cloud SQL)
+- **インフラ**: Docker Compose, Terraform 1.5+, GCP（Cloud Run, Cloud Build, Artifact Registry, Secret Manager, VPC Connector）
 
 ## リポジトリ構成
 ```
@@ -92,6 +92,11 @@ Go (Gin) 製の API と React + TypeScript 製 SPA（公開サイト / 管理画
 | `APP_SECURITY_CSRF_SIGNING_KEY` | CSRF トークン署名キー。 |
 | `APP_GOOGLE_CLIENT_ID` / `APP_GOOGLE_CLIENT_SECRET` | Google OAuth クライアント情報。 |
 | `APP_GOOGLE_REDIRECT_URL` | Google OAuth のリダイレクト URL。Cloud Run 公開 URL の `/api/auth/callback` を指定。 |
+| `DB_DRIVER` | `mysql` または `firestore` を指定。データストア切替に使用。 |
+| `DB_USER` | 接続に使用する MySQL ユーザー名（Cloud SQL の IAM DB User など）。 |
+| `DB_PASSWORD` | `DB_USER` に対応するパスワード。Cloud Build / Secret Manager 経由で注入。 |
+| `DB_NAME` | 利用するデータベース名。 |
+| `DB_INSTANCE_CONNECTION_NAME` | Cloud SQL の接続名 (`project:region:instance`)。ローカルでは空のまま TCP 接続。 |
 
 追加の詳細設定は `backend/config/config.yaml` または環境変数 `APP_*` で上書きします（例: `APP_SECURITY_ENABLE_CSRF=false`）。予約ワークフロー向けには `APP_BOOKING_CALENDAR_ID` や `APP_BOOKING_NOTIFICATION_SENDER` なども利用できます。
 
@@ -136,7 +141,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
   ```
   - API: http://localhost:8100
   - フロント (nginx): http://localhost:3000
-  - Firestore が必要な場合は `gcloud beta emulators firestore start --host-port=localhost:8080` などでエミュレータを併用してください（`.env` の `APP_FIRESTORE_EMULATOR_HOST` を設定）。
+  - MySQL（Cloud SQL 互換）を別途起動し、`deploy/mysql/schema.sql` を適用して初期データベースを作成してください。Cloud SQL Proxy を利用する場合は `/cloudsql` ソケットをマウントし、`DB_INSTANCE_CONNECTION_NAME` を設定します。Firestore Token Store を利用する場合のみ `APP_FIRESTORE_*` を設定してください。
 - **ユーティリティ**:
   - `make build`: バックエンドバイナリ / フロント dist を生成
   - `make fmt`: Go / TypeScript のフォーマッタ実行
@@ -193,18 +198,31 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 - 予約時: Google Calendar API への挿入、Gmail API 経由のメール送信。Circuit Breaker + Retry + Timeout を実装。
 
 ## データ永続化
-- DB スキーマは `deploy/mysql/init` の SQL で初期化（コンテナ起動時に自動適用）。
+- DB スキーマは `deploy/mysql/schema.sql` の SQL で初期化（Cloud SQL やローカル MySQL に適用）。
 - エンティティ例:
   - `profile`: プロフィール情報
   - `projects`, `research`: 公開コンテンツ
   - `meetings`: 予約（`status`, `calendar_event_id` を保持）
   - `blacklist`: 予約を拒否するメールアドレス
   - `google_oauth_tokens`: Google API 用トークンの暗号化保存
-- リポジトリ実装: Firestore / In-memory の両方を実装し、テスト容易性を確保。
+- リポジトリ実装: MySQL / Firestore / In-memory の実装を持ち、環境に応じて DI で切り替え。
+
+### データストア切り替え
+- `DB_DRIVER=mysql`（既定）: Cloud SQL (MySQL) を使用。高トラフィック・長期運用向け。`
+- `DB_DRIVER=firestore`: Firestore を使用。初期プロダクションや低トラフィック環境でのコスト最適化に有効。
+- 例:
+  ```bash
+  export DB_DRIVER=firestore
+  export GCP_PROJECT_ID=my-project-id
+  export APP_FIRESTORE_PROJECT_ID=my-project-id
+  ```
+- Cloud Run / Secret Manager 経由で `DB_DRIVER` を環境ごとに登録することで、本番（Firestore）と検証環境（Cloud SQL）を切り替えられます。
 
 ## テストと品質保証
 - `make lint`: gofmt チェック + `go vet` + ESLint
 - `make test`: `go test ./...` + `pnpm -r test`
+- Firestore モードでの検証: `DB_DRIVER=firestore APP_FIRESTORE_PROJECT_ID=demo go test ./...`
+- Cloud SQL モードでの検証: `DB_DRIVER=mysql DB_USER=test DB_PASSWORD=test DB_NAME=personal_website go test ./...`
 - `pnpm --filter @personal-website/public test --watch`: 公開 SPA のウォッチモード
 - `pnpm test:e2e`: Playwright（セットアップ後に有効。CI には未組み込み）
 - `pnpm test:perf`: Lighthouse CI（ビルド後に実行。Node 18+ が必要）
@@ -302,7 +320,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 
 ## 今後の改善アイデア
 1. Go / React 双方で統合テスト・E2E テスト（Playwright）を CI に組み込み、カバレッジ 80% 以上を目指す。
-2. Terraform に Firestore / Secret Manager / Monitoring リソースを追加し、環境差分を完全 IaC 化する。
+2. Terraform に Cloud SQL Backups / Secret Manager / Monitoring リソースを追加し、環境差分を完全 IaC 化する。
 3. Cloud Build 後に自動でライトウェイトな Smoke テスト（`make smoke-backend`）や Lighthouse CI を走らせる。
 4. Cloud Monitoring にダッシュボード・アラートポリシーを定義し、インシデント対応の基盤を整える。
 5. 管理 SPA の UX 改善（並列編集、ドラフト機能）とアクセス制御細分化（ロールベース）を検討する。

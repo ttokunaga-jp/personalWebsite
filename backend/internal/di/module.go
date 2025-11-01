@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"github.com/jmoiron/sqlx"
 	"go.uber.org/fx"
 
 	"github.com/takumi/personal-website/internal/calendar"
@@ -14,9 +15,11 @@ import (
 	"github.com/takumi/personal-website/internal/handler"
 	firestoredb "github.com/takumi/personal-website/internal/infra/firestore"
 	"github.com/takumi/personal-website/internal/infra/google"
+	mysqlinfra "github.com/takumi/personal-website/internal/infra/mysql"
 	"github.com/takumi/personal-website/internal/logging"
 	"github.com/takumi/personal-website/internal/mail"
 	"github.com/takumi/personal-website/internal/middleware"
+	"github.com/takumi/personal-website/internal/repository"
 	"github.com/takumi/personal-website/internal/repository/provider"
 	csrfmgr "github.com/takumi/personal-website/internal/security/csrf"
 	"github.com/takumi/personal-website/internal/service"
@@ -27,6 +30,7 @@ import (
 
 var Module = fx.Module("di",
 	fx.Provide(
+		mysqlinfra.NewClient,
 		firestoredb.NewClient,
 		provideAuthConfig,
 		auth.NewJWTIssuer,
@@ -36,16 +40,16 @@ var Module = fx.Module("di",
 		google.NewGmailTokenManager,
 		auth.NewService,
 		auth.NewJWTVerifier,
-		provider.NewProfileRepository,
-		provider.NewProjectRepository,
+		provideProfileRepository,
+		provideProjectRepository,
 		provider.NewAdminProjectRepository,
-		provider.NewResearchRepository,
+		provideResearchRepository,
 		provider.NewAdminResearchRepository,
-		provider.NewContactRepository,
-		provider.NewAvailabilityRepository,
-		provider.NewBlogRepository,
-		provider.NewMeetingRepository,
-		provider.NewBlacklistRepository,
+		provideContactRepository,
+		provideAvailabilityRepository,
+		provideBlogRepository,
+		provideMeetingRepository,
+		provideBlacklistRepository,
 		provideHTTPClient,
 		provideGoogleTokenProvider,
 		provideCalendarClient,
@@ -148,4 +152,115 @@ func provideCSRFManager(cfg *config.AppConfig) *csrfmgr.Manager {
 		return nil
 	}
 	return csrfmgr.NewManager(cfg.Security.CSRFSigningKey, cfg.Security.CSRFTokenTTL)
+}
+
+func provideProfileRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.ProfileRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewProfileRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewProfileRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewProfileRepository(db, fs, cfg)
+	}
+}
+
+func provideProjectRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.ProjectRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewProjectRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewProjectRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewProjectRepository(db, fs, cfg)
+	}
+}
+
+func provideResearchRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.ResearchRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewResearchRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewResearchRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewResearchRepository(db, fs, cfg)
+	}
+}
+
+func provideContactRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.ContactRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewContactRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewContactRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewContactRepository(db, fs, cfg)
+	}
+}
+
+func provideAvailabilityRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.AvailabilityRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewAvailabilityRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewAvailabilityRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewAvailabilityRepository(db, fs, cfg)
+	}
+}
+
+func provideBlogRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.BlogRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewBlogRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewBlogRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewBlogRepository(db, fs, cfg)
+	}
+}
+
+func provideMeetingRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.MeetingRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewMeetingRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewMeetingRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewMeetingRepository(db, fs, cfg)
+	}
+}
+
+func provideBlacklistRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.BlacklistRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewBlacklistRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewBlacklistRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewBlacklistRepository(db, fs, cfg)
+	}
+}
+
+func normalizedDriver(cfg *config.AppConfig) string {
+	if cfg == nil {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(cfg.DBDriver))
 }

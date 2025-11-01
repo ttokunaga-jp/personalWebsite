@@ -3,7 +3,7 @@ import { setupServer } from "msw/node";
 
 import type {
   CreateBookingPayload,
-  CreateBookingResponse,
+  BookingResult,
 } from "../modules/public-api";
 
 import {
@@ -44,12 +44,20 @@ export const defaultHandlers = [
   ),
   http.post("/api/v1/public/contact/bookings", async ({ request }) => {
     const payload = (await request.json()) as CreateBookingPayload;
-    return HttpResponse.json({
-      data: {
-        ...defaultBookingResponse,
-        bookingId: `bk-${payload.slotId || "unknown"}`,
-      } satisfies CreateBookingResponse,
-    });
+    const result: BookingResult = {
+      ...defaultBookingResponse,
+      meeting: {
+        ...defaultBookingResponse.meeting,
+        id: Date.now(),
+        name: payload.name,
+        email: payload.email,
+        datetime: payload.startTime,
+        durationMinutes: payload.durationMinutes,
+        notes: payload.agenda,
+      },
+      calendarEventId: defaultBookingResponse.calendarEventId,
+    };
+    return HttpResponse.json({ data: result });
   }),
   http.get("https://www.google.com/recaptcha/api.js", () =>
     HttpResponse.text("void grecaptcha;"),

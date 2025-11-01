@@ -139,18 +139,6 @@ sink:
   includeChildren: true
 ```
 
-```bash
-# scripts/db-checksum.sh
-set -euo pipefail
-DB_INSTANCE="${1:-personal-website-staging}"
-DB_NAME="${2:-app}"
-gcloud sql export sql "$DB_INSTANCE" "gs://$PROJECT-backup-temp/${DB_NAME}-$(date +%F).sql.gz" \
-  --database="$DB_NAME" \
-  --offload
-
-gsutil cp "gs://$PROJECT-backup-temp/${DB_NAME}-$(date +%F).sql.gz" - | gunzip | md5sum
-```
-
 # 設定
 - **ディレクトリ構造**：
   ```
@@ -158,18 +146,16 @@ gsutil cp "gs://$PROJECT-backup-temp/${DB_NAME}-$(date +%F).sql.gz" - | gunzip |
     architecture-design.md
     operations-design.md
   deploy/
+    mysql/
+      schema.sql
     cloud-logging/
       log-router.yaml
     monitoring/
       service.json
-    runbooks/
-      api-5xx.md
-      calendar-outage.md
-      sql-connection-exhaust.md
-  scripts/
-    db-checksum.sh
-    replay-calendar-events.sh
-    smoke-test.sh
+    runbooks/            # TODO: Runbook テンプレートを追加予定
+  backend/
+    scripts/
+      api_smoke.sh
   terraform/
     modules/
       monitoring/
@@ -190,8 +176,8 @@ gsutil cp "gs://$PROJECT-backup-temp/${DB_NAME}-$(date +%F).sql.gz" - | gunzip |
   - Cloud Monitoring で `test_notification` を実行し、PagerDuty/Slack に到達することを確認。
   - `gcloud alpha monitoring policies enable --policy=<id> --notification-channel=<test>` を用いて条件を一時的にトリガーし、Runbook リンクの動作を確認。
 - **バックアップ & リストア演習**：
-  - ステージング環境で日次バックアップを取得後、`gcloud sql backups restore` を自動化スクリプトから実行し、アンケートテーブルの件数一致を `scripts/db-checksum.sh` の結果で検証。
-  - Cloud Storage のバージョン復元を `gsutil cp -a` で実施し、React ビルドアセットのハッシュ一致を `scripts/smoke-test.sh` で確認。
+  - ステージング環境で日次バックアップを取得後、`gcloud sql backups restore` で別インスタンスにリストアし、`deploy/mysql/schema.sql` に含まれる代表テーブルで `CHECKSUM TABLE` を実行して整合性を確認。
+  - Cloud Storage のバージョン復元を `gsutil cp -a` で実施し、React ビルドアセットのハッシュ一致を `pnpm --filter @personal-website/public build` の出力と比較。API の基本機能は `backend/scripts/api_smoke.sh` で確認。
 - **可観測性検証**：
   - k6 シナリオで 10 分間負荷を与え、`latency_p95` と `error_rate` のメトリクス更新をダッシュボードで確認。
   - 管理画面のメトリクス表示コンポーネントが Cloud Monitoring API から最新値を取得する E2E テスト（Playwright）を実行。

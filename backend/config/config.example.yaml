@@ -70,3 +70,16 @@ metrics:
   namespace: "personal_website"
 logging:
   level: "info"
+db_driver: "mysql"
+database:
+  driver: "mysql"
+  dsn: "" # optional; when empty, uses DB_* environment variables
+  host: "127.0.0.1"
+  port: 3306
+  user: "app_user"
+  name: "personal_website"
+  instance_connection_name: "" # e.g. project:region:instance for Cloud SQL
+  timezone: "Asia/Tokyo"
+  max_open_conns: 10
+  max_idle_conns: 5
+  conn_max_lifetime: 30m

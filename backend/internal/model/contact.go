@@ -5,6 +5,7 @@ type ContactRequest struct {
 	Name    string `json:"name" binding:"required"`
 	Email   string `json:"email" binding:"required,email"`
 	Message string `json:"message" binding:"required"`
+	Topic   string `json:"topic"`
 }
 
 // ContactSubmission is a stub for persistence/queueing, ready for expansion.

@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useMemo, useState } from "react";
+import { FormEvent, useCallback, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -12,7 +12,7 @@ type FormState = {
   name: string;
   email: string;
   topic: string;
-  message: string;
+  agenda: string;
   slotId: string;
 };
 
@@ -34,12 +34,15 @@ const initialFormState: FormState = {
   name: "",
   email: "",
   topic: "",
-  message: "",
+  agenda: "",
   slotId: "",
 };
 
 export function ContactPage() {
   const { t } = useTranslation();
+  const messageFieldId = useId();
+  const messageErrorId = useId();
+  const messageConsentId = useId();
   const {
     data: availability,
     isLoading: isAvailabilityLoading,
@@ -50,7 +53,20 @@ export function ContactPage() {
     isLoading: isConfigLoading,
     error: configError,
   } = useContactConfig();
-  const slots = availability?.slots ?? [];
+  const availableSlots = useMemo(() => {
+    if (!availability?.days) {
+      return [];
+    }
+    return availability.days.flatMap((day) =>
+      day.slots.map((slot) => ({
+        id: slot.id || slot.start,
+        start: slot.start,
+        end: slot.end,
+        isBookable: slot.isBookable,
+      })),
+    );
+  }, [availability]);
+
   const topics = config?.topics ?? [];
 
   const [formState, setFormState] = useState<FormState>(initialFormState);
@@ -81,8 +97,8 @@ export function ContactPage() {
         errors.topic = t("contact.form.errors.topicRequired");
       }
 
-      if (!state.message.trim() || state.message.trim().length < 20) {
-        errors.message = t("contact.form.errors.messageLength");
+      if (!state.agenda.trim() || state.agenda.trim().length < 20) {
+        errors.agenda = t("contact.form.errors.messageLength");
       }
 
       if (!state.slotId) {
@@ -156,17 +172,34 @@ export function ContactPage() {
     try {
       setIsSubmitting(true);
       const recaptchaToken = await loadRecaptchaToken();
+      const selectedSlot = availableSlots.find(
+        (slot) => slot.id === formState.slotId,
+      );
+      if (!selectedSlot) {
+        setFormErrors({ slotId: t("contact.form.errors.slotRequired") });
+        return;
+      }
+
+      const slotStart = new Date(selectedSlot.start);
+      const slotEnd = new Date(selectedSlot.end);
+      const startTime = slotStart.toISOString();
+      const durationMinutes = Math.max(
+        1,
+        Math.round((slotEnd.getTime() - slotStart.getTime()) / 60000),
+      );
+
       const response = await publicApi.createBooking({
         name: formState.name.trim(),
         email: formState.email.trim(),
         topic: formState.topic,
-        message: formState.message.trim(),
-        slotId: formState.slotId,
+        agenda: formState.agenda.trim(),
+        startTime,
+        durationMinutes,
         recaptchaToken,
       });
 
       setStatusMessage(
-        t("contact.form.success", { bookingId: response.bookingId }),
+        t("contact.form.success", { bookingId: response.meeting.id }),
       );
       setFormState(initialFormState);
       setFormErrors({});
@@ -180,10 +213,7 @@ export function ContactPage() {
     }
   };
 
-  const selectSlot = (slotId: string, enabled: boolean) => {
-    if (!enabled) {
-      return;
-    }
+  const selectSlot = (slotId: string) => {
     setFormState((previous) => ({
       ...previous,
       slotId: previous.slotId === slotId ? "" : slotId,
@@ -224,28 +254,27 @@ export function ContactPage() {
               <span className="inline-block h-10 w-28 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
             </>
           )}
-          {!isAvailabilityLoading && slots.length === 0 ? (
+          {!isAvailabilityLoading && availableSlots.length === 0 ? (
             <span className="text-sm text-slate-500 dark:text-slate-400">
               {t("contact.availability.unavailable")}
             </span>
           ) : null}
-          {slots.map((slot) => {
+          {availableSlots.map((slot) => {
             const isSelected = formState.slotId === slot.id;
-            const isEnabled = slot.isBookable;
             return (
               <button
                 key={slot.id}
                 type="button"
-                onClick={() => selectSlot(slot.id, isEnabled)}
-                disabled={!isEnabled}
+                onClick={() => selectSlot(slot.id)}
                 className={`rounded-lg border px-3 py-2 text-sm transition ${
                   isSelected
                     ? "border-sky-500 bg-sky-500 text-white"
-                    : isEnabled
+                    : slot.isBookable
                       ? "border-slate-300 text-slate-700 hover:border-sky-400 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-400 dark:hover:text-sky-300"
                       : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-500"
                 }`}
                 aria-pressed={isSelected}
+                disabled={!slot.isBookable}
               >
                 <span className="block font-medium">
                   {formatDateTime(slot.start, availability?.timezone)}
@@ -352,29 +381,45 @@ export function ContactPage() {
             ) : null}
           </label>
 
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700 dark:text-slate-200">
+          <div className="flex flex-col gap-1 text-sm">
+            <label
+              className="font-medium text-slate-700 dark:text-slate-200"
+              htmlFor={messageFieldId}
+            >
               {t("contact.form.message")}
-            </span>
+            </label>
             <textarea
-              name="message"
+              id={messageFieldId}
+              name="agenda"
               rows={4}
-              value={formState.message}
-              onChange={handleInputChange("message")}
+              value={formState.agenda}
+              onChange={handleInputChange("agenda")}
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm transition focus-visible:border-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:focus-visible:border-sky-400 dark:focus-visible:ring-sky-900/60"
-              aria-invalid={Boolean(formErrors.message)}
+              aria-invalid={Boolean(formErrors.agenda)}
+              aria-describedby={[
+                formErrors.agenda ? messageErrorId : null,
+                config?.consentText ? messageConsentId : null,
+              ]
+                .filter(Boolean)
+                .join(" ") || undefined}
             />
-            {formErrors.message ? (
-              <span className="text-xs text-rose-500 dark:text-rose-400">
-                {formErrors.message}
+            {formErrors.agenda ? (
+              <span
+                id={messageErrorId}
+                className="text-xs text-rose-500 dark:text-rose-400"
+              >
+                {formErrors.agenda}
               </span>
             ) : null}
             {config?.consentText ? (
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p
+                id={messageConsentId}
+                className="text-xs text-slate-500 dark:text-slate-400"
+              >
                 {config.consentText}
               </p>
             ) : null}
-          </label>
+          </div>
         </fieldset>
 
         <button

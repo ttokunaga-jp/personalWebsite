@@ -61,6 +61,7 @@ func TestBookingService_Success(t *testing.T) {
 		StartTime:       now.Add(2 * time.Hour),
 		DurationMinutes: 45,
 		Agenda:          "Discuss portfolio improvements",
+		RecaptchaToken:  "test-token",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -111,6 +112,7 @@ func TestBookingService_Blacklist(t *testing.T) {
 		Email:           "blocked@example.com",
 		StartTime:       now.Add(2 * time.Hour),
 		DurationMinutes: 30,
+		RecaptchaToken:  "test-token",
 	})
 	require.Error(t, err)
 	appErr := errs.From(err)
@@ -164,6 +166,7 @@ func TestBookingService_BufferConflict(t *testing.T) {
 		Email:           "conflict@example.com",
 		StartTime:       conflictingStart,
 		DurationMinutes: 30,
+		RecaptchaToken:  "test-token",
 	})
 	require.Error(t, err)
 	appErr := errs.From(err)
@@ -209,6 +212,7 @@ func TestBookingService_CalendarFailure(t *testing.T) {
 		Email:           "retry@example.com",
 		StartTime:       now.Add(2 * time.Hour),
 		DurationMinutes: 30,
+		RecaptchaToken:  "test-token",
 	})
 	require.Error(t, err)
 	appErr := errs.From(err)
@@ -255,6 +259,7 @@ func TestBookingService_CalendarAuthRequired(t *testing.T) {
 		Email:           "auth@example.com",
 		StartTime:       now.Add(2 * time.Hour),
 		DurationMinutes: 30,
+		RecaptchaToken:  "test-token",
 	})
 	require.Error(t, err)
 	appErr := errs.From(err)

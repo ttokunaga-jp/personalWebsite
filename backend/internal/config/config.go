@@ -106,6 +106,20 @@ type LoggingConfig struct {
 	Level string `mapstructure:"level"`
 }
 
+type DatabaseConfig struct {
+	Driver                 string        `mapstructure:"driver"`
+	DSN                    string        `mapstructure:"dsn"`
+	Host                   string        `mapstructure:"host"`
+	Port                   int           `mapstructure:"port"`
+	User                   string        `mapstructure:"user"`
+	Name                   string        `mapstructure:"name"`
+	InstanceConnectionName string        `mapstructure:"instance_connection_name"`
+	Timezone               string        `mapstructure:"timezone"`
+	MaxOpenConns           int           `mapstructure:"max_open_conns"`
+	MaxIdleConns           int           `mapstructure:"max_idle_conns"`
+	ConnMaxLifetime        time.Duration `mapstructure:"conn_max_lifetime"`
+}
+
 type AppConfig struct {
 	Server    ServerConfig      `mapstructure:"server"`
 	Firestore FirestoreConfig   `mapstructure:"firestore"`
@@ -116,6 +130,8 @@ type AppConfig struct {
 	Security  SecurityConfig    `mapstructure:"security"`
 	Metrics   MetricsConfig     `mapstructure:"metrics"`
 	Logging   LoggingConfig     `mapstructure:"logging"`
+	Database  DatabaseConfig    `mapstructure:"database"`
+	DBDriver  string            `mapstructure:"db_driver"`
 }
 
 var Module = fx.Module("config",
@@ -198,6 +214,18 @@ func load() (*AppConfig, error) {
 	v.SetDefault("security.hsts_max_age_seconds", 63072000)
 	v.SetDefault("security.content_security_policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'")
 	v.SetDefault("security.referrer_policy", "strict-origin-when-cross-origin")
+	v.SetDefault("db_driver", "mysql")
+	v.SetDefault("database.driver", "mysql")
+	v.SetDefault("database.dsn", "")
+	v.SetDefault("database.host", "127.0.0.1")
+	v.SetDefault("database.port", 3306)
+	v.SetDefault("database.user", "")
+	v.SetDefault("database.name", "")
+	v.SetDefault("database.instance_connection_name", "")
+	v.SetDefault("database.timezone", "Asia/Tokyo")
+	v.SetDefault("database.max_open_conns", 10)
+	v.SetDefault("database.max_idle_conns", 5)
+	v.SetDefault("database.conn_max_lifetime", 30*time.Minute)
 	v.SetDefault("security.rate_limit_requests_per_minute", 120)
 	v.SetDefault("security.rate_limit_burst", 20)
 	v.SetDefault("security.rate_limit_whitelist", []string{})

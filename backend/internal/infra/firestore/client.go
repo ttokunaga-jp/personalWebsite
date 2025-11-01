@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"cloud.google.com/go/firestore"
+	firebase "firebase.google.com/go/v4"
 	"go.uber.org/fx"
 	"google.golang.org/api/option"
 
@@ -19,6 +21,10 @@ import (
 func NewClient(lc fx.Lifecycle, cfg *config.AppConfig) (*firestore.Client, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("firestore client: missing app config")
+	}
+
+	if !strings.EqualFold(cfg.DBDriver, "firestore") {
+		return nil, nil
 	}
 
 	fsCfg := cfg.Firestore
@@ -40,7 +46,13 @@ func NewClient(lc fx.Lifecycle, cfg *config.AppConfig) (*firestore.Client, error
 		log.Printf("firestore client: custom database_id %q requested but NewClientWithConfig is unavailable; falling back to default database", fsCfg.DatabaseID)
 	}
 
-	client, err := firestore.NewClient(ctx, fsCfg.ProjectID, clientOptions(fsCfg)...)
+	opts := clientOptions(fsCfg)
+	app, err := firebase.NewApp(ctx, &firebase.Config{ProjectID: fsCfg.ProjectID}, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("firestore client: new app: %w", err)
+	}
+
+	client, err := app.Firestore(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("firestore client: create: %w", err)
 	}

@@ -2,27 +2,37 @@ package provider
 
 import (
 	"cloud.google.com/go/firestore"
+	"github.com/jmoiron/sqlx"
 
 	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/repository"
 	repoFirestore "github.com/takumi/personal-website/internal/repository/firestore"
 	"github.com/takumi/personal-website/internal/repository/inmemory"
+	repoMySQL "github.com/takumi/personal-website/internal/repository/mysql"
 )
 
-// NewProfileRepository selects an appropriate profile repository implementation based on the Firestore client.
-func NewProfileRepository(client *firestore.Client, cfg *config.AppConfig) repository.ProfileRepository {
-	if client == nil {
+// NewProfileRepository selects the appropriate implementation with a preference for MySQL.
+func NewProfileRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.ProfileRepository {
+	switch {
+	case db != nil:
+		return repoMySQL.NewProfileRepository(db)
+	case client != nil:
+		return repoFirestore.NewProfileRepository(client, prefix(cfg))
+	default:
 		return inmemory.NewProfileRepository()
 	}
-	return repoFirestore.NewProfileRepository(client, prefix(cfg))
 }
 
-// NewProjectRepository selects an appropriate project repository implementation based on the Firestore client.
-func NewProjectRepository(client *firestore.Client, cfg *config.AppConfig) repository.ProjectRepository {
-	if client == nil {
+// NewProjectRepository selects an appropriate project repository implementation.
+func NewProjectRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.ProjectRepository {
+	switch {
+	case db != nil:
+		return repoMySQL.NewProjectRepository(db)
+	case client != nil:
+		return repoFirestore.NewProjectRepository(client, prefix(cfg))
+	default:
 		return inmemory.NewProjectRepository()
 	}
-	return repoFirestore.NewProjectRepository(client, prefix(cfg))
 }
 
 // NewAdminProjectRepository exposes the admin interface while reusing the concrete project repository instance.
@@ -33,12 +43,16 @@ func NewAdminProjectRepository(repo repository.ProjectRepository) repository.Adm
 	panic("project repository does not implement admin interface")
 }
 
-// NewResearchRepository selects an appropriate research repository implementation based on the Firestore client.
-func NewResearchRepository(client *firestore.Client, cfg *config.AppConfig) repository.ResearchRepository {
-	if client == nil {
+// NewResearchRepository selects an appropriate research repository implementation.
+func NewResearchRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.ResearchRepository {
+	switch {
+	case db != nil:
+		return repoMySQL.NewResearchRepository(db)
+	case client != nil:
+		return repoFirestore.NewResearchRepository(client, prefix(cfg))
+	default:
 		return inmemory.NewResearchRepository()
 	}
-	return repoFirestore.NewResearchRepository(client, prefix(cfg))
 }
 
 // NewAdminResearchRepository exposes the admin interface for the concrete implementation.
@@ -49,41 +63,63 @@ func NewAdminResearchRepository(repo repository.ResearchRepository) repository.A
 	panic("research repository does not implement admin interface")
 }
 
-// NewContactRepository keeps using the in-memory implementation until Firestore persistence is introduced.
-func NewContactRepository() repository.ContactRepository {
+// NewContactRepository selects the backing store for contact messages.
+func NewContactRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.ContactRepository {
+	if db != nil {
+		return repoMySQL.NewContactRepository(db)
+	}
+	if client != nil {
+		return repoFirestore.NewContactRepository(client, prefix(cfg))
+	}
 	return inmemory.NewContactRepository()
 }
 
 // NewAvailabilityRepository selects the appropriate implementation for schedule computation.
-func NewAvailabilityRepository(client *firestore.Client, cfg *config.AppConfig) repository.AvailabilityRepository {
-	if client == nil {
+func NewAvailabilityRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.AvailabilityRepository {
+	switch {
+	case db != nil:
+		return repoMySQL.NewAvailabilityRepository(db)
+	case client != nil:
+		return repoFirestore.NewAvailabilityRepository(client, prefix(cfg))
+	default:
 		return inmemory.NewAvailabilityRepository()
 	}
-	return repoFirestore.NewAvailabilityRepository(client, prefix(cfg))
 }
 
 // NewBlogRepository selects an appropriate blog repository implementation based on the Firestore client.
-func NewBlogRepository(client *firestore.Client, cfg *config.AppConfig) repository.BlogRepository {
-	if client == nil {
+func NewBlogRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.BlogRepository {
+	switch {
+	case db != nil:
+		return repoMySQL.NewBlogRepository(db)
+	case client != nil:
+		return repoFirestore.NewBlogRepository(client, prefix(cfg))
+	default:
 		return inmemory.NewBlogRepository()
 	}
-	return repoFirestore.NewBlogRepository(client, prefix(cfg))
 }
 
 // NewMeetingRepository selects an appropriate meeting repository implementation based on the Firestore client.
-func NewMeetingRepository(client *firestore.Client, cfg *config.AppConfig) repository.MeetingRepository {
-	if client == nil {
+func NewMeetingRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.MeetingRepository {
+	switch {
+	case db != nil:
+		return repoMySQL.NewMeetingRepository(db)
+	case client != nil:
+		return repoFirestore.NewMeetingRepository(client, prefix(cfg))
+	default:
 		return inmemory.NewMeetingRepository()
 	}
-	return repoFirestore.NewMeetingRepository(client, prefix(cfg))
 }
 
 // NewBlacklistRepository selects an appropriate blacklist repository implementation based on the Firestore client.
-func NewBlacklistRepository(client *firestore.Client, cfg *config.AppConfig) repository.BlacklistRepository {
-	if client == nil {
+func NewBlacklistRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.BlacklistRepository {
+	switch {
+	case db != nil:
+		return repoMySQL.NewBlacklistRepository(db)
+	case client != nil:
+		return repoFirestore.NewBlacklistRepository(client, prefix(cfg))
+	default:
 		return inmemory.NewBlacklistRepository()
 	}
-	return repoFirestore.NewBlacklistRepository(client, prefix(cfg))
 }
 
 func prefix(cfg *config.AppConfig) string {

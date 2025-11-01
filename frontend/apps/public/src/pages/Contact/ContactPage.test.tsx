@@ -67,9 +67,29 @@ describe("ContactPage", () => {
 
   it("submits a booking request after collecting a Recaptcha token", async () => {
     const user = userEvent.setup();
+    const firstSlot = contactAvailabilityFixture.days[0]?.slots[0];
     const createBookingMock = vi
       .spyOn(publicApi, "createBooking")
-      .mockResolvedValue({ bookingId: "bk-slot-1", status: "pending" });
+      .mockResolvedValue({
+        meeting: {
+          id: 1,
+          name: "Jane Doe",
+          email: "jane.doe@example.com",
+          datetime: firstSlot?.start ?? "",
+          durationMinutes: firstSlot
+            ? Math.round(
+                (new Date(firstSlot.end).getTime() -
+                  new Date(firstSlot.start).getTime()) /
+                  60000,
+              )
+            : 30,
+          meetUrl: "",
+          calendarEventId: "event-1",
+          status: "pending",
+          notes: "[Research collaboration] I would like to discuss possibilities for joint research in HRI.",
+        },
+        calendarEventId: "event-1",
+      });
 
     window.grecaptcha = {
       ready: (callback: () => void) => {
@@ -83,21 +103,12 @@ describe("ContactPage", () => {
     const nameInput = await screen.findByLabelText("Your name");
     const emailInput = await screen.findByLabelText("Email address");
     const topicSelect = await screen.findByLabelText("Topic");
-    const textboxes = await screen.findAllByRole("textbox");
-    const messageTextarea = textboxes.find(
-      (element) => element.getAttribute("name") === "message",
-    );
-    if (!messageTextarea) {
-      throw new Error("Message textarea not found");
-    }
+    const agendaTextarea = await screen.findByLabelText("Message");
 
     await user.type(nameInput, "  Jane Doe  ");
     await user.type(emailInput, "jane.doe@example.com");
     await user.selectOptions(topicSelect, contactConfigFixture.topics[0] ?? "");
-    await user.type(
-      messageTextarea,
-      "I would like to discuss possibilities for joint research in HRI.",
-    );
+    await user.type(agendaTextarea, "I would like to discuss possibilities for joint research in HRI.");
 
     const slotButton = await getFirstAvailableSlotButton();
     await user.click(slotButton);
@@ -105,16 +116,23 @@ describe("ContactPage", () => {
     await user.click(screen.getByRole("button", { name: /request booking/i }));
 
     expect(
-      await screen.findByText(/Your request \(ID: bk-slot-1\)/),
+      await screen.findByText(/Your request \(ID: 1\)/),
     ).toBeInTheDocument();
 
     expect(createBookingMock).toHaveBeenCalledWith({
       name: "Jane Doe",
       email: "jane.doe@example.com",
       topic: contactConfigFixture.topics[0] ?? "",
-      message:
+      agenda:
         "I would like to discuss possibilities for joint research in HRI.",
-      slotId: contactAvailabilityFixture.slots[0]?.id ?? "",
+      startTime: firstSlot?.start ?? "",
+      durationMinutes: firstSlot
+        ? Math.round(
+            (new Date(firstSlot.end).getTime() -
+              new Date(firstSlot.start).getTime()) /
+              60000,
+          )
+        : 30,
       recaptchaToken: "recaptcha-token-123",
     });
 

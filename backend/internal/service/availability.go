@@ -113,8 +113,10 @@ func buildSlots(dayStart, dayEnd time.Time, slotDuration time.Duration, busy []m
 			continue
 		}
 		slots = append(slots, model.AvailabilitySlot{
-			Start: cursor,
-			End:   slotEnd,
+			ID:         cursor.UTC().Format(time.RFC3339),
+			Start:      cursor,
+			End:        slotEnd,
+			IsBookable: true,
 		})
 	}
 	return slots

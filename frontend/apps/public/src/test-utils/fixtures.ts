@@ -6,7 +6,7 @@ import {
 import type {
   ContactAvailabilityResponse,
   ContactConfigResponse,
-  CreateBookingResponse,
+  BookingResult,
   ProfileResponse,
   Project,
   ResearchEntry,
@@ -36,18 +36,27 @@ export const projectsFixture: Project[] =
 export const contactAvailabilityFixture: ContactAvailabilityResponse = {
   timezone: "Asia/Tokyo",
   generatedAt: iso(now),
-  slots: [
+  days: [
     {
-      id: "slot-1",
-      start: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24)),
-      end: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24 + 30 * 60 * 1000)),
-      isBookable: true,
-    },
-    {
-      id: "slot-2",
-      start: iso(new Date(now.getTime() + 1000 * 60 * 60 * 48)),
-      end: iso(new Date(now.getTime() + 1000 * 60 * 60 * 48 + 30 * 60 * 1000)),
-      isBookable: false,
+      date: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24)).slice(0, 10),
+      slots: [
+        {
+          id: "slot-1",
+          start: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24)),
+          end: iso(
+            new Date(now.getTime() + 1000 * 60 * 60 * 24 + 30 * 60 * 1000),
+          ),
+          isBookable: true,
+        },
+        {
+          id: "slot-2",
+          start: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24 + 2 * 60 * 60 * 1000)),
+          end: iso(
+            new Date(now.getTime() + 1000 * 60 * 60 * 24 + 2 * 60 * 60 * 1000 + 30 * 60 * 1000),
+          ),
+          isBookable: false,
+        },
+      ],
     },
   ],
 };
@@ -59,8 +68,17 @@ export const contactConfigFixture: ContactConfigResponse = {
   consentText: "We only use your information for scheduling purposes.",
 };
 
-export const defaultBookingResponse: CreateBookingResponse = {
-  bookingId: "bk-slot-1",
-  status: "pending",
-  calendarUrl: "https://calendar.example.com/bookings/bk-slot-1",
+export const defaultBookingResponse: BookingResult = {
+  meeting: {
+    id: 1,
+    name: "Jane Doe",
+    email: "jane.doe@example.com",
+    datetime: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24)),
+    durationMinutes: 30,
+    meetUrl: "https://meet.example.com/abc",
+    calendarEventId: "event-1",
+    status: "pending",
+    notes: "Initial consultation",
+  },
+  calendarEventId: "event-1",
 };

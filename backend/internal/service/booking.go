@@ -102,6 +102,7 @@ func (s *bookingService) Book(ctx context.Context, req model.BookingRequest) (*m
 	name := strings.TrimSpace(req.Name)
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	agenda := strings.TrimSpace(req.Agenda)
+	topic := strings.TrimSpace(req.Topic)
 
 	loc, err := time.LoadLocation(s.contactCfg.Timezone)
 	if err != nil {
@@ -117,6 +118,10 @@ func (s *bookingService) Book(ctx context.Context, req model.BookingRequest) (*m
 	duration := time.Duration(req.DurationMinutes) * time.Minute
 	if duration <= 0 {
 		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "duration must be greater than zero", nil)
+	}
+
+	if strings.TrimSpace(req.RecaptchaToken) == "" {
+		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "recaptcha token is required", nil)
 	}
 
 	bufferMinutes := s.contactCfg.BufferMinutes
@@ -183,6 +188,15 @@ func (s *bookingService) Book(ctx context.Context, req model.BookingRequest) (*m
 		meetURL = calendarEvent.HTMLLink
 	}
 
+	notes := agenda
+	if topic != "" {
+		if notes != "" {
+			notes = fmt.Sprintf("[%s] %s", topic, notes)
+		} else {
+			notes = fmt.Sprintf("[%s]", topic)
+		}
+	}
+
 	newMeeting := model.Meeting{
 		Name:            name,
 		Email:           email,
@@ -191,7 +205,7 @@ func (s *bookingService) Book(ctx context.Context, req model.BookingRequest) (*m
 		MeetURL:         strings.TrimSpace(meetURL),
 		CalendarEventID: calendarEvent.ID,
 		Status:          model.MeetingStatusPending,
-		Notes:           agenda,
+		Notes:           notes,
 	}
 
 	stored, err := s.meetings.CreateMeeting(ctx, &newMeeting)

@@ -17,7 +17,7 @@ describe("ProfilePage", () => {
       throw new Error("Affiliation card not found");
     }
 
-    const items = within(affiliationCard).getAllByRole("listitem");
+    const items = await within(affiliationCard).findAllByRole("listitem");
     expect(items[0]).toHaveTextContent(
       profileFixture.affiliations[0]?.organization ?? "",
     );
@@ -34,7 +34,7 @@ describe("ProfilePage", () => {
     }
 
     expect(
-      within(skillsCard).getByText(
+      await within(skillsCard).findByText(
         profileFixture.skillGroups[0]?.items[0]?.name ?? "",
       ),
     ).toBeInTheDocument();

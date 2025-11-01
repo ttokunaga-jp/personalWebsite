@@ -1,6 +1,6 @@
 import type { Router as RemixRouter } from "@remix-run/router";
-import { render } from "@testing-library/react";
-import { act } from "react";
+import { act, render } from "@testing-library/react";
+import type { RenderResult } from "@testing-library/react";
 
 import { App, type AppThemeOverrides } from "../App";
 import { createAppMemoryRouter } from "../app/router";
@@ -16,20 +16,16 @@ export async function renderWithRouter({
   initialEntries,
   router,
   themeOverrides,
-}: RenderWithRouterOptions = {}) {
+}: RenderWithRouterOptions = {}): Promise<RenderResult & { router: RemixRouter }> {
   await preloadRouteModules();
 
   const testRouter = router ?? createAppMemoryRouter(initialEntries);
 
-  let renderResult: ReturnType<typeof render> | null = null;
+  const renderResult = render(
+    <App router={testRouter} themeOverrides={themeOverrides} />,
+  );
 
-  await act(async () => {
-    renderResult = render(
-      <App router={testRouter} themeOverrides={themeOverrides} />,
-    );
-  });
-
-  // Allow any queued microtasks (e.g., i18n initialization) to resolve before assertions.
+  // Allow queued microtasks (e.g., i18n initialization) to settle before assertions.
   await act(
     () =>
       new Promise<void>((resolve) => {
@@ -37,9 +33,5 @@ export async function renderWithRouter({
       }),
   );
 
-  if (!renderResult) {
-    throw new Error("renderWithRouter failed to mount the component");
-  }
-
-  return Object.assign({ router: testRouter }, renderResult);
+  return { router: testRouter, ...renderResult };
 }

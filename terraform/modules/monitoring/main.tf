@@ -16,13 +16,11 @@ resource "google_logging_project_sink" "cloud_run" {
   name                   = var.log_sink_name
   destination            = "logging.googleapis.com/projects/${var.project_id}/locations/${var.log_location}/buckets/${google_logging_project_bucket_config.this.bucket_id}"
   filter                 = "resource.type=\"cloud_run_revision\""
-  include_children       = false
   unique_writer_identity = true
 }
 
-resource "google_logging_project_bucket_config_iam_member" "sink_writer" {
+resource "google_project_iam_member" "sink_writer" {
   project = var.project_id
-  bucket  = google_logging_project_bucket_config.this.bucket_id
   role    = "roles/logging.bucketWriter"
   member  = google_logging_project_sink.cloud_run.writer_identity
 }

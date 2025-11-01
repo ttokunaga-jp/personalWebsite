@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { act } from "react";
 import { afterAll, afterEach, beforeAll, vi } from "vitest";
+import { cleanup } from "@testing-library/react";
 
 import i18n from "./src/modules/i18n";
 import { server } from "./src/test-utils/server";
@@ -71,6 +72,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  cleanup();
   server.resetHandlers();
   vi.restoreAllMocks();
   window.localStorage.clear();

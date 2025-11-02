@@ -339,7 +339,9 @@ jobs:
                 append_unique BACKEND_REMOVE_ENV_VARS "${env_key}"
                 return
               fi
-              BACKEND_SECRETS_LIST+=("${env_key}=${ref}")
+              local run_ref
+              run_ref="$(format_secret_for_gcloud_run "${ref}")"
+              BACKEND_SECRETS_LIST+=("${env_key}=${run_ref}")
               append_unique BACKEND_REMOVE_ENV_VARS "${env_key}"
             else
               echo "Info: ${env_key} is treated as a literal value and will be injected via env vars." >&2
@@ -377,6 +379,27 @@ jobs:
               return 1
             fi
             return 0
+          }
+
+          format_secret_for_gcloud_run() {
+            local ref="$1"
+            local normalized="${ref}"
+            if [[ "${normalized}" != projects/*/secrets/*:* ]]; then
+              normalized="$(normalize_secret_ref "${normalized}")"
+            fi
+
+            local path="${normalized%:*}"
+            local version="${normalized##*:}"
+            local remainder="${path#projects/}"
+            local secret_project="${remainder%%/*}"
+            local secret_name="${remainder#*/secrets/}"
+            local run_ref="${secret_name}:${version}"
+
+            if [[ -n "${secret_project}" && "${secret_project}" != "${GCP_PROJECT_ID}" ]]; then
+              run_ref="${run_ref}@${secret_project}"
+            fi
+
+            printf '%s' "${run_ref}"
           }
 
           docker build -f backend/Dockerfile -t "${BACKEND_IMAGE}" backend
@@ -482,7 +505,7 @@ jobs:
             if is_secret_reference "${FRONTEND_RECAPTCHA}"; then
               FRONTEND_SECRET_RECAPTCHA_REF="$(normalize_secret_ref "${FRONTEND_RECAPTCHA}")"
               if require_secret_version "${FRONTEND_SECRET_RECAPTCHA_REF}" false; then
-                FRONTEND_SECRETS_ARGS+=(--set-secrets="VITE_RECAPTCHA_SECRET=${FRONTEND_SECRET_RECAPTCHA_REF}")
+                FRONTEND_SECRETS_ARGS+=(--set-secrets="VITE_RECAPTCHA_SECRET=$(format_secret_for_gcloud_run "${FRONTEND_SECRET_RECAPTCHA_REF}")")
               else
                 FRONTEND_SECRETS_ARGS+=(--remove-secrets="VITE_RECAPTCHA_SECRET")
               fi

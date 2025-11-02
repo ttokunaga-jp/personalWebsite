@@ -289,8 +289,9 @@ jobs:
           add_secret_or_env() {
             local env_key="$1"
             local value="$2"
+            local required_flag="${3:-true}"
             local required
-            if [[ "$3" == "false" ]]; then
+            if [[ "${required_flag}" == "false" ]]; then
               required="false"
             else
               required="true"

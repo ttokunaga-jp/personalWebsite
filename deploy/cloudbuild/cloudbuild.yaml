@@ -134,13 +134,30 @@ steps:
         BACKEND_TRAFFIC="${_BACKEND_TRAFFIC:-100}"
         FRONTEND_TRAFFIC="${_FRONTEND_TRAFFIC:-100}"
 
-        ensure_secret_ref() {
+        normalize_secret_ref() {
           local ref="$1"
-          if [[ "${ref}" == *":"* ]]; then
-            printf '%s' "${ref}"
-          else
-            printf '%s:latest' "${ref}"
+          local raw="${ref}"
+          local version=""
+
+          if [[ "${raw}" == sm://* ]]; then
+            raw="${raw#sm://}"
           fi
+
+          if [[ "${raw}" == *":"* ]]; then
+            version="${raw##*:}"
+            raw="${raw%:*}"
+          fi
+
+          local path="${raw}"
+          if [[ "${path}" != projects/*/secrets/* ]]; then
+            path="projects/${PROJECT_ID}/secrets/${path}"
+          fi
+
+          if [[ -z "${version}" ]]; then
+            version="latest"
+          fi
+
+          printf '%s:%s' "${path}" "${version}"
         }
 
         is_secret_reference() {
@@ -204,7 +221,7 @@ steps:
 
           if is_secret_reference "${value}"; then
             local ref
-            ref="$(ensure_secret_ref "${value}")"
+            ref="$(normalize_secret_ref "${value}")"
             require_secret_version "${ref}"
             BACKEND_SET_SECRETS_LIST+=("${env_key}=${ref}")
           else
@@ -216,21 +233,16 @@ steps:
 
         require_secret_version() {
           local ref="$1"
-          local identifier="${ref%:*}"
-          local version="${ref##*:}"
-          if [[ "${identifier}" == "${ref}" ]]; then
-            identifier="${ref}"
-            version="latest"
+          local normalized="${ref}"
+          if [[ "${normalized}" != projects/*/secrets/*:* ]]; then
+            normalized="$(normalize_secret_ref "${normalized}")"
           fi
 
-          local secret_project="${PROJECT_ID}"
-          local secret_name="${identifier}"
-
-          if [[ "${identifier}" == projects/*/secrets/* ]]; then
-            local remainder="${identifier#projects/}"
-            secret_project="${remainder%%/*}"
-            secret_name="${remainder#*/secrets/}"
-          fi
+          local path="${normalized%:*}"
+          local version="${normalized##*:}"
+          local remainder="${path#projects/}"
+          local secret_project="${remainder%%/*}"
+          local secret_name="${remainder#*/secrets/}"
 
           if ! gcloud secrets versions describe "${version}" \
             --secret="${secret_name}" \
@@ -300,7 +312,7 @@ steps:
 
         if [[ -n "${_FRONTEND_SECRET_RECAPTCHA}" ]]; then
           if is_secret_reference "${_FRONTEND_SECRET_RECAPTCHA}"; then
-            FRONTEND_SECRET_RECAPTCHA_REF="$(ensure_secret_ref "${_FRONTEND_SECRET_RECAPTCHA}")"
+            FRONTEND_SECRET_RECAPTCHA_REF="$(normalize_secret_ref "${_FRONTEND_SECRET_RECAPTCHA}")"
             require_secret_version "${FRONTEND_SECRET_RECAPTCHA_REF}"
             FRONTEND_SECRETS_ARGS+=(--set-secrets="VITE_RECAPTCHA_SECRET=${FRONTEND_SECRET_RECAPTCHA_REF}")
           else

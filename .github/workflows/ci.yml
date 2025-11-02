@@ -180,6 +180,7 @@ jobs:
           fi
           FRONTEND_API_BASE_CANON="${FRONTEND_API_BASE_CANON%/}"
           FRONTEND_PROXY_PASS="${FRONTEND_API_BASE_CANON}/"
+          FRONTEND_ADMIN_LOGIN_URL="${FRONTEND_API_BASE_CANON}/admin/auth/login"
 
           BACKEND_TRAFFIC="${BACKEND_TRAFFIC_PERCENT:-100}"
           FRONTEND_TRAFFIC="${FRONTEND_TRAFFIC_PERCENT:-100}"
@@ -409,7 +410,15 @@ jobs:
           }
 
           docker build -f backend/Dockerfile -t "${BACKEND_IMAGE}" backend
-          docker build -f frontend/Dockerfile -t "${FRONTEND_IMAGE}" frontend
+
+          FRONTEND_BUILD_ARGS=(
+            --build-arg "VITE_API_BASE_URL=${FRONTEND_API_BASE_CANON}"
+            --build-arg "VITE_ADMIN_LOGIN_URL=${FRONTEND_ADMIN_LOGIN_URL}"
+          )
+          if [[ -n "${FRONTEND_ADMIN_SUPPORT_EMAIL:-}" ]]; then
+            FRONTEND_BUILD_ARGS+=(--build-arg "VITE_ADMIN_SUPPORT_EMAIL=${FRONTEND_ADMIN_SUPPORT_EMAIL}")
+          fi
+          docker build "${FRONTEND_BUILD_ARGS[@]}" -f frontend/Dockerfile -t "${FRONTEND_IMAGE}" frontend
 
           docker push "${BACKEND_IMAGE}"
           docker push "${FRONTEND_IMAGE}"
@@ -504,7 +513,7 @@ jobs:
             echo "Warning: BACKEND_TRAFFIC_PERCENT=${BACKEND_TRAFFIC} is not currently applied. Update traffic manually via gcloud run services update-traffic." >&2
           fi
 
-          ENV_VARS_FRONTEND="ENV=${DEPLOY_ENV},VITE_API_BASE_URL=${FRONTEND_API_BASE_CANON},API_PROXY_PASS=${FRONTEND_PROXY_PASS}"
+          ENV_VARS_FRONTEND="ENV=${DEPLOY_ENV},VITE_API_BASE_URL=${FRONTEND_API_BASE_CANON},API_PROXY_PASS=${FRONTEND_PROXY_PASS},VITE_ADMIN_LOGIN_URL=${FRONTEND_ADMIN_LOGIN_URL}"
           FRONTEND_SECRETS_ARGS=()
 
           if [[ -n "${FRONTEND_RECAPTCHA}" ]]; then

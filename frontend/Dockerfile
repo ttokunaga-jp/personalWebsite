@@ -4,6 +4,13 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 WORKDIR /app
 
+ARG VITE_API_BASE_URL=/api
+ARG VITE_ADMIN_LOGIN_URL=/api/admin/auth/login
+ARG VITE_ADMIN_SUPPORT_EMAIL=support@example.com
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL \
+    VITE_ADMIN_LOGIN_URL=$VITE_ADMIN_LOGIN_URL \
+    VITE_ADMIN_SUPPORT_EMAIL=$VITE_ADMIN_SUPPORT_EMAIL
+
 COPY package.json pnpm-workspace.yaml tsconfig.json tsconfig.base.json ./
 COPY pnpm-lock.yaml ./pnpm-lock.yaml
 COPY packages ./packages

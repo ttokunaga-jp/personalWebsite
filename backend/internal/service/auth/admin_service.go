@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"log"
+	"net/url"
 	"strings"
 
 	"github.com/takumi/personal-website/internal/config"
@@ -208,6 +209,31 @@ func (s *adminService) ensureAllowed(info *UserInfo) error {
 func sanitizeAdminRedirect(requested, fallback string) string {
 	requested = strings.TrimSpace(requested)
 	fallback = strings.TrimSpace(fallback)
+
+	if fallback == "" {
+		fallback = "/admin"
+	}
+
+	if baseURL, err := url.Parse(fallback); err == nil && baseURL.IsAbs() && baseURL.Host != "" {
+		target := baseURL
+		if requested != "" {
+			if candidate, err := url.Parse(requested); err == nil {
+				switch {
+				case candidate.IsAbs():
+					if candidate.Host == baseURL.Host && candidate.Scheme == baseURL.Scheme {
+						target = candidate
+					}
+				case strings.HasPrefix(requested, "/"):
+					target = baseURL.ResolveReference(candidate)
+				}
+			}
+		}
+		if target.Path == "" {
+			target.Path = baseURL.Path
+		}
+		return target.String()
+	}
+
 	if fallback == "" {
 		fallback = "/admin"
 	}

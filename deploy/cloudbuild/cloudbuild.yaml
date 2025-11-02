@@ -76,6 +76,8 @@ steps:
         BACKEND_SECRET_CSRF="${_BACKEND_SECRET_CSRF}"
         BACKEND_SECRET_ADMIN_ALLOWED_EMAILS="${_BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}"
         BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS="${_BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}"
+        BACKEND_SECRET_RECAPTCHA="${_BACKEND_SECRET_RECAPTCHA}"
+        FRONTEND_SECRET_RECAPTCHA="${_FRONTEND_SECRET_RECAPTCHA}"
 
         if [[ -z "${BACKEND_SERVICE_ACCOUNT}" && -n "${FRONTEND_SERVICE_ACCOUNT}" ]]; then
           echo "Backend service account substitution missing. Reusing frontend service account." >&2
@@ -198,6 +200,19 @@ steps:
           fi
         }
 
+        append_unique() {
+          local list_name="$1"
+          local value="$2"
+          local -n list_ref="${list_name}"
+          for existing in "${list_ref[@]}"; do
+            if [[ "${existing}" == "${value}" ]]; then
+              return 0
+            fi
+          done
+          list_ref+=("${value}")
+          return 0
+        }
+
         append_backend_env_var() {
           append_env_var_to ENV_VARS_BACKEND "$1" "$2"
         }
@@ -210,29 +225,45 @@ steps:
           local env_key="$1"
           local value="$2"
           local required="${3:-true}"
+          local var_ref="${4:-}"
 
           if [[ -z "${value}" ]]; then
             if [[ "${required}" == "true" ]]; then
               echo "Error: ${env_key} is required but not provided." >&2
               exit 1
             fi
+            if [[ -n "${var_ref}" ]]; then
+              printf -v "${var_ref}" ''
+            fi
+            append_unique BACKEND_REMOVE_SECRETS "${env_key}"
             return
           }
 
           if is_secret_reference "${value}"; then
             local ref
             ref="$(normalize_secret_ref "${value}")"
-            require_secret_version "${ref}"
+            if ! require_secret_version "${ref}" "${required}"; then
+              if [[ "${required}" == "true" ]]; then
+                exit 1
+              fi
+              if [[ -n "${var_ref}" ]]; then
+                printf -v "${var_ref}" ''
+              fi
+              append_unique BACKEND_REMOVE_SECRETS "${env_key}"
+              return
+            fi
             BACKEND_SET_SECRETS_LIST+=("${env_key}=${ref}")
           else
             echo "Info: ${env_key} is treated as a literal value and will be injected via env vars." >&2
             append_backend_env_var "${env_key}" "${value}"
-            BACKEND_REMOVE_SECRETS+=("${env_key}")
+            append_unique BACKEND_REMOVE_SECRETS "${env_key}"
           fi
+          return 0
         }
 
         require_secret_version() {
           local ref="$1"
+          local required="${2:-true}"
           local normalized="${ref}"
           if [[ "${normalized}" != projects/*/secrets/*:* ]]; then
             normalized="$(normalize_secret_ref "${normalized}")"
@@ -248,9 +279,14 @@ steps:
             --secret="${secret_name}" \
             --project="${secret_project}" \
             --quiet >/dev/null 2>&1; then
-            echo "Error: Secret ${secret_project}/${secret_name} (version ${version}) is not accessible. Create it in Secret Manager or grant access." >&2
-            exit 1
+            if [[ "${required}" == "true" ]]; then
+              echo "Error: Secret ${secret_project}/${secret_name} (version ${version}) is not accessible. Create it in Secret Manager or grant access." >&2
+            else
+              echo "Warning: Secret ${secret_project}/${secret_name} (version ${version}) is not accessible. Skipping optional secret injection." >&2
+            fi
+            return 1
           fi
+          return 0
         }
 
         ENV_VARS_BACKEND="GIN_MODE=release,ENV=${_ENV},APP_FIRESTORE_PROJECT_ID=${PROJECT_ID},APP_FIRESTORE_DATABASE_ID=${_FIRESTORE_DATABASE_ID},APP_FIRESTORE_COLLECTION_PREFIX=${_FIRESTORE_COLLECTION_PREFIX},APP_GOOGLE_CLIENT_ID=${_BACKEND_GOOGLE_CLIENT_ID}"
@@ -262,8 +298,8 @@ steps:
         add_secret_or_env "APP_SECURITY_CSRF_SIGNING_KEY" "${BACKEND_SECRET_CSRF}"
         add_secret_or_env "APP_GOOGLE_CLIENT_SECRET" "${_BACKEND_SECRET_GOOGLE_CLIENT_SECRET}"
         add_secret_or_env "APP_AUTH_ADMIN_ALLOWED_EMAILS" "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}"
-        add_secret_or_env "APP_AUTH_ADMIN_ALLOWED_DOMAINS" "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}" "false"
-        add_secret_or_env "G_RECAPTCHA_SECRET" "${_BACKEND_SECRET_RECAPTCHA}" "false"
+        add_secret_or_env "APP_AUTH_ADMIN_ALLOWED_DOMAINS" "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}" "false" BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS
+        add_secret_or_env "G_RECAPTCHA_SECRET" "${BACKEND_SECRET_RECAPTCHA}" "false" BACKEND_SECRET_RECAPTCHA
 
         BACKEND_CMD=(
           gcloud run deploy "${_BACKEND_SERVICE}-${_ENV}"
@@ -310,14 +346,18 @@ steps:
         ENV_VARS_FRONTEND="ENV=${_ENV},VITE_API_BASE_URL=${_FRONTEND_API_BASE_URL}"
         FRONTEND_SECRETS_ARGS=()
 
-        if [[ -n "${_FRONTEND_SECRET_RECAPTCHA}" ]]; then
-          if is_secret_reference "${_FRONTEND_SECRET_RECAPTCHA}"; then
-            FRONTEND_SECRET_RECAPTCHA_REF="$(normalize_secret_ref "${_FRONTEND_SECRET_RECAPTCHA}")"
-            require_secret_version "${FRONTEND_SECRET_RECAPTCHA_REF}"
-            FRONTEND_SECRETS_ARGS+=(--set-secrets="VITE_RECAPTCHA_SECRET=${FRONTEND_SECRET_RECAPTCHA_REF}")
+        if [[ -n "${FRONTEND_SECRET_RECAPTCHA}" ]]; then
+          if is_secret_reference "${FRONTEND_SECRET_RECAPTCHA}"; then
+            FRONTEND_SECRET_RECAPTCHA_REF="$(normalize_secret_ref "${FRONTEND_SECRET_RECAPTCHA}")"
+            if require_secret_version "${FRONTEND_SECRET_RECAPTCHA_REF}" false; then
+              FRONTEND_SECRETS_ARGS+=(--set-secrets="VITE_RECAPTCHA_SECRET=${FRONTEND_SECRET_RECAPTCHA_REF}")
+            else
+              FRONTEND_SECRETS_ARGS+=(--remove-secrets="VITE_RECAPTCHA_SECRET")
+              FRONTEND_SECRET_RECAPTCHA=""
+            fi
           else
             echo "Info: VITE_RECAPTCHA_SECRET is treated as a literal value and will be injected via env vars." >&2
-            append_frontend_env_var "VITE_RECAPTCHA_SECRET" "${_FRONTEND_SECRET_RECAPTCHA}"
+            append_frontend_env_var "VITE_RECAPTCHA_SECRET" "${FRONTEND_SECRET_RECAPTCHA}"
             FRONTEND_SECRETS_ARGS+=(--remove-secrets="VITE_RECAPTCHA_SECRET")
           fi
         fi

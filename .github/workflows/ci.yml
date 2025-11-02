@@ -265,6 +265,19 @@ jobs:
             fi
           }
 
+          append_unique() {
+            local list_name="$1"
+            local value="$2"
+            local -n list_ref="${list_name}"
+            for existing in "${list_ref[@]}"; do
+              if [[ "${existing}" == "${value}" ]]; then
+                return 0
+              fi
+            done
+            list_ref+=("${value}")
+            return 0
+          }
+
           append_backend_env_var() {
             append_env_var_to ENV_VARS_BACKEND "$1" "$2"
           }
@@ -277,30 +290,48 @@ jobs:
             local env_key="$1"
             local value="$2"
             local required="${3:-true}"
+            local var_ref="${4:-}"
 
             if [[ -z "${value}" ]]; then
               if [[ "${required}" == "true" ]]; then
                 echo "Error: ${env_key} is required but not provided." >&2
                 exit 1
               fi
+              if [[ -n "${var_ref}" ]]; then
+                printf -v "${var_ref}" ''
+              fi
+              append_unique BACKEND_REMOVE_SECRETS "${env_key}"
+              append_unique BACKEND_REMOVE_ENV_VARS "${env_key}"
               return
             fi
 
             if is_secret_reference "${value}"; then
               local ref
               ref="$(normalize_secret_ref "${value}")"
-              require_secret_version "${ref}"
+              if ! require_secret_version "${ref}" "${required}"; then
+                if [[ "${required}" == "true" ]]; then
+                  exit 1
+                fi
+                if [[ -n "${var_ref}" ]]; then
+                  printf -v "${var_ref}" ''
+                fi
+                append_unique BACKEND_REMOVE_SECRETS "${env_key}"
+                append_unique BACKEND_REMOVE_ENV_VARS "${env_key}"
+                return
+              fi
               BACKEND_SECRETS_LIST+=("${env_key}=${ref}")
-              BACKEND_REMOVE_ENV_VARS+=("${env_key}")
+              append_unique BACKEND_REMOVE_ENV_VARS "${env_key}"
             else
               echo "Info: ${env_key} is treated as a literal value and will be injected via env vars." >&2
               append_backend_env_var "${env_key}" "${value}"
-              BACKEND_REMOVE_SECRETS+=("${env_key}")
+              append_unique BACKEND_REMOVE_SECRETS "${env_key}"
             fi
+            return 0
           }
 
           require_secret_version() {
             local ref="$1"
+            local required="${2:-true}"
             local normalized="${ref}"
             if [[ "${normalized}" != projects/*/secrets/*:* ]]; then
               normalized="$(normalize_secret_ref "${normalized}")"
@@ -316,9 +347,14 @@ jobs:
               --secret="${secret_name}" \
               --project="${secret_project}" \
               --quiet >/dev/null 2>&1; then
-              echo "Error: Secret ${secret_project}/${secret_name} (version ${version}) is not accessible. Create it in Secret Manager or grant access." >&2
-              exit 1
+              if [[ "${required}" == "true" ]]; then
+                echo "Error: Secret ${secret_project}/${secret_name} (version ${version}) is not accessible. Create it in Secret Manager or grant access." >&2
+              else
+                echo "Warning: Secret ${secret_project}/${secret_name} (version ${version}) is not accessible. Skipping optional secret injection." >&2
+              fi
+              return 1
             fi
+            return 0
           }
 
           docker build -f backend/Dockerfile -t "${BACKEND_IMAGE}" backend
@@ -337,8 +373,8 @@ jobs:
           add_secret_or_env "APP_SECURITY_CSRF_SIGNING_KEY" "${BACKEND_SECRET_CSRF}"
           add_secret_or_env "APP_GOOGLE_CLIENT_SECRET" "${BACKEND_SECRET_GOOGLE_CLIENT_SECRET}"
           add_secret_or_env "APP_AUTH_ADMIN_ALLOWED_EMAILS" "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}"
-          add_secret_or_env "APP_AUTH_ADMIN_ALLOWED_DOMAINS" "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS:-}" "false"
-          add_secret_or_env "G_RECAPTCHA_SECRET" "${BACKEND_RECAPTCHA:-}" "false"
+          add_secret_or_env "APP_AUTH_ADMIN_ALLOWED_DOMAINS" "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS:-}" "false" BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS
+          add_secret_or_env "G_RECAPTCHA_SECRET" "${BACKEND_RECAPTCHA:-}" "false" BACKEND_RECAPTCHA
 
           BACKEND_SECRETS=""
           if [[ ${#BACKEND_SECRETS_LIST[@]} -gt 0 ]]; then
@@ -415,8 +451,11 @@ jobs:
           if [[ -n "${FRONTEND_RECAPTCHA}" ]]; then
             if is_secret_reference "${FRONTEND_RECAPTCHA}"; then
               FRONTEND_SECRET_RECAPTCHA_REF="$(normalize_secret_ref "${FRONTEND_RECAPTCHA}")"
-              require_secret_version "${FRONTEND_SECRET_RECAPTCHA_REF}"
-              FRONTEND_SECRETS_ARGS+=(--set-secrets="VITE_RECAPTCHA_SECRET=${FRONTEND_SECRET_RECAPTCHA_REF}")
+              if require_secret_version "${FRONTEND_SECRET_RECAPTCHA_REF}" false; then
+                FRONTEND_SECRETS_ARGS+=(--set-secrets="VITE_RECAPTCHA_SECRET=${FRONTEND_SECRET_RECAPTCHA_REF}")
+              else
+                FRONTEND_SECRETS_ARGS+=(--remove-secrets="VITE_RECAPTCHA_SECRET")
+              fi
             else
               echo "Info: VITE_RECAPTCHA_SECRET is treated as a literal value and will be injected via env vars." >&2
               append_frontend_env_var "VITE_RECAPTCHA_SECRET" "${FRONTEND_RECAPTCHA}"

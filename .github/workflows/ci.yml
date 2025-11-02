@@ -210,9 +210,22 @@ jobs:
               raw="${raw#sm://}"
             fi
 
+            # Remove common control characters that break secret resolution
+            raw="${raw//$'\r'/}"
+            raw="${raw//$'\n'/}"
+            raw="${raw//$'\t'/}"
+
             if [[ "${raw}" == *":"* ]]; then
               version="${raw##*:}"
               raw="${raw%:*}"
+            fi
+
+            if [[ "${raw}" == */versions/* ]]; then
+              local candidate_version="${raw##*/versions/}"
+              if [[ -z "${version}" && -n "${candidate_version}" ]]; then
+                version="${candidate_version}"
+              fi
+              raw="${raw%/versions/*}"
             fi
 
             local path="${raw}"

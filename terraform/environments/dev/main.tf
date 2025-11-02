@@ -30,6 +30,15 @@ locals {
     "_",
     "-"
   )
+  api_base_raw = trimspace(var.public_api_base_url)
+  api_base_normalized = local.api_base_raw != "" ? regexreplace(local.api_base_raw, "/+$", "") : ""
+  api_base_canonical = local.api_base_normalized == "" ? "" : (
+    can(regex(".*/api(/.*)?$", local.api_base_normalized))
+    ? local.api_base_normalized
+    : "${local.api_base_normalized}/api"
+  )
+  api_proxy_pass  = local.api_base_canonical == "" ? "" : "${local.api_base_canonical}/"
+  admin_login_url = local.api_base_canonical == "" ? "" : "${local.api_base_canonical}/admin/auth/login"
 }
 
 module "project_services" {
@@ -222,9 +231,13 @@ module "frontend" {
   labels                = local.common_labels
   env_vars = merge(
     {
-      ENVIRONMENT  = var.environment
-      API_BASE_URL = var.public_api_base_url
+      ENVIRONMENT = var.environment
     },
+    local.api_base_canonical != "" ? {
+      VITE_API_BASE_URL    = local.api_base_canonical
+      API_PROXY_PASS       = local.api_proxy_pass
+      VITE_ADMIN_LOGIN_URL = local.admin_login_url
+    } : {},
     var.frontend_additional_env
   )
   secret_env_vars = var.frontend_secret_env

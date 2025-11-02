@@ -2,6 +2,12 @@ import { useTranslation } from "react-i18next";
 
 export function AdminLandingPage() {
   const { t } = useTranslation();
+  const loginBase =
+    import.meta.env.VITE_ADMIN_LOGIN_URL?.trim() || "/api/admin/auth/login";
+  const redirectParams = new URLSearchParams({ redirect_uri: "/admin" }).toString();
+  const loginHref = loginBase.includes("?")
+    ? `${loginBase}&${redirectParams}`
+    : `${loginBase}?${redirectParams}`;
 
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-12 sm:px-8">
@@ -21,7 +27,7 @@ export function AdminLandingPage() {
           {t("admin.loginCallout")}
         </p>
         <a
-          href="/api/admin/auth/login?redirect_uri=/admin"
+          href={loginHref}
           className="mt-4 inline-flex items-center justify-center rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
         >
           {t("admin.loginCta")}

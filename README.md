@@ -270,10 +270,11 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
    - `CLOUD_RUN_VPC_CONNECTOR`（必要な場合のみ。未接続なら空文字を設定）
    - `BACKEND_SERVICE_ACCOUNT_EMAIL`, `FRONTEND_SERVICE_ACCOUNT_EMAIL`
    - `FRONTEND_API_BASE_URL`
-   - `BACKEND_GOOGLE_CLIENT_ID`
-   - `FIRESTORE_DATABASE_ID`（必要な場合のみ）
-   - `FIRESTORE_COLLECTION_PREFIX`（必要な場合のみ）
-   - `BACKEND_TRAFFIC_PERCENT`, `FRONTEND_TRAFFIC_PERCENT`（現在の CI は 100% デプロイのみ自動適用。段階的リリースを行う場合はデプロイ後に `gcloud run services update-traffic` で手動調整が必要）
+    - `BACKEND_GOOGLE_CLIENT_ID`
+    - `FIRESTORE_DATABASE_ID`（必要な場合のみ）
+    - `FIRESTORE_COLLECTION_PREFIX`（必要な場合のみ）
+    - `BACKEND_TRAFFIC_PERCENT`, `FRONTEND_TRAFFIC_PERCENT`（現在の CI は 100% デプロイのみ自動適用。段階的リリースを行う場合はデプロイ後に `gcloud run services update-traffic` で手動調整が必要）
+   - ※ `FRONTEND_API_BASE_URL` には Cloud Run の API サービス公開 URL（`https://...run.app` 形式）を指定してください。CI/CD 側で自動的に `/api` を付与し、`API_PROXY_PASS` / `VITE_ADMIN_LOGIN_URL` を正しく設定します。
 2. 同環境の Secrets:
    - `BACKEND_SECRET_JWT`
    - `BACKEND_SECRET_STATE`

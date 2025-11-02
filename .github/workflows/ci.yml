@@ -440,10 +440,6 @@ jobs:
             BACKEND_CMD+=(--remove-secrets="$(IFS=,; printf '%s' "${BACKEND_REMOVE_SECRETS[*]}")")
           fi
 
-          if [[ ${#BACKEND_REMOVE_ENV_VARS[@]} -gt 0 ]]; then
-            BACKEND_CMD+=(--remove-env-vars="$(IFS=,; printf '%s' "${BACKEND_REMOVE_ENV_VARS[*]}")")
-          fi
-
           if [[ -n "${VPC}" ]]; then
             BACKEND_CMD+=(--vpc-connector="${VPC}")
           else
@@ -451,6 +447,18 @@ jobs:
           fi
 
           "${BACKEND_CMD[@]}"
+
+          if [[ ${#BACKEND_REMOVE_ENV_VARS[@]} -gt 0 ]]; then
+            BACKEND_REMOVE_ENV_VARS_JOINED="$(IFS=,; printf '%s' "${BACKEND_REMOVE_ENV_VARS[*]}")"
+            if ! gcloud run services update "${BACKEND_SERVICE_NAME}" \
+              --project="${GCP_PROJECT_ID}" \
+              --region="${CLOUD_RUN_REGION}" \
+              --platform=managed \
+              --remove-env-vars="${BACKEND_REMOVE_ENV_VARS_JOINED}" \
+              --quiet; then
+              echo "Warning: APP env var cleanup (${BACKEND_REMOVE_ENV_VARS_JOINED}) skipped (likely not previously set)." >&2
+            fi
+          fi
 
           if [[ -z "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS:-}" ]]; then
             if ! gcloud run services update "${BACKEND_SERVICE_NAME}" \

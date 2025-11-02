@@ -1,3 +1,4 @@
+# 修正箇所: 147行目 'set -euo pipefail' から 'u' を削除し 'set -eo pipefail' に変更
 name: CI / CD
 
 on:
@@ -143,7 +144,7 @@ jobs:
         env:
           DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'staging' }}
         run: |
-          set -euo pipefail
+          set -eo pipefail
 
           if [[ -z "${BACKEND_SERVICE_ACCOUNT:-}" && -n "${FRONTEND_SERVICE_ACCOUNT:-}" ]]; then
             echo "BACKEND_SERVICE_ACCOUNT is not set. Falling back to FRONTEND_SERVICE_ACCOUNT." >&2

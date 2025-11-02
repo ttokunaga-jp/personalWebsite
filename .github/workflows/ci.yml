@@ -289,7 +289,12 @@ jobs:
           add_secret_or_env() {
             local env_key="$1"
             local value="$2"
-            local required="${3:-true}"
+            local required
+            if [[ "$3" == "false" ]]; then
+              required="false"
+            else
+              required="true"
+            fi
             local var_ref="${4:-}"
 
             if [[ -z "${value}" ]]; then

@@ -234,15 +234,49 @@ jobs:
             printf '%s' "${value}"
           }
 
-          append_env_var() {
-            local key="$1"
-            local value="$2"
+          append_env_var_to() {
+            local list_name="$1"
+            local key="$2"
+            local value="$3"
             local escaped
             escaped="$(escape_env_value "${value}")"
-            if [[ -z "${ENV_VARS_BACKEND}" ]]; then
-              ENV_VARS_BACKEND="${key}=${escaped}"
+            if [[ -z "${!list_name}" ]]; then
+              printf -v "${list_name}" "%s=%s" "${key}" "${escaped}"
             else
-              ENV_VARS_BACKEND="${ENV_VARS_BACKEND},${key}=${escaped}"
+              printf -v "${list_name}" "%s,%s=%s" "${!list_name}" "${key}" "${escaped}"
+            fi
+          }
+
+          append_backend_env_var() {
+            append_env_var_to ENV_VARS_BACKEND "$1" "$2"
+          }
+
+          append_frontend_env_var() {
+            append_env_var_to ENV_VARS_FRONTEND "$1" "$2"
+          }
+
+          add_secret_or_env() {
+            local env_key="$1"
+            local value="$2"
+            local required="${3:-true}"
+
+            if [[ -z "${value}" ]]; then
+              if [[ "${required}" == "true" ]]; then
+                echo "Error: ${env_key} is required but not provided." >&2
+                exit 1
+              fi
+              return
+            fi
+
+            if is_secret_reference "${value}"; then
+              local ref
+              ref="$(ensure_secret_ref "${value}")"
+              require_secret_version "${ref}"
+              BACKEND_SECRETS_LIST+=("${env_key}=${ref}")
+            else
+              echo "Info: ${env_key} is treated as a literal value and will be injected via env vars." >&2
+              append_backend_env_var "${env_key}" "${value}"
+              BACKEND_REMOVE_SECRETS+=("${env_key}")
             fi
           }
 
@@ -280,55 +314,24 @@ jobs:
           docker push "${FRONTEND_IMAGE}"
 
           ENV_VARS_BACKEND="GIN_MODE=release,ENV=${DEPLOY_ENV},APP_FIRESTORE_PROJECT_ID=${GCP_PROJECT_ID},APP_FIRESTORE_DATABASE_ID=${FIRESTORE_DB},APP_FIRESTORE_COLLECTION_PREFIX=${FIRESTORE_PREFIX},APP_GOOGLE_CLIENT_ID=${BACKEND_GOOGLE_CLIENT_ID},APP_SERVER_PORT=8080"
-          BACKEND_SECRET_JWT_REF="$(ensure_secret_ref "${BACKEND_SECRET_JWT}")"
-          BACKEND_SECRET_STATE_REF="$(ensure_secret_ref "${BACKEND_SECRET_STATE}")"
-          BACKEND_SECRET_CSRF_REF="$(ensure_secret_ref "${BACKEND_SECRET_CSRF}")"
-          BACKEND_SECRET_GOOGLE_CLIENT_SECRET_REF="$(ensure_secret_ref "${BACKEND_SECRET_GOOGLE_CLIENT_SECRET}")"
-
-          require_secret_version "${BACKEND_SECRET_JWT_REF}"
-          require_secret_version "${BACKEND_SECRET_STATE_REF}"
-          require_secret_version "${BACKEND_SECRET_CSRF_REF}"
-          require_secret_version "${BACKEND_SECRET_GOOGLE_CLIENT_SECRET_REF}"
-          BACKEND_SECRETS_LIST=(
-            "APP_AUTH_JWT_SECRET=${BACKEND_SECRET_JWT_REF}"
-            "APP_AUTH_STATE_SECRET=${BACKEND_SECRET_STATE_REF}"
-            "APP_SECURITY_CSRF_SIGNING_KEY=${BACKEND_SECRET_CSRF_REF}"
-            "APP_GOOGLE_CLIENT_SECRET=${BACKEND_SECRET_GOOGLE_CLIENT_SECRET_REF}"
-          )
+          BACKEND_SECRETS_LIST=()
           BACKEND_REMOVE_SECRETS=()
 
-          if is_secret_reference "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}"; then
-            BACKEND_SECRET_ADMIN_ALLOWED_EMAILS_REF="$(ensure_secret_ref "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}")"
-            require_secret_version "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS_REF}"
-            BACKEND_SECRETS_LIST+=("APP_AUTH_ADMIN_ALLOWED_EMAILS=${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS_REF}")
-          else
-            echo "Info: BACKEND_SECRET_ADMIN_ALLOWED_EMAILS is treated as a literal value and will be injected via env vars." >&2
-            append_env_var "APP_AUTH_ADMIN_ALLOWED_EMAILS" "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}"
-            BACKEND_REMOVE_SECRETS+=("APP_AUTH_ADMIN_ALLOWED_EMAILS")
-          fi
+          add_secret_or_env "APP_AUTH_JWT_SECRET" "${BACKEND_SECRET_JWT}"
+          add_secret_or_env "APP_AUTH_STATE_SECRET" "${BACKEND_SECRET_STATE}"
+          add_secret_or_env "APP_SECURITY_CSRF_SIGNING_KEY" "${BACKEND_SECRET_CSRF}"
+          add_secret_or_env "APP_GOOGLE_CLIENT_SECRET" "${BACKEND_SECRET_GOOGLE_CLIENT_SECRET}"
+          add_secret_or_env "APP_AUTH_ADMIN_ALLOWED_EMAILS" "${BACKEND_SECRET_ADMIN_ALLOWED_EMAILS}"
+          add_secret_or_env "APP_AUTH_ADMIN_ALLOWED_DOMAINS" "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS:-}" "false"
+          add_secret_or_env "G_RECAPTCHA_SECRET" "${BACKEND_RECAPTCHA:-}" "false"
 
-          if [[ -n "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS:-}" ]]; then
-            if is_secret_reference "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}"; then
-              BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF="$(ensure_secret_ref "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}")"
-              require_secret_version "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF}"
-              BACKEND_SECRETS_LIST+=("APP_AUTH_ADMIN_ALLOWED_DOMAINS=${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS_REF}")
-            else
-              echo "Info: BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS is treated as a literal value and will be injected via env vars." >&2
-              append_env_var "APP_AUTH_ADMIN_ALLOWED_DOMAINS" "${BACKEND_SECRET_ADMIN_ALLOWED_DOMAINS}"
-              BACKEND_REMOVE_SECRETS+=("APP_AUTH_ADMIN_ALLOWED_DOMAINS")
-            fi
-          fi
-
-          BACKEND_SECRETS_IFS="${IFS}"
-          IFS=,
-          BACKEND_SECRETS="${BACKEND_SECRETS_LIST[*]}"
-          IFS="${BACKEND_SECRETS_IFS}"
-          unset BACKEND_SECRETS_IFS
-
-          if [[ -n "${BACKEND_RECAPTCHA}" ]]; then
-            BACKEND_SECRET_RECAPTCHA_REF="$(ensure_secret_ref "${BACKEND_RECAPTCHA}")"
-            require_secret_version "${BACKEND_SECRET_RECAPTCHA_REF}"
-            BACKEND_SECRETS="${BACKEND_SECRETS},G_RECAPTCHA_SECRET=${BACKEND_SECRET_RECAPTCHA_REF}"
+          BACKEND_SECRETS=""
+          if [[ ${#BACKEND_SECRETS_LIST[@]} -gt 0 ]]; then
+            BACKEND_SECRETS_IFS="${IFS}"
+            IFS=,
+            BACKEND_SECRETS="${BACKEND_SECRETS_LIST[*]}"
+            IFS="${BACKEND_SECRETS_IFS}"
+            unset BACKEND_SECRETS_IFS
           fi
 
           BACKEND_SERVICE_NAME="${BACKEND_SERVICE}"
@@ -351,11 +354,14 @@ jobs:
             --execution-environment=gen2
             --no-allow-unauthenticated
             --set-env-vars="${ENV_VARS_BACKEND}"
-            --set-secrets="${BACKEND_SECRETS}"
             --quiet
             --max-instances=3
             --labels="service=${BACKEND_SERVICE},stage=${DEPLOY_ENV},managed-by=github-actions"
           )
+
+          if [[ -n "${BACKEND_SECRETS}" ]]; then
+            BACKEND_CMD+=(--set-secrets="${BACKEND_SECRETS}")
+          fi
 
           if [[ ${#BACKEND_REMOVE_SECRETS[@]} -gt 0 ]]; then
             BACKEND_CMD+=(--remove-secrets="$(IFS=,; printf '%s' "${BACKEND_REMOVE_SECRETS[*]}")")
@@ -385,6 +391,20 @@ jobs:
           fi
 
           ENV_VARS_FRONTEND="ENV=${DEPLOY_ENV},VITE_API_BASE_URL=${FRONTEND_API_BASE_URL},API_PROXY_PASS=${FRONTEND_API_BASE_URL}"
+          FRONTEND_SECRETS_ARGS=()
+
+          if [[ -n "${FRONTEND_RECAPTCHA}" ]]; then
+            if is_secret_reference "${FRONTEND_RECAPTCHA}"; then
+              FRONTEND_SECRET_RECAPTCHA_REF="$(ensure_secret_ref "${FRONTEND_RECAPTCHA}")"
+              require_secret_version "${FRONTEND_SECRET_RECAPTCHA_REF}"
+              FRONTEND_SECRETS_ARGS+=(--set-secrets="VITE_RECAPTCHA_SECRET=${FRONTEND_SECRET_RECAPTCHA_REF}")
+            else
+              echo "Info: VITE_RECAPTCHA_SECRET is treated as a literal value and will be injected via env vars." >&2
+              append_frontend_env_var "VITE_RECAPTCHA_SECRET" "${FRONTEND_RECAPTCHA}"
+              FRONTEND_SECRETS_ARGS+=(--remove-secrets="VITE_RECAPTCHA_SECRET")
+            fi
+          fi
+
           FRONTEND_CMD=(
             gcloud run deploy "${FRONTEND_SERVICE_NAME}"
             --project="${GCP_PROJECT_ID}"
@@ -399,16 +419,14 @@ jobs:
             --labels="service=${FRONTEND_SERVICE},stage=${DEPLOY_ENV},managed-by=github-actions"
           )
 
-          if [[ -n "${FRONTEND_RECAPTCHA}" ]]; then
-            FRONTEND_SECRET_RECAPTCHA_REF="$(ensure_secret_ref "${FRONTEND_RECAPTCHA}")"
-            require_secret_version "${FRONTEND_SECRET_RECAPTCHA_REF}"
-            FRONTEND_CMD+=(--set-secrets="VITE_RECAPTCHA_SECRET=${FRONTEND_SECRET_RECAPTCHA_REF}")
-          fi
-
           if [[ -n "${VPC}" ]]; then
             FRONTEND_CMD+=(--vpc-connector="${VPC}")
           else
             FRONTEND_CMD+=(--clear-vpc-connector)
+          fi
+
+          if [[ ${#FRONTEND_SECRETS_ARGS[@]} -gt 0 ]]; then
+            FRONTEND_CMD+=("${FRONTEND_SECRETS_ARGS[@]}")
           fi
 
           "${FRONTEND_CMD[@]}"

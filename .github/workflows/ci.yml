@@ -203,17 +203,6 @@ jobs:
               BACKEND_ADMIN_DEFAULT_REDIRECT_URI="${FRONTEND_APP_BASE}/admin"
             fi
           fi
-          FRONTEND_APP_BASE="${FRONTEND_API_BASE_CANON%/api}"
-          if [[ "${FRONTEND_APP_BASE}" == "${FRONTEND_API_BASE_CANON}" ]]; then
-            FRONTEND_APP_BASE="${FRONTEND_API_BASE_CANON%/}"
-          fi
-          if [[ -z "${FRONTEND_APP_BASE}" ]]; then
-            BACKEND_ADMIN_DEFAULT_REDIRECT_URI="/admin"
-          else
-            FRONTEND_APP_BASE="${FRONTEND_APP_BASE%/}"
-            BACKEND_ADMIN_DEFAULT_REDIRECT_URI="${FRONTEND_APP_BASE}/admin"
-          fi
-
           BACKEND_TRAFFIC="${BACKEND_TRAFFIC_PERCENT:-100}"
           FRONTEND_TRAFFIC="${FRONTEND_TRAFFIC_PERCENT:-100}"
           BACKEND_RECAPTCHA="${BACKEND_SECRET_RECAPTCHA:-}"

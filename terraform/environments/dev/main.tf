@@ -39,6 +39,7 @@ locals {
   )
   api_proxy_pass  = local.api_base_canonical == "" ? "" : "${local.api_base_canonical}/"
   admin_login_url = local.api_base_canonical == "" ? "" : "${local.api_base_canonical}/admin/auth/login"
+  google_redirect_url = local.api_base_canonical == "" ? "" : "${local.api_base_canonical}/admin/auth/callback"
 }
 
 module "project_services" {
@@ -174,6 +175,9 @@ module "api" {
     trimspace(var.admin_redirect_uri) != "" ? {
       APP_ADMIN_REDIRECT_URI             = var.admin_redirect_uri
       APP_AUTH_ADMIN_DEFAULT_REDIRECT_URI = var.admin_redirect_uri
+    } : {},
+    local.google_redirect_url != "" ? {
+      APP_GOOGLE_REDIRECT_URL = local.google_redirect_url
     } : {},
     var.api_additional_env
   )

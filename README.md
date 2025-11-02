@@ -91,7 +91,7 @@
 | `APP_AUTH_STATE_SECRET` | Google OAuth の state/トークン暗号化に使用するシークレット。 |
 | `APP_SECURITY_CSRF_SIGNING_KEY` | CSRF トークン署名キー。 |
 | `APP_GOOGLE_CLIENT_ID` / `APP_GOOGLE_CLIENT_SECRET` | Google OAuth クライアント情報。 |
-| `APP_GOOGLE_REDIRECT_URL` | Google OAuth のリダイレクト URL。Cloud Run 公開 URL の `/api/auth/callback` を指定。 |
+| `APP_GOOGLE_REDIRECT_URL` | Google OAuth のリダイレクト URL。Cloud Run 公開 URL の `/api/admin/auth/callback` を指定。CI/CD では `FRONTEND_API_BASE_URL` から自動補完されます。 |
 | `APP_AUTH_ADMIN_ALLOWED_EMAILS` | 管理画面へアクセス可能なメールアドレスのリスト（カンマ区切り）。Secret Manager 経由で注入します。 |
 | `APP_ADMIN_ALLOWED_EMAILS` | `APP_AUTH_ADMIN_ALLOWED_EMAILS` の互換エイリアス。Terraform / Cloud Run で同一シークレットを共有。 |
 | `APP_AUTH_ADMIN_DEFAULT_REDIRECT_URI` | OAuth コールバック後にリダイレクトする管理 SPA のパス。既定は `/admin`。 |
@@ -274,7 +274,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
     - `FIRESTORE_DATABASE_ID`（必要な場合のみ）
     - `FIRESTORE_COLLECTION_PREFIX`（必要な場合のみ）
     - `BACKEND_TRAFFIC_PERCENT`, `FRONTEND_TRAFFIC_PERCENT`（現在の CI は 100% デプロイのみ自動適用。段階的リリースを行う場合はデプロイ後に `gcloud run services update-traffic` で手動調整が必要）
-   - ※ `FRONTEND_API_BASE_URL` には Cloud Run の API サービス公開 URL（`https://...run.app` 形式）を指定してください。CI/CD 側で自動的に `/api` を付与し、`API_PROXY_PASS` / `VITE_ADMIN_LOGIN_URL` を正しく設定します。
+   - ※ `FRONTEND_API_BASE_URL` には Cloud Run の API サービス公開 URL（`https://...run.app` 形式）を指定してください。CI/CD 側で自動的に `/api` を付与し、`API_PROXY_PASS` / `VITE_ADMIN_LOGIN_URL` / `APP_GOOGLE_REDIRECT_URL` を正しく設定します。
 2. 同環境の Secrets:
    - `BACKEND_SECRET_JWT`
    - `BACKEND_SECRET_STATE`

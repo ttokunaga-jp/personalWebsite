@@ -350,6 +350,8 @@ jobs:
             local secret_project="${remainder%%/*}"
             local secret_name="${remainder#*/secrets/}"
 
+            echo "Checking secret: ${secret_project}/${secret_name}"
+
             if ! gcloud secrets versions describe "${version}" \
               --secret="${secret_name}" \
               --project="${secret_project}" \

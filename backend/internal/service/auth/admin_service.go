@@ -144,11 +144,13 @@ func (s *adminService) HandleCallback(ctx context.Context, state, code string) (
 
 	token, err := s.provider.Exchange(ctx, code)
 	if err != nil {
+		log.Printf("admin auth: oauth exchange failed: %v", err)
 		return nil, errs.New(errs.CodeUnauthorized, 401, "oauth exchange failed", err)
 	}
 
 	userInfo, err := s.provider.FetchUserInfo(ctx, token)
 	if err != nil {
+		log.Printf("admin auth: oauth userinfo fetch failed: %v", err)
 		return nil, errs.New(errs.CodeUnauthorized, 401, "oauth userinfo fetch failed", err)
 	}
 	if !userInfo.EmailVerified {

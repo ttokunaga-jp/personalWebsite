@@ -143,11 +143,13 @@ func (s *service) HandleCallback(ctx context.Context, state, code string) (*Call
 
 	token, err := s.provider.Exchange(ctx, code)
 	if err != nil {
+		log.Printf("auth: oauth exchange failed: %v", err)
 		return nil, errs.New(errs.CodeUnauthorized, 401, "oauth exchange failed", err)
 	}
 
 	userInfo, err := s.provider.FetchUserInfo(ctx, token)
 	if err != nil {
+		log.Printf("auth: oauth userinfo fetch failed: %v", err)
 		return nil, errs.New(errs.CodeUnauthorized, 401, "oauth userinfo fetch failed", err)
 	}
 

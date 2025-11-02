@@ -30,15 +30,15 @@ locals {
     "_",
     "-"
   )
-  api_base_raw = trimspace(var.public_api_base_url)
+  api_base_raw        = trimspace(var.public_api_base_url)
   api_base_normalized = local.api_base_raw != "" ? regexreplace(local.api_base_raw, "/+$", "") : ""
   api_base_canonical = local.api_base_normalized == "" ? "" : (
     can(regex(".*/api(/.*)?$", local.api_base_normalized))
     ? local.api_base_normalized
     : "${local.api_base_normalized}/api"
   )
-  api_proxy_pass  = local.api_base_canonical == "" ? "" : "${local.api_base_canonical}/"
-  admin_login_url = local.api_base_canonical == "" ? "" : "${local.api_base_canonical}/admin/auth/login"
+  api_proxy_pass      = local.api_base_canonical == "" ? "" : "${local.api_base_canonical}/"
+  admin_login_url     = local.api_base_canonical == "" ? "" : "${local.api_base_canonical}/admin/auth/login"
   google_redirect_url = local.api_base_canonical == "" ? "" : "${local.api_base_canonical}/admin/auth/callback"
 }
 
@@ -173,7 +173,7 @@ module "api" {
       STORAGE_BUCKET              = module.assets_bucket.bucket_name
     },
     trimspace(var.admin_redirect_uri) != "" ? {
-      APP_ADMIN_REDIRECT_URI             = var.admin_redirect_uri
+      APP_ADMIN_REDIRECT_URI              = var.admin_redirect_uri
       APP_AUTH_ADMIN_DEFAULT_REDIRECT_URI = var.admin_redirect_uri
     } : {},
     local.google_redirect_url != "" ? {

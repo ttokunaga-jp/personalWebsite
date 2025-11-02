@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -25,7 +26,7 @@ func TestAdminAuthCallbackSetsCookieAndRedirects(t *testing.T) {
 			RedirectPath: "/admin/dashboard",
 		},
 	}
-	handler := NewAdminAuthHandler(service)
+	handler := NewAdminAuthHandler(service, nil, nil)
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -56,7 +57,7 @@ func TestAdminAuthCallbackValidatesQueryParameters(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
 
-	handler := NewAdminAuthHandler(&stubAdminAuthService{})
+	handler := NewAdminAuthHandler(&stubAdminAuthService{}, nil, nil)
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -76,7 +77,7 @@ func TestAdminAuthCallbackPropagatesServiceErrors(t *testing.T) {
 	service := &stubAdminAuthService{
 		callbackErr: errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "invalid oauth state", nil),
 	}
-	handler := NewAdminAuthHandler(service)
+	handler := NewAdminAuthHandler(service, nil, nil)
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -87,6 +88,60 @@ func TestAdminAuthCallbackPropagatesServiceErrors(t *testing.T) {
 
 	require.Equal(t, http.StatusUnauthorized, rec.Code)
 	require.Contains(t, rec.Body.String(), "invalid oauth state")
+}
+
+func TestAdminSessionRehydratesFromCookie(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	verifier := &stubTokenVerifier{
+		expectedToken: "cookie-token",
+		claims: &authsvc.Claims{
+			Subject:   "admin-subject",
+			Email:     "admin@example.com",
+			Roles:     []string{"admin"},
+			ExpiresAt: time.Now().Add(5 * time.Minute),
+		},
+	}
+	issuer := &stubTokenIssuer{
+		issuedToken: "refreshed-token",
+		expiresAt:   time.Now().Add(45 * time.Minute),
+	}
+
+	handler := NewAdminAuthHandler(&stubAdminAuthService{}, issuer, verifier)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/auth/session", nil)
+	req.AddCookie(&http.Cookie{Name: "ps_admin_jwt", Value: "cookie-token"})
+	c.Request = req
+
+	handler.Session(c)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var payload struct {
+		Data struct {
+			Active    bool   `json:"active"`
+			Token     string `json:"token"`
+			ExpiresAt int64  `json:"expiresAt"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	require.True(t, payload.Data.Active)
+	require.Equal(t, "refreshed-token", payload.Data.Token)
+	require.NotZero(t, payload.Data.ExpiresAt)
+
+	res := rec.Result()
+	var sessionCookie *http.Cookie
+	for _, cookie := range res.Cookies() {
+		if cookie.Name == "ps_admin_jwt" {
+			sessionCookie = cookie
+			break
+		}
+	}
+	require.NotNil(t, sessionCookie)
+	require.Equal(t, "refreshed-token", sessionCookie.Value)
 }
 
 type stubAdminAuthService struct {
@@ -115,4 +170,36 @@ func (s *stubAdminAuthService) HandleCallback(context.Context, string, string) (
 		ExpiresAt:    time.Now().Add(15 * time.Minute).Unix(),
 		RedirectPath: "/admin",
 	}, nil
+}
+
+type stubTokenIssuer struct {
+	issuedToken string
+	expiresAt   time.Time
+	err         error
+}
+
+func (s *stubTokenIssuer) Issue(_ context.Context, subject, email string, roles ...string) (string, time.Time, error) {
+	_ = subject
+	_ = email
+	_ = roles
+	if s.err != nil {
+		return "", time.Time{}, s.err
+	}
+	return s.issuedToken, s.expiresAt, nil
+}
+
+type stubTokenVerifier struct {
+	claims        *authsvc.Claims
+	err           error
+	expectedToken string
+}
+
+func (s *stubTokenVerifier) Verify(_ context.Context, token string) (*authsvc.Claims, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.expectedToken != "" && token != s.expectedToken {
+		return nil, errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "unexpected token", nil)
+	}
+	return s.claims, nil
 }

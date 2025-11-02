@@ -114,7 +114,11 @@ type AdminApi = {
     payload: BlacklistPayload,
   ) => ApiResult<BlacklistEntry>;
   deleteBlacklist: (id: number) => ApiResult<void>;
-  session: () => ApiResult<{ active: boolean }>;
+  session: () => ApiResult<{
+    active: boolean;
+    token?: string;
+    expiresAt?: number;
+  }>;
 };
 
 export const adminApi: AdminApi = {
@@ -157,5 +161,12 @@ export const adminApi: AdminApi = {
     unwrap(apiClient.post<BlacklistEntry>("/admin/blacklist", payload)),
   deleteBlacklist: (id: number) =>
     unwrap(apiClient.delete<void>(`/admin/blacklist/${id}`)),
-  session: () => unwrap(apiClient.get<{ active: boolean }>("/admin/auth/session")),
+  session: () =>
+    unwrap(
+      apiClient.get<{
+        active: boolean;
+        token?: string;
+        expiresAt?: number;
+      }>("/admin/auth/session"),
+    ),
 };

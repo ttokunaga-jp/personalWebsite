@@ -44,6 +44,7 @@ func registerRoutes(
 	{
 		adminAuth.GET("/login", adminAuthHandler.Login)
 		adminAuth.GET("/callback", adminAuthHandler.Callback)
+		adminAuth.GET("/session", adminAuthHandler.Session)
 	}
 
 	publicV1 := api.Group("/v1/public")

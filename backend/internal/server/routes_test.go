@@ -84,7 +84,7 @@ func TestRegisterRoutes(t *testing.T) {
 		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
-		handler.NewAdminAuthHandler(&stubAdminAuthService{}),
+		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}),
 		jwtMiddleware,
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
@@ -435,7 +435,7 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
-		handler.NewAdminAuthHandler(&stubAdminAuthService{}),
+		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}),
 		jwtMiddleware,
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
@@ -480,6 +480,23 @@ func (s *stubAdminAuthService) HandleCallback(context.Context, string, string) (
 		Token:        "admin-stub-token",
 		ExpiresAt:    456,
 		RedirectPath: "/admin",
+	}, nil
+}
+
+type stubTokenIssuer struct{}
+
+func (s *stubTokenIssuer) Issue(context.Context, string, string, ...string) (string, time.Time, error) {
+	return "stub-issued-token", time.Now().Add(time.Hour), nil
+}
+
+type stubTokenVerifier struct{}
+
+func (s *stubTokenVerifier) Verify(context.Context, string) (*auth.Claims, error) {
+	return &auth.Claims{
+		Subject:   "stub-admin",
+		Email:     "stub@example.com",
+		Roles:     []string{"admin"},
+		ExpiresAt: time.Now().Add(time.Hour),
 	}, nil
 }
 

@@ -185,10 +185,46 @@ function App() {
     if (token) {
       setAuthState("authenticated");
       void refreshAll();
-    } else {
-      handleUnauthorized();
+      return;
     }
-  }, [authState, token, refreshAll, handleUnauthorized]);
+
+    let cancelled = false;
+
+    const resumeSession = async () => {
+      try {
+        const sessionRes = await adminApi.session();
+        if (cancelled) {
+          return;
+        }
+        const sessionToken = sessionRes.data.token?.trim();
+        if (sessionToken) {
+          storeToken(sessionToken);
+        }
+        if (sessionRes.data.active) {
+          setAuthState("authenticated");
+          void refreshAll();
+        } else {
+          handleUnauthorized();
+        }
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+        if (isUnauthorizedError(err)) {
+          handleUnauthorized();
+        } else {
+          console.error(err);
+          handleUnauthorized();
+        }
+      }
+    };
+
+    void resumeSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authState, token, refreshAll, handleUnauthorized, storeToken]);
 
   useEffect(() => {
     if (authState !== "authenticated") {
@@ -208,7 +244,11 @@ function App() {
 
     const poll = async () => {
       try {
-        await adminApi.session();
+        const sessionRes = await adminApi.session();
+        const sessionToken = sessionRes.data.token?.trim();
+        if (sessionToken) {
+          storeToken(sessionToken);
+        }
       } catch (err) {
         if (isUnauthorizedError(err)) {
           handleUnauthorized();
@@ -221,7 +261,7 @@ function App() {
     void poll();
     const intervalId = window.setInterval(poll, 60_000);
     return () => window.clearInterval(intervalId);
-  }, [authState, handleUnauthorized]);
+  }, [authState, handleUnauthorized, storeToken]);
 
   const run = useCallback(
     async (operation: () => Promise<unknown>) => {

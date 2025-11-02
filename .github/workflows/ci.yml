@@ -173,7 +173,13 @@ jobs:
           fi
           : "${BACKEND_SECRET_GOOGLE_CLIENT_SECRET:?Missing BACKEND_SECRET_GOOGLE_CLIENT_SECRET secret}"
           : "${FRONTEND_API_BASE_URL:?Missing FRONTEND_API_BASE_URL var}"
-          FRONTEND_API_BASE_URL="${FRONTEND_API_BASE_URL%/}/"
+          FRONTEND_API_BASE_CANON="${FRONTEND_API_BASE_URL%/}"
+          if [[ "${FRONTEND_API_BASE_CANON}" != */api && "${FRONTEND_API_BASE_CANON}" != */api/* ]]; then
+            echo "Info: FRONTEND_API_BASE_URL does not include /api prefix. Appending automatically for SPA requests." >&2
+            FRONTEND_API_BASE_CANON="${FRONTEND_API_BASE_CANON%/}/api"
+          fi
+          FRONTEND_API_BASE_CANON="${FRONTEND_API_BASE_CANON%/}"
+          FRONTEND_PROXY_PASS="${FRONTEND_API_BASE_CANON}/"
 
           BACKEND_TRAFFIC="${BACKEND_TRAFFIC_PERCENT:-100}"
           FRONTEND_TRAFFIC="${FRONTEND_TRAFFIC_PERCENT:-100}"
@@ -448,7 +454,7 @@ jobs:
             --image="${BACKEND_IMAGE}"
             --service-account="${BACKEND_SERVICE_ACCOUNT}"
             --execution-environment=gen2
-            --no-allow-unauthenticated
+            --allow-unauthenticated
             --set-env-vars="${ENV_VARS_BACKEND}"
             --quiet
             --max-instances=3
@@ -498,7 +504,7 @@ jobs:
             echo "Warning: BACKEND_TRAFFIC_PERCENT=${BACKEND_TRAFFIC} is not currently applied. Update traffic manually via gcloud run services update-traffic." >&2
           fi
 
-          ENV_VARS_FRONTEND="ENV=${DEPLOY_ENV},VITE_API_BASE_URL=${FRONTEND_API_BASE_URL},API_PROXY_PASS=${FRONTEND_API_BASE_URL}"
+          ENV_VARS_FRONTEND="ENV=${DEPLOY_ENV},VITE_API_BASE_URL=${FRONTEND_API_BASE_CANON},API_PROXY_PASS=${FRONTEND_PROXY_PASS}"
           FRONTEND_SECRETS_ARGS=()
 
           if [[ -n "${FRONTEND_RECAPTCHA}" ]]; then

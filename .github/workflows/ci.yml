@@ -220,7 +220,7 @@ jobs:
             if [[ "${candidate}" == sm://* ]]; then
               return 0
             fi
-            if [[ "${candidate}" =~ ^[A-Za-z0-9_-]+(:[A-Za-z0-9_-]+)?$ ]]; then
+            if [[ "${candidate}" =~ ^[A-Za-z0-9_-]+:(latest|[0-9]+)$ ]]; then
               return 0
             fi
             return 1

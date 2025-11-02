@@ -281,7 +281,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
    - `BACKEND_SECRET_GOOGLE_CLIENT_SECRET`
    - `BACKEND_SECRET_RECAPTCHA`（任意）
    - `FRONTEND_SECRET_RECAPTCHA`（任意）
-   - Secret の値には Secret Manager のシークレット ID を設定すればよい（`:latest` などのバージョン指定は CI が自動的に付加）。
+   - Secret の値には Secret Manager のシークレットを `projects/<project>/secrets/<name>[:version]` 形式、または `sm://` URI で設定する（省略形を使う場合も `:<version>` を付けてください。例: `my-secret:latest`）。プレーンテキストを直接設定したい場合はメールアドレスなどのリテラル値をそのまま入力すれば `--set-env-vars` として注入されます。
 3. リポジトリ全体の Actions Secrets:
    - `GCP_PROJECT_ID`
    - `GCP_WORKLOAD_IDENTITY_PROVIDER`

@@ -17,7 +17,15 @@ describe("apiClient authentication interceptors", () => {
   it("attaches a bearer token from the registered provider", async () => {
     registerAuthTokenProvider(() => "test-bearer-token");
 
-    const handler = apiClient.interceptors.request.handlers[0]?.fulfilled;
+    const requestInterceptors =
+      apiClient.interceptors.request as unknown as {
+        handlers: Array<{
+          fulfilled?: (config: AxiosRequestConfig) =>
+            | AxiosRequestConfig
+            | Promise<AxiosRequestConfig>;
+        }>;
+      };
+    const handler = requestInterceptors.handlers[0]?.fulfilled;
     expect(handler).toBeDefined();
 
     const config = await handler!({ headers: {} } as AxiosRequestConfig);
@@ -33,17 +41,29 @@ describe("apiClient authentication interceptors", () => {
       wasInvalidated = true;
     });
 
-    const handler = apiClient.interceptors.response.handlers[0]?.rejected;
+    const responseInterceptors =
+      apiClient.interceptors.response as unknown as {
+        handlers: Array<{
+          rejected?: (error: unknown) => unknown | Promise<unknown>;
+        }>;
+      };
+    const handler = responseInterceptors.handlers[0]?.rejected;
     expect(handler).toBeDefined();
 
-    const response: AxiosResponse = {
+    const response = {
       data: {},
       status: 401,
       statusText: "Unauthorized",
       headers: {},
-      config: {},
-    };
-    const error = new AxiosError("unauthorized", undefined, {}, null, response);
+      config: { headers: {} } as AxiosRequestConfig,
+    } as AxiosResponse;
+    const error = new AxiosError(
+      "unauthorized",
+      undefined,
+      response.config,
+      null,
+      response,
+    );
 
     await expect(handler!(error)).rejects.toBeDefined();
     expect(wasInvalidated).toBe(true);

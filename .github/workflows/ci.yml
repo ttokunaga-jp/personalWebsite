@@ -220,7 +220,8 @@ jobs:
             if [[ "${candidate}" == sm://* ]]; then
               return 0
             fi
-            if [[ "${candidate}" =~ ^[A-Za-z0-9_-]+:(latest|[0-9]+)$ ]]; then
+            # Allow secret names with versions, or just secret names (implies latest)
+            if [[ "${candidate}" =~ ^[a-zA-Z0-9_-]+(:[a-zA-Z0-9_-]+)?$ ]]; then
               return 0
             fi
             return 1
@@ -273,6 +274,7 @@ jobs:
               ref="$(ensure_secret_ref "${value}")"
               require_secret_version "${ref}"
               BACKEND_SECRETS_LIST+=("${env_key}=${ref}")
+              BACKEND_REMOVE_ENV_VARS+=("${env_key}")
             else
               echo "Info: ${env_key} is treated as a literal value and will be injected via env vars." >&2
               append_backend_env_var "${env_key}" "${value}"
@@ -316,6 +318,7 @@ jobs:
           ENV_VARS_BACKEND="GIN_MODE=release,ENV=${DEPLOY_ENV},APP_FIRESTORE_PROJECT_ID=${GCP_PROJECT_ID},APP_FIRESTORE_DATABASE_ID=${FIRESTORE_DB},APP_FIRESTORE_COLLECTION_PREFIX=${FIRESTORE_PREFIX},APP_GOOGLE_CLIENT_ID=${BACKEND_GOOGLE_CLIENT_ID},APP_SERVER_PORT=8080"
           BACKEND_SECRETS_LIST=()
           BACKEND_REMOVE_SECRETS=()
+          BACKEND_REMOVE_ENV_VARS=()
 
           add_secret_or_env "APP_AUTH_JWT_SECRET" "${BACKEND_SECRET_JWT}"
           add_secret_or_env "APP_AUTH_STATE_SECRET" "${BACKEND_SECRET_STATE}"
@@ -365,6 +368,10 @@ jobs:
 
           if [[ ${#BACKEND_REMOVE_SECRETS[@]} -gt 0 ]]; then
             BACKEND_CMD+=(--remove-secrets="$(IFS=,; printf '%s' "${BACKEND_REMOVE_SECRETS[*]}")")
+          fi
+
+          if [[ ${#BACKEND_REMOVE_ENV_VARS[@]} -gt 0 ]]; then
+            BACKEND_CMD+=(--remove-env-vars="$(IFS=,; printf '%s' "${BACKEND_REMOVE_ENV_VARS[*]}")")
           fi
 
           if [[ -n "${VPC}" ]]; then

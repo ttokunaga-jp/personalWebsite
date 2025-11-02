@@ -1,6 +1,7 @@
 module.exports = {
   extends: ["../../config/eslint-base.cjs"],
   parserOptions: {
-    project: ["./tsconfig.json", "./tsconfig.eslint.json"]
+    project: ["./tsconfig.eslint.json"],
+    tsconfigRootDir: __dirname
   }
 };

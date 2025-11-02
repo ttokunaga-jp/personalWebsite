@@ -1,7 +1,6 @@
-import { apiClient } from "@shared/lib/api-client";
+import { apiClient, type ApiClientPromise } from "@shared/lib/api-client";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AxiosResponse } from "axios";
 import { act } from "react";
 import { vi } from "vitest";
 
@@ -32,6 +31,8 @@ const profileResponse = {
 
 let user = userEvent.setup();
 
+type ApiResponse<T> = Awaited<ApiClientPromise<T>>;
+
 describe("App", () => {
   beforeEach(() => {
 
@@ -39,18 +40,18 @@ describe("App", () => {
       if (typeof url === "string" && url === "/health") {
         return Promise.resolve({
           data: { status: "healthy" },
-        } as AxiosResponse<{ status: string }>);
+        } as ApiResponse<{ status: string }>);
       }
 
       if (typeof url === "string" && url.includes("/v1/public/profile")) {
         return Promise.resolve({
           data: { data: profileResponse },
-        } as AxiosResponse<{ data: typeof profileResponse }>);
+        } as ApiResponse<{ data: typeof profileResponse }>);
       }
 
       return Promise.resolve({
         data: {},
-      } as AxiosResponse<Record<string, unknown>>);
+      } as ApiResponse<Record<string, unknown>>);
     });
 
     user = userEvent.setup();

@@ -2,7 +2,11 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["vitest/globals", "vite/client"]
+    "types": [
+      "vitest/globals",
+      "vite/client",
+      "@testing-library/jest-dom/vitest"
+    ]
   },
   "include": [
     "src/**/*.ts",
@@ -11,7 +15,10 @@
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "vite.config.ts",
-    "tailwind.config.ts"
+    "tailwind.config.ts",
+    "../../packages/shared/src/**/*.ts",
+    "../../packages/shared/src/**/*.tsx",
+    "../../packages/shared/src/**/*.d.ts"
   ],
   "exclude": []
 }

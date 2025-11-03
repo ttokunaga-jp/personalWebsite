@@ -70,6 +70,11 @@ func (r *RateLimiter) Handler() gin.HandlerFunc {
 			return
 		}
 
+		if r.isPathExempt(c) {
+			c.Next()
+			return
+		}
+
 		ip := resolveClientIP(c, r.trustedProxies)
 		if strings.TrimSpace(ip) == "" {
 			ip = "unknown"
@@ -101,6 +106,28 @@ func (r *RateLimiter) Handler() gin.HandlerFunc {
 func (r *RateLimiter) isWhitelisted(ip string) bool {
 	for _, allowed := range r.cfg.RateLimitWhitelist {
 		if ip == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *RateLimiter) isPathExempt(c *gin.Context) bool {
+	if len(r.cfg.RateLimitExemptPaths) == 0 {
+		return false
+	}
+	path := c.FullPath()
+	if strings.TrimSpace(path) == "" {
+		path = c.Request.URL.Path
+	}
+	if path == "" {
+		return false
+	}
+	for _, exempt := range r.cfg.RateLimitExemptPaths {
+		if strings.TrimSpace(exempt) == "" {
+			continue
+		}
+		if path == exempt {
 			return true
 		}
 	}

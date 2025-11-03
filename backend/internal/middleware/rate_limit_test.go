@@ -40,3 +40,30 @@ func TestRateLimiterBlocksExcessRequests(t *testing.T) {
 		t.Fatalf("expected second request to be rate limited, got %d", rec2.Code)
 	}
 }
+
+func TestRateLimiterAllowsExemptPaths(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+
+	cfg := &config.AppConfig{}
+	cfg.Security.RateLimitRequestsPerMinute = 1
+	cfg.Security.RateLimitBurst = 1
+	cfg.Security.RateLimitExemptPaths = []string{"/admin/auth/callback"}
+
+	rl := newRateLimiter(nil, cfg)
+	engine.Use(rl.Handler())
+	engine.GET("/admin/auth/callback", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	for i := 0; i < 5; i++ {
+		rec := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/admin/auth/callback", nil)
+		engine.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected exempt request to pass, got %d", rec.Code)
+		}
+	}
+}

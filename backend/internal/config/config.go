@@ -93,6 +93,7 @@ type SecurityConfig struct {
 	RateLimitRequestsPerMinute int           `mapstructure:"rate_limit_requests_per_minute"`
 	RateLimitBurst             int           `mapstructure:"rate_limit_burst"`
 	RateLimitWhitelist         []string      `mapstructure:"rate_limit_whitelist"`
+	RateLimitExemptPaths       []string      `mapstructure:"rate_limit_exempt_paths"`
 	AllowedOrigins             []string      `mapstructure:"allowed_origins"`
 	AllowCredentials           bool          `mapstructure:"allow_credentials"`
 }
@@ -251,6 +252,11 @@ func load() (*AppConfig, error) {
 	v.SetDefault("security.rate_limit_requests_per_minute", 120)
 	v.SetDefault("security.rate_limit_burst", 20)
 	v.SetDefault("security.rate_limit_whitelist", []string{})
+	v.SetDefault("security.rate_limit_exempt_paths", []string{
+		"/api/admin/auth/login",
+		"/api/admin/auth/callback",
+		"/api/admin/auth/session",
+	})
 	v.SetDefault("security.allowed_origins", []string{})
 	v.SetDefault("security.allow_credentials", true)
 	v.SetDefault("metrics.enabled", true)

@@ -480,7 +480,7 @@ func (s *stubAuthService) HandleCallback(context.Context, string, string) (*auth
 	return &auth.CallbackResult{
 		Token:       "stub-token",
 		ExpiresAt:   123,
-		RedirectURI: "/admin",
+		RedirectURI: "/admin/",
 	}, nil
 }
 
@@ -497,7 +497,7 @@ func (s *stubAdminAuthService) HandleCallback(context.Context, string, string) (
 	return &auth.AdminCallbackResult{
 		Token:        "admin-stub-token",
 		ExpiresAt:    456,
-		RedirectPath: "/admin",
+		RedirectPath: "/admin/",
 	}, nil
 }
 

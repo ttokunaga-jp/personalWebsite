@@ -214,11 +214,17 @@ func domainPart(email string) string {
 
 func sanitizeRedirectURI(raw string) string {
 	raw = strings.TrimSpace(raw)
-	if raw == "" || strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
-		return "/admin"
+	if raw == "" {
+		return "/admin/"
+	}
+	if strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") {
+		return "/admin/"
 	}
 	if !strings.HasPrefix(raw, "/") {
-		return "/admin"
+		return "/admin/"
+	}
+	if raw == "/admin" {
+		return "/admin/"
 	}
 	return raw
 }

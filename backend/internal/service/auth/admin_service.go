@@ -63,7 +63,7 @@ func NewAdminService(
 
 	adminCfg := cfg.Auth.Admin
 	if strings.TrimSpace(adminCfg.DefaultRedirectURI) == "" {
-		adminCfg.DefaultRedirectURI = "/admin"
+		adminCfg.DefaultRedirectURI = "/admin/"
 	}
 
 	domainSet := make(map[string]struct{})
@@ -211,7 +211,7 @@ func sanitizeAdminRedirect(requested, fallback string) string {
 	fallback = strings.TrimSpace(fallback)
 
 	if fallback == "" {
-		fallback = "/admin"
+		fallback = "/admin/"
 	}
 
 	if baseURL, err := url.Parse(fallback); err == nil && baseURL.IsAbs() && baseURL.Host != "" {
@@ -231,15 +231,10 @@ func sanitizeAdminRedirect(requested, fallback string) string {
 		if target.Path == "" {
 			target.Path = baseURL.Path
 		}
-		return target.String()
+		return normalizeAdminRedirectTarget(target.String())
 	}
 
-	if fallback == "" {
-		fallback = "/admin"
-	}
-	if !strings.HasPrefix(fallback, "/") {
-		fallback = "/admin"
-	}
+	fallback = normalizeAdminRedirectTarget(fallback)
 	if requested == "" {
 		return fallback
 	}
@@ -249,7 +244,40 @@ func sanitizeAdminRedirect(requested, fallback string) string {
 	if !strings.HasPrefix(requested, "/") {
 		return fallback
 	}
-	return requested
+	return normalizeAdminRedirectTarget(requested)
+}
+
+func normalizeAdminRedirectTarget(target string) string {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return "/admin/"
+	}
+
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		u, err := url.Parse(target)
+		if err != nil {
+			return "/admin/"
+		}
+		u.Path = normalizeAdminPath(u.Path)
+		return u.String()
+	}
+
+	if !strings.HasPrefix(target, "/") {
+		return "/admin/"
+	}
+
+	return normalizeAdminPath(target)
+}
+
+func normalizeAdminPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" || path == "/" {
+		return "/admin/"
+	}
+	if path == "/admin" {
+		return "/admin/"
+	}
+	return path
 }
 
 var _ AdminService = (*adminService)(nil)

@@ -452,9 +452,9 @@ variable "api_secret_env" {
 }
 
 variable "admin_redirect_uri" {
-  description = "Redirect URI used by the admin authentication callback (e.g. https://<service>.run.app/admin)"
+  description = "Redirect URI used by the admin authentication callback (e.g. https://<service>.run.app/admin/)"
   type        = string
-  default     = "/admin"
+  default     = "/admin/"
 }
 
 variable "admin_allowed_emails_secret" {

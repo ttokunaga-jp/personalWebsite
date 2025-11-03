@@ -207,16 +207,47 @@ func (h *AdminAuthHandler) Session(c *gin.Context) {
 }
 
 func buildAdminRedirect(path, token string) string {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		path = "/admin"
+	stripped := strings.TrimSpace(path)
+	if strings.Contains(stripped, "#") {
+		parts := strings.SplitN(stripped, "#", 2)
+		stripped = parts[0]
 	}
-	if strings.Contains(path, "#") {
-		parts := strings.SplitN(path, "#", 2)
-		path = parts[0]
-	}
+	normalized := normalizeAdminRedirectLocation(stripped)
 	fragment := "token=" + url.QueryEscape(token)
-	return path + "#" + fragment
+	return normalized + "#" + fragment
+}
+
+func normalizeAdminRedirectLocation(path string) string {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return "/admin/"
+	}
+
+	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
+		u, err := url.Parse(trimmed)
+		if err != nil {
+			return "/admin/"
+		}
+		u.Path = ensureAdminRedirectPath(u.Path)
+		return u.String()
+	}
+
+	if !strings.HasPrefix(trimmed, "/") {
+		return "/admin/"
+	}
+
+	return ensureAdminRedirectPath(trimmed)
+}
+
+func ensureAdminRedirectPath(path string) string {
+	cleaned := strings.TrimSpace(path)
+	if cleaned == "" || cleaned == "/" {
+		return "/admin/"
+	}
+	if cleaned == "/admin" {
+		return "/admin/"
+	}
+	return cleaned
 }
 
 func setAdminSessionCookie(w http.ResponseWriter, token string, expires time.Time, opts adminSessionCookieOptions) {

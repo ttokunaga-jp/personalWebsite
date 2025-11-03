@@ -16,6 +16,11 @@ auth:
       - "admin@example.com"
     allowed_domains:
       - "example.com"
+    session_cookie_name: "ps_admin_jwt"
+    session_cookie_path: "/"
+    session_cookie_secure: true
+    session_cookie_http_only: true
+    session_cookie_same_site: "lax"
 
 google:
   client_id: "your-google-oauth-client-id"

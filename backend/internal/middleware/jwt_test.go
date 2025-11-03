@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 
+	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/errs"
 	"github.com/takumi/personal-website/internal/service/auth"
 )
@@ -20,7 +21,7 @@ func TestJWTMiddlewareUsesAuthorizationHeader(t *testing.T) {
 	verifier := &stubTokenVerifier{
 		claims: &auth.Claims{Roles: []string{"admin"}},
 	}
-	mw := NewJWTMiddleware(verifier)
+	mw := NewJWTMiddleware(verifier, testJWTAuthConfig())
 
 	engine := gin.New()
 	engine.Use(mw.Handler())
@@ -45,7 +46,7 @@ func TestJWTMiddlewareFallsBackToCookie(t *testing.T) {
 	verifier := &stubTokenVerifier{
 		claims: &auth.Claims{Roles: []string{"admin"}},
 	}
-	mw := NewJWTMiddleware(verifier)
+	mw := NewJWTMiddleware(verifier, testJWTAuthConfig())
 
 	engine := gin.New()
 	engine.Use(mw.Handler())
@@ -117,4 +118,16 @@ func (s *stubTokenVerifier) Verify(_ context.Context, token string) (*auth.Claim
 		return nil, errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "missing claims", nil)
 	}
 	return s.claims, nil
+}
+
+func testJWTAuthConfig() config.AuthConfig {
+	return config.AuthConfig{
+		Admin: config.AdminAuthConfig{
+			SessionCookieName:     "ps_admin_jwt",
+			SessionCookiePath:     "/",
+			SessionCookieHTTPOnly: true,
+			SessionCookieSecure:   true,
+			SessionCookieSameSite: "lax",
+		},
+	}
 }

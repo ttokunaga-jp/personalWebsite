@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/errs"
 	"github.com/takumi/personal-website/internal/service/auth"
 )
@@ -12,12 +13,18 @@ import (
 const ContextClaimsKey = "auth.claims"
 
 type JWTMiddleware struct {
-	verifier auth.TokenVerifier
+	verifier   auth.TokenVerifier
+	cookieName string
 }
 
-func NewJWTMiddleware(verifier auth.TokenVerifier) *JWTMiddleware {
+func NewJWTMiddleware(verifier auth.TokenVerifier, cfg config.AuthConfig) *JWTMiddleware {
+	name := strings.TrimSpace(cfg.Admin.SessionCookieName)
+	if name == "" {
+		name = "ps_admin_jwt"
+	}
 	return &JWTMiddleware{
-		verifier: verifier,
+		verifier:   verifier,
+		cookieName: name,
 	}
 }
 
@@ -26,9 +33,24 @@ func (m *JWTMiddleware) Handler() gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 		token := extractBearerToken(authHeader)
 		if token == "" {
-			if cookie, err := c.Cookie("ps_admin_jwt"); err == nil {
-				token = strings.TrimSpace(cookie)
+			if cookieName := strings.TrimSpace(m.cookieName); cookieName != "" {
+				if cookie, err := c.Cookie(cookieName); err == nil {
+					token = strings.TrimSpace(cookie)
+				}
 			}
+			if token == "" {
+				if cookie, err := c.Cookie("ps_admin_jwt"); err == nil {
+					token = strings.TrimSpace(cookie)
+				}
+			}
+		}
+		if strings.TrimSpace(token) == "" {
+			appErr := errs.New(errs.CodeUnauthorized, 401, "missing token", nil)
+			c.AbortWithStatusJSON(appErr.Status, gin.H{
+				"error":   appErr.Code,
+				"message": appErr.Message,
+			})
+			return
 		}
 		claims, err := m.verifier.Verify(c.Request.Context(), token)
 		if err != nil {
@@ -44,7 +66,6 @@ func (m *JWTMiddleware) Handler() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
 func extractBearerToken(header string) string {
 	if header == "" {
 		return ""

@@ -138,7 +138,7 @@ func TestServiceDisabledBypassesProvider(t *testing.T) {
 
 	res, err := service.HandleCallback(context.Background(), login.State, "ignored")
 	require.NoError(t, err)
-	require.Equal(t, "/admin", res.RedirectURI)
+	require.Equal(t, "/admin/", res.RedirectURI)
 	require.NotEmpty(t, res.Token)
 }
 

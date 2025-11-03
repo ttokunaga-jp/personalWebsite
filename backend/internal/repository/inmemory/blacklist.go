@@ -50,6 +50,8 @@ func (r *blacklistRepository) AddBlacklistEntry(ctx context.Context, entry *mode
 		return nil, repository.ErrInvalidInput
 	}
 
+	reason := strings.TrimSpace(entry.Reason)
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -62,11 +64,46 @@ func (r *blacklistRepository) AddBlacklistEntry(ctx context.Context, entry *mode
 	entry.ID = r.nextID
 	r.nextID++
 	entry.Email = email
+	entry.Reason = reason
 	entry.CreatedAt = time.Now().UTC()
 	r.entries = append(r.entries, *entry)
 
 	added := *entry
 	return &added, nil
+}
+
+func (r *blacklistRepository) UpdateBlacklistEntry(ctx context.Context, entry *model.BlacklistEntry) (*model.BlacklistEntry, error) {
+	if entry == nil || entry.ID == 0 {
+		return nil, repository.ErrInvalidInput
+	}
+
+	email := strings.ToLower(strings.TrimSpace(entry.Email))
+	if email == "" {
+		return nil, repository.ErrInvalidInput
+	}
+	reason := strings.TrimSpace(entry.Reason)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var targetIndex = -1
+	for idx, existing := range r.entries {
+		if existing.ID == entry.ID {
+			targetIndex = idx
+		} else if strings.EqualFold(existing.Email, email) {
+			return nil, repository.ErrDuplicate
+		}
+	}
+
+	if targetIndex == -1 {
+		return nil, repository.ErrNotFound
+	}
+
+	r.entries[targetIndex].Email = email
+	r.entries[targetIndex].Reason = reason
+
+	updated := r.entries[targetIndex]
+	return &updated, nil
 }
 
 func (r *blacklistRepository) RemoveBlacklistEntry(ctx context.Context, id int64) error {

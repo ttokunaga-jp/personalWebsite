@@ -64,6 +64,9 @@ func registerRoutes(
 		admin.GET("/health", healthHandler.Ping)
 		admin.GET("/summary", adminHandler.Summary)
 
+		admin.GET("/profile", adminHandler.GetProfile)
+		admin.PUT("/profile", adminHandler.UpdateProfile)
+
 		admin.GET("/projects", adminHandler.ListProjects)
 		admin.POST("/projects", adminHandler.CreateProject)
 		admin.GET("/projects/:id", adminHandler.GetProject)
@@ -76,20 +79,14 @@ func registerRoutes(
 		admin.PUT("/research/:id", adminHandler.UpdateResearch)
 		admin.DELETE("/research/:id", adminHandler.DeleteResearch)
 
-		admin.GET("/blogs", adminHandler.ListBlogPosts)
-		admin.POST("/blogs", adminHandler.CreateBlogPost)
-		admin.GET("/blogs/:id", adminHandler.GetBlogPost)
-		admin.PUT("/blogs/:id", adminHandler.UpdateBlogPost)
-		admin.DELETE("/blogs/:id", adminHandler.DeleteBlogPost)
-
-		admin.GET("/meetings", adminHandler.ListMeetings)
-		admin.POST("/meetings", adminHandler.CreateMeeting)
-		admin.GET("/meetings/:id", adminHandler.GetMeeting)
-		admin.PUT("/meetings/:id", adminHandler.UpdateMeeting)
-		admin.DELETE("/meetings/:id", adminHandler.DeleteMeeting)
+		admin.GET("/contacts", adminHandler.ListContacts)
+		admin.GET("/contacts/:id", adminHandler.GetContact)
+		admin.PUT("/contacts/:id", adminHandler.UpdateContact)
+		admin.DELETE("/contacts/:id", adminHandler.DeleteContact)
 
 		admin.GET("/blacklist", adminHandler.ListBlacklist)
 		admin.POST("/blacklist", adminHandler.CreateBlacklist)
+		admin.PUT("/blacklist/:id", adminHandler.UpdateBlacklist)
 		admin.DELETE("/blacklist/:id", adminHandler.DeleteBlacklist)
 	}
 }

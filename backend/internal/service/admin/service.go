@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/takumi/personal-website/internal/errs"
 	"github.com/takumi/personal-website/internal/model"
@@ -14,6 +13,9 @@ import (
 
 // Service exposes administrative operations across content domains.
 type Service interface {
+	GetProfile(ctx context.Context) (*model.AdminProfile, error)
+	UpdateProfile(ctx context.Context, input ProfileInput) (*model.AdminProfile, error)
+
 	ListProjects(ctx context.Context) ([]model.AdminProject, error)
 	GetProject(ctx context.Context, id int64) (*model.AdminProject, error)
 	CreateProject(ctx context.Context, input ProjectInput) (*model.AdminProject, error)
@@ -26,20 +28,14 @@ type Service interface {
 	UpdateResearch(ctx context.Context, id int64, input ResearchInput) (*model.AdminResearch, error)
 	DeleteResearch(ctx context.Context, id int64) error
 
-	ListBlogPosts(ctx context.Context) ([]model.BlogPost, error)
-	GetBlogPost(ctx context.Context, id int64) (*model.BlogPost, error)
-	CreateBlogPost(ctx context.Context, input BlogPostInput) (*model.BlogPost, error)
-	UpdateBlogPost(ctx context.Context, id int64, input BlogPostInput) (*model.BlogPost, error)
-	DeleteBlogPost(ctx context.Context, id int64) error
-
-	ListMeetings(ctx context.Context) ([]model.Meeting, error)
-	GetMeeting(ctx context.Context, id int64) (*model.Meeting, error)
-	CreateMeeting(ctx context.Context, input MeetingInput) (*model.Meeting, error)
-	UpdateMeeting(ctx context.Context, id int64, input MeetingInput) (*model.Meeting, error)
-	DeleteMeeting(ctx context.Context, id int64) error
+	ListContactMessages(ctx context.Context) ([]model.ContactMessage, error)
+	GetContactMessage(ctx context.Context, id string) (*model.ContactMessage, error)
+	UpdateContactMessage(ctx context.Context, id string, input ContactUpdateInput) (*model.ContactMessage, error)
+	DeleteContactMessage(ctx context.Context, id string) error
 
 	ListBlacklist(ctx context.Context) ([]model.BlacklistEntry, error)
 	AddBlacklistEntry(ctx context.Context, input BlacklistInput) (*model.BlacklistEntry, error)
+	UpdateBlacklistEntry(ctx context.Context, id int64, input BlacklistInput) (*model.BlacklistEntry, error)
 	RemoveBlacklistEntry(ctx context.Context, id int64) error
 	IsEmailBlacklisted(ctx context.Context, email string) (bool, error)
 
@@ -47,32 +43,65 @@ type Service interface {
 }
 
 type service struct {
+	profile   repository.AdminProfileRepository
 	projects  repository.AdminProjectRepository
 	research  repository.AdminResearchRepository
-	blogs     repository.BlogRepository
-	meetings  repository.MeetingRepository
+	contacts  repository.AdminContactRepository
 	blacklist repository.BlacklistRepository
 }
 
 // NewService wires repositories into the admin service.
 func NewService(
+	profile repository.AdminProfileRepository,
 	projects repository.AdminProjectRepository,
 	research repository.AdminResearchRepository,
-	blogs repository.BlogRepository,
-	meetings repository.MeetingRepository,
+	contacts repository.AdminContactRepository,
 	blacklist repository.BlacklistRepository,
 ) (Service, error) {
-	if projects == nil || research == nil || blogs == nil || meetings == nil || blacklist == nil {
+	if profile == nil || projects == nil || research == nil || contacts == nil || blacklist == nil {
 		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "admin service: missing dependencies", nil)
 	}
 
 	return &service{
+		profile:   profile,
 		projects:  projects,
 		research:  research,
-		blogs:     blogs,
-		meetings:  meetings,
+		contacts:  contacts,
 		blacklist: blacklist,
 	}, nil
+}
+
+// ProfileInput captures administrator-provided profile data.
+type ProfileInput struct {
+	Name        model.LocalizedText
+	Title       model.LocalizedText
+	Affiliation model.LocalizedText
+	Lab         model.LocalizedText
+	Summary     model.LocalizedText
+	Skills      []model.LocalizedText
+	FocusAreas  []model.LocalizedText
+}
+
+func (s *service) GetProfile(ctx context.Context) (*model.AdminProfile, error) {
+	return s.profile.GetAdminProfile(ctx)
+}
+
+func (s *service) UpdateProfile(ctx context.Context, input ProfileInput) (*model.AdminProfile, error) {
+	if err := validateProfileInput(input); err != nil {
+		return nil, err
+	}
+
+	adminProfile := model.AdminProfile{
+		Name:        normalizeLocalized(input.Name),
+		Title:       normalizeLocalized(input.Title),
+		Affiliation: normalizeLocalized(input.Affiliation),
+		Lab:         normalizeLocalized(input.Lab),
+		Summary:     normalizeLocalized(input.Summary),
+		Skills:      normalizeLocalizedList(input.Skills),
+		FocusAreas:  normalizeLocalizedList(input.FocusAreas),
+	}
+
+	return s.profile.UpdateAdminProfile(ctx, &adminProfile)
 }
 
 // ProjectInput captures administrator-provided project data.
@@ -185,128 +214,39 @@ func (s *service) DeleteResearch(ctx context.Context, id int64) error {
 	return s.research.DeleteAdminResearch(ctx, id)
 }
 
-// BlogPostInput captures admin blog post data.
-type BlogPostInput struct {
-	Title       model.LocalizedText
-	Summary     model.LocalizedText
-	ContentMD   model.LocalizedText
-	Tags        []string
-	Published   bool
-	PublishedAt *time.Time
+// ContactUpdateInput captures moderation edits for a contact submission.
+type ContactUpdateInput struct {
+	Topic     string
+	Message   string
+	Status    model.ContactStatus
+	AdminNote string
 }
 
-func (s *service) ListBlogPosts(ctx context.Context) ([]model.BlogPost, error) {
-	return s.blogs.ListBlogPosts(ctx)
+func (s *service) ListContactMessages(ctx context.Context) ([]model.ContactMessage, error) {
+	return s.contacts.ListContactMessages(ctx)
 }
 
-func (s *service) GetBlogPost(ctx context.Context, id int64) (*model.BlogPost, error) {
-	return s.blogs.GetBlogPost(ctx, id)
+func (s *service) GetContactMessage(ctx context.Context, id string) (*model.ContactMessage, error) {
+	return s.contacts.GetContactMessage(ctx, strings.TrimSpace(id))
 }
 
-func (s *service) CreateBlogPost(ctx context.Context, input BlogPostInput) (*model.BlogPost, error) {
-	if err := validateBlogPostInput(input); err != nil {
+func (s *service) UpdateContactMessage(ctx context.Context, id string, input ContactUpdateInput) (*model.ContactMessage, error) {
+	if err := validateContactUpdateInput(input); err != nil {
 		return nil, err
 	}
 
-	post := model.BlogPost{
-		Title:       normalizeLocalized(input.Title),
-		Summary:     normalizeLocalized(input.Summary),
-		ContentMD:   normalizeLocalized(input.ContentMD),
-		Tags:        copyStrings(input.Tags),
-		Published:   input.Published,
-		PublishedAt: copyTimePointer(input.PublishedAt),
+	message := &model.ContactMessage{
+		ID:        strings.TrimSpace(id),
+		Topic:     strings.TrimSpace(input.Topic),
+		Message:   strings.TrimSpace(input.Message),
+		Status:    input.Status,
+		AdminNote: strings.TrimSpace(input.AdminNote),
 	}
-	if post.Published && post.PublishedAt == nil {
-		now := time.Now().UTC()
-		post.PublishedAt = &now
-	}
-	return s.blogs.CreateBlogPost(ctx, &post)
+	return s.contacts.UpdateContactMessage(ctx, message)
 }
 
-func (s *service) UpdateBlogPost(ctx context.Context, id int64, input BlogPostInput) (*model.BlogPost, error) {
-	if err := validateBlogPostInput(input); err != nil {
-		return nil, err
-	}
-
-	post := model.BlogPost{
-		ID:          id,
-		Title:       normalizeLocalized(input.Title),
-		Summary:     normalizeLocalized(input.Summary),
-		ContentMD:   normalizeLocalized(input.ContentMD),
-		Tags:        copyStrings(input.Tags),
-		Published:   input.Published,
-		PublishedAt: copyTimePointer(input.PublishedAt),
-	}
-	if post.Published && post.PublishedAt == nil {
-		now := time.Now().UTC()
-		post.PublishedAt = &now
-	}
-	return s.blogs.UpdateBlogPost(ctx, &post)
-}
-
-func (s *service) DeleteBlogPost(ctx context.Context, id int64) error {
-	return s.blogs.DeleteBlogPost(ctx, id)
-}
-
-// MeetingInput captures reservation data edits.
-type MeetingInput struct {
-	Name            string
-	Email           string
-	Datetime        time.Time
-	DurationMinutes int
-	MeetURL         string
-	CalendarEventID string
-	Status          model.MeetingStatus
-	Notes           string
-}
-
-func (s *service) ListMeetings(ctx context.Context) ([]model.Meeting, error) {
-	return s.meetings.ListMeetings(ctx)
-}
-
-func (s *service) GetMeeting(ctx context.Context, id int64) (*model.Meeting, error) {
-	return s.meetings.GetMeeting(ctx, id)
-}
-
-func (s *service) CreateMeeting(ctx context.Context, input MeetingInput) (*model.Meeting, error) {
-	if err := validateMeetingInput(input); err != nil {
-		return nil, err
-	}
-
-	meeting := model.Meeting{
-		Name:            strings.TrimSpace(input.Name),
-		Email:           strings.ToLower(strings.TrimSpace(input.Email)),
-		Datetime:        input.Datetime.UTC(),
-		DurationMinutes: input.DurationMinutes,
-		MeetURL:         strings.TrimSpace(input.MeetURL),
-		CalendarEventID: strings.TrimSpace(input.CalendarEventID),
-		Status:          input.Status,
-		Notes:           strings.TrimSpace(input.Notes),
-	}
-	return s.meetings.CreateMeeting(ctx, &meeting)
-}
-
-func (s *service) UpdateMeeting(ctx context.Context, id int64, input MeetingInput) (*model.Meeting, error) {
-	if err := validateMeetingInput(input); err != nil {
-		return nil, err
-	}
-
-	meeting := model.Meeting{
-		ID:              id,
-		Name:            strings.TrimSpace(input.Name),
-		Email:           strings.ToLower(strings.TrimSpace(input.Email)),
-		Datetime:        input.Datetime.UTC(),
-		DurationMinutes: input.DurationMinutes,
-		MeetURL:         strings.TrimSpace(input.MeetURL),
-		CalendarEventID: strings.TrimSpace(input.CalendarEventID),
-		Status:          input.Status,
-		Notes:           strings.TrimSpace(input.Notes),
-	}
-	return s.meetings.UpdateMeeting(ctx, &meeting)
-}
-
-func (s *service) DeleteMeeting(ctx context.Context, id int64) error {
-	return s.meetings.DeleteMeeting(ctx, id)
+func (s *service) DeleteContactMessage(ctx context.Context, id string) error {
+	return s.contacts.DeleteContactMessage(ctx, strings.TrimSpace(id))
 }
 
 // BlacklistInput captures email blocking requests.
@@ -338,6 +278,26 @@ func (s *service) AddBlacklistEntry(ctx context.Context, input BlacklistInput) (
 	return result, nil
 }
 
+func (s *service) UpdateBlacklistEntry(ctx context.Context, id int64, input BlacklistInput) (*model.BlacklistEntry, error) {
+	if err := validateBlacklistInput(input); err != nil {
+		return nil, err
+	}
+
+	entry := model.BlacklistEntry{
+		ID:     id,
+		Email:  strings.ToLower(strings.TrimSpace(input.Email)),
+		Reason: strings.TrimSpace(input.Reason),
+	}
+	updated, err := s.blacklist.UpdateBlacklistEntry(ctx, &entry)
+	if err != nil {
+		if errors.Is(err, repository.ErrDuplicate) {
+			return nil, errs.New(errs.CodeConflict, http.StatusConflict, "email already blacklisted", err)
+		}
+		return nil, err
+	}
+	return updated, nil
+}
+
 func (s *service) RemoveBlacklistEntry(ctx context.Context, id int64) error {
 	return s.blacklist.RemoveBlacklistEntry(ctx, id)
 }
@@ -354,6 +314,11 @@ func (s *service) IsEmailBlacklisted(ctx context.Context, email string) (bool, e
 }
 
 func (s *service) Summary(ctx context.Context) (*model.AdminSummary, error) {
+	profile, err := s.profile.GetAdminProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	projects, err := s.projects.ListAdminProjects(ctx)
 	if err != nil {
 		return nil, err
@@ -372,35 +337,22 @@ func (s *service) Summary(ctx context.Context) (*model.AdminSummary, error) {
 		return nil, err
 	}
 	var publishedResearch, draftResearch int
-	for _, rch := range research {
-		if rch.Published {
+	for _, item := range research {
+		if item.Published {
 			publishedResearch++
 		} else {
 			draftResearch++
 		}
 	}
 
-	posts, err := s.blogs.ListBlogPosts(ctx)
+	contacts, err := s.contacts.ListContactMessages(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var publishedBlogs, draftBlogs int
-	for _, post := range posts {
-		if post.Published {
-			publishedBlogs++
-		} else {
-			draftBlogs++
-		}
-	}
-
-	meetings, err := s.meetings.ListMeetings(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var pendingMeetings int
-	for _, meeting := range meetings {
-		if meeting.Status == model.MeetingStatusPending {
-			pendingMeetings++
+	var pendingContacts int
+	for _, contact := range contacts {
+		if contact.Status == model.ContactStatusPending {
+			pendingContacts++
 		}
 	}
 
@@ -409,16 +361,32 @@ func (s *service) Summary(ctx context.Context) (*model.AdminSummary, error) {
 		return nil, err
 	}
 
-	return &model.AdminSummary{
+	summary := &model.AdminSummary{
 		PublishedProjects: publishedProjects,
 		DraftProjects:     draftProjects,
 		PublishedResearch: publishedResearch,
 		DraftResearch:     draftResearch,
-		PublishedBlogs:    publishedBlogs,
-		DraftBlogs:        draftBlogs,
-		PendingMeetings:   pendingMeetings,
+		PendingContacts:   pendingContacts,
 		BlacklistEntries:  len(blacklist),
-	}, nil
+	}
+	if profile != nil {
+		summary.SkillCount = len(profile.Skills)
+		summary.FocusAreaCount = len(profile.FocusAreas)
+		summary.ProfileUpdatedAt = profile.UpdatedAt
+	}
+	return summary, nil
+}
+
+func validateProfileInput(input ProfileInput) error {
+	nameEmpty := strings.TrimSpace(input.Name.Ja) == "" && strings.TrimSpace(input.Name.En) == ""
+	summaryEmpty := strings.TrimSpace(input.Summary.Ja) == "" && strings.TrimSpace(input.Summary.En) == ""
+	if nameEmpty {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "profile name is required", nil)
+	}
+	if summaryEmpty {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "profile summary is required", nil)
+	}
+	return nil
 }
 
 func validateProjectInput(input ProjectInput) error {
@@ -441,28 +409,17 @@ func validateResearchInput(input ResearchInput) error {
 	return nil
 }
 
-func validateBlogPostInput(input BlogPostInput) error {
-	if strings.TrimSpace(input.Title.Ja) == "" && strings.TrimSpace(input.Title.En) == "" {
-		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "blog post title is required", nil)
-	}
-	if strings.TrimSpace(input.ContentMD.Ja) == "" && strings.TrimSpace(input.ContentMD.En) == "" {
-		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "blog post content is required", nil)
-	}
-	return nil
-}
-
-func validateMeetingInput(input MeetingInput) error {
-	if strings.TrimSpace(input.Name) == "" {
-		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "meeting name is required", nil)
-	}
-	if strings.TrimSpace(input.Email) == "" {
-		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "meeting email is required", nil)
-	}
-	if input.DurationMinutes <= 0 {
-		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "meeting duration must be positive", nil)
-	}
-	if input.Status != model.MeetingStatusPending && input.Status != model.MeetingStatusConfirmed && input.Status != model.MeetingStatusCancelled {
-		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid meeting status", nil)
+func validateContactUpdateInput(input ContactUpdateInput) error {
+	switch input.Status {
+	case model.ContactStatusPending,
+		model.ContactStatusInReview,
+		model.ContactStatusResolved,
+		model.ContactStatusArchived:
+		// ok
+	case "":
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "contact status is required", nil)
+	default:
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid contact status", nil)
 	}
 	return nil
 }
@@ -479,6 +436,24 @@ func normalizeLocalized(text model.LocalizedText) model.LocalizedText {
 		Ja: strings.TrimSpace(text.Ja),
 		En: strings.TrimSpace(text.En),
 	}
+}
+
+func normalizeLocalizedList(items []model.LocalizedText) []model.LocalizedText {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]model.LocalizedText, 0, len(items))
+	for _, item := range items {
+		normalized := normalizeLocalized(item)
+		if normalized.Ja == "" && normalized.En == "" {
+			continue
+		}
+		result = append(result, normalized)
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }
 
 func copyStrings(values []string) []string {
@@ -498,12 +473,4 @@ func copyIntPointer(value *int) *int {
 	}
 	v := *value
 	return &v
-}
-
-func copyTimePointer(value *time.Time) *time.Time {
-	if value == nil {
-		return nil
-	}
-	clone := value.UTC()
-	return &clone
 }

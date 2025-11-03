@@ -3,6 +3,17 @@ export type LocalizedText = {
   en?: string;
 };
 
+export type AdminProfile = {
+  name: LocalizedText;
+  title: LocalizedText;
+  affiliation: LocalizedText;
+  lab: LocalizedText;
+  summary: LocalizedText;
+  skills: LocalizedText[];
+  focusAreas: LocalizedText[];
+  updatedAt?: string | null;
+};
+
 export type AdminProject = {
   id: number;
   title: LocalizedText;
@@ -27,29 +38,16 @@ export type AdminResearch = {
   updatedAt: string;
 };
 
-export type BlogPost = {
-  id: number;
-  title: LocalizedText;
-  summary: LocalizedText;
-  contentMd: LocalizedText;
-  tags: string[];
-  published: boolean;
-  publishedAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+export type ContactStatus = "pending" | "in_review" | "resolved" | "archived";
 
-export type MeetingStatus = "pending" | "confirmed" | "cancelled";
-
-export type Meeting = {
-  id: number;
+export type ContactMessage = {
+  id: string;
   name: string;
   email: string;
-  datetime: string;
-  durationMinutes: number;
-  meetUrl: string;
-  status: MeetingStatus;
-  notes: string;
+  topic: string;
+  message: string;
+  status: ContactStatus;
+  adminNote: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -62,12 +60,13 @@ export type BlacklistEntry = {
 };
 
 export type AdminSummary = {
+  profileUpdatedAt?: string | null;
+  skillCount: number;
+  focusAreaCount: number;
   publishedProjects: number;
   draftProjects: number;
   publishedResearch: number;
   draftResearch: number;
-  publishedBlogs: number;
-  draftBlogs: number;
-  pendingMeetings: number;
+  pendingContacts: number;
   blacklistEntries: number;
 };

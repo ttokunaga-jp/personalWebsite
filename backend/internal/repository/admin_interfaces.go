@@ -15,6 +15,12 @@ type AdminProjectRepository interface {
 	DeleteAdminProject(ctx context.Context, id int64) error
 }
 
+// AdminProfileRepository manages author profile metadata.
+type AdminProfileRepository interface {
+	GetAdminProfile(ctx context.Context) (*model.AdminProfile, error)
+	UpdateAdminProfile(ctx context.Context, profile *model.AdminProfile) (*model.AdminProfile, error)
+}
+
 // AdminResearchRepository manages research CRUD operations for the admin surface.
 type AdminResearchRepository interface {
 	ListAdminResearch(ctx context.Context) ([]model.AdminResearch, error)
@@ -42,10 +48,19 @@ type MeetingRepository interface {
 	DeleteMeeting(ctx context.Context, id int64) error
 }
 
+// AdminContactRepository exposes management capabilities for contact submissions.
+type AdminContactRepository interface {
+	ListContactMessages(ctx context.Context) ([]model.ContactMessage, error)
+	GetContactMessage(ctx context.Context, id string) (*model.ContactMessage, error)
+	UpdateContactMessage(ctx context.Context, message *model.ContactMessage) (*model.ContactMessage, error)
+	DeleteContactMessage(ctx context.Context, id string) error
+}
+
 // BlacklistRepository persists blacklisted emails for booking exclusion.
 type BlacklistRepository interface {
 	ListBlacklistEntries(ctx context.Context) ([]model.BlacklistEntry, error)
 	AddBlacklistEntry(ctx context.Context, entry *model.BlacklistEntry) (*model.BlacklistEntry, error)
+	UpdateBlacklistEntry(ctx context.Context, entry *model.BlacklistEntry) (*model.BlacklistEntry, error)
 	RemoveBlacklistEntry(ctx context.Context, id int64) error
 	FindBlacklistEntryByEmail(ctx context.Context, email string) (*model.BlacklistEntry, error)
 }

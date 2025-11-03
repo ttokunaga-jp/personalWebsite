@@ -136,9 +136,15 @@ type AppConfig struct {
 }
 
 type AdminAuthConfig struct {
-	DefaultRedirectURI string   `mapstructure:"default_redirect_uri"`
-	AllowedDomains     []string `mapstructure:"allowed_domains"`
-	AllowedEmails      []string `mapstructure:"allowed_emails"`
+	DefaultRedirectURI    string   `mapstructure:"default_redirect_uri"`
+	AllowedDomains        []string `mapstructure:"allowed_domains"`
+	AllowedEmails         []string `mapstructure:"allowed_emails"`
+	SessionCookieName     string   `mapstructure:"session_cookie_name"`
+	SessionCookieDomain   string   `mapstructure:"session_cookie_domain"`
+	SessionCookiePath     string   `mapstructure:"session_cookie_path"`
+	SessionCookieSecure   bool     `mapstructure:"session_cookie_secure"`
+	SessionCookieHTTPOnly bool     `mapstructure:"session_cookie_http_only"`
+	SessionCookieSameSite string   `mapstructure:"session_cookie_same_site"`
 }
 
 var Module = fx.Module("config",
@@ -172,9 +178,15 @@ func load() (*AppConfig, error) {
 	v.SetDefault("auth.state_secret", "local-dev-state-secret-change-me")
 	v.SetDefault("auth.state_ttl_seconds", 300)
 	v.SetDefault("auth.disabled", false)
-	v.SetDefault("auth.admin.default_redirect_uri", "/admin")
+	v.SetDefault("auth.admin.default_redirect_uri", "/admin/")
 	v.SetDefault("auth.admin.allowed_domains", []string{})
 	v.SetDefault("auth.admin.allowed_emails", []string{})
+	v.SetDefault("auth.admin.session_cookie_name", "ps_admin_jwt")
+	v.SetDefault("auth.admin.session_cookie_domain", "")
+	v.SetDefault("auth.admin.session_cookie_path", "/")
+	v.SetDefault("auth.admin.session_cookie_secure", true)
+	v.SetDefault("auth.admin.session_cookie_http_only", true)
+	v.SetDefault("auth.admin.session_cookie_same_site", "lax")
 	v.SetDefault("google.auth_url", "https://accounts.google.com/o/oauth2/v2/auth")
 	v.SetDefault("google.token_url", "https://oauth2.googleapis.com/token")
 	v.SetDefault("google.userinfo_url", "https://openidconnect.googleapis.com/v1/userinfo")

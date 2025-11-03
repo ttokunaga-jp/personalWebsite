@@ -56,17 +56,16 @@ func TestRegisterRoutes(t *testing.T) {
 		},
 	}
 
-	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
-		JWTSecret:        "test-secret",
-		Issuer:           "personal-website",
-		Audience:         []string{"personal-website-admin"},
-		ClockSkewSeconds: 30,
-		Disabled:         true,
-	})
-	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier)
-	adminSvc := &stubAdminService{}
-
 	appCfg := &config.AppConfig{
+		Auth: config.AuthConfig{
+			Admin: config.AdminAuthConfig{
+				SessionCookieName:     "ps_admin_jwt",
+				SessionCookiePath:     "/",
+				SessionCookieHTTPOnly: true,
+				SessionCookieSecure:   true,
+				SessionCookieSameSite: "lax",
+			},
+		},
 		Contact: config.ContactConfig{
 			Topics:           []string{"Research collaboration"},
 			RecaptchaSiteKey: "test-site-key",
@@ -74,6 +73,16 @@ func TestRegisterRoutes(t *testing.T) {
 			ConsentText:      "Testing purposes only.",
 		},
 	}
+
+	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
+		JWTSecret:        "test-secret",
+		Issuer:           "personal-website",
+		Audience:         []string{"personal-website-admin"},
+		ClockSkewSeconds: 30,
+		Disabled:         true,
+	})
+	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier, appCfg.Auth)
+	adminSvc := &stubAdminService{}
 
 	registerRoutes(
 		engine,
@@ -84,7 +93,7 @@ func TestRegisterRoutes(t *testing.T) {
 		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
-		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}),
+		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}, appCfg.Auth),
 		jwtMiddleware,
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
@@ -406,18 +415,16 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 		},
 	}
 
-	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
-		JWTSecret:        "test-jwt-secret",
-		Issuer:           "personal-website",
-		Audience:         []string{"personal-website-admin"},
-		ClockSkewSeconds: 30,
-		Disabled:         true,
-	})
-	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier)
-	adminSvc := &stubAdminService{}
-	securityHandler := handler.NewSecurityHandler(csrfManager, cfg)
-
 	appCfg := &config.AppConfig{
+		Auth: config.AuthConfig{
+			Admin: config.AdminAuthConfig{
+				SessionCookieName:     "ps_admin_jwt",
+				SessionCookiePath:     "/",
+				SessionCookieHTTPOnly: true,
+				SessionCookieSecure:   true,
+				SessionCookieSameSite: "lax",
+			},
+		},
 		Contact: config.ContactConfig{
 			Topics:           []string{"Research collaboration"},
 			RecaptchaSiteKey: "test-site-key",
@@ -425,6 +432,17 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 			ConsentText:      "Testing purposes only.",
 		},
 	}
+
+	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
+		JWTSecret:        "test-jwt-secret",
+		Issuer:           "personal-website",
+		Audience:         []string{"personal-website-admin"},
+		ClockSkewSeconds: 30,
+		Disabled:         true,
+	})
+	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier, appCfg.Auth)
+	adminSvc := &stubAdminService{}
+	securityHandler := handler.NewSecurityHandler(csrfManager, cfg)
 
 	registerRoutes(
 		engine,
@@ -435,7 +453,7 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
-		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}),
+		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}, appCfg.Auth),
 		jwtMiddleware,
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
@@ -462,7 +480,7 @@ func (s *stubAuthService) HandleCallback(context.Context, string, string) (*auth
 	return &auth.CallbackResult{
 		Token:       "stub-token",
 		ExpiresAt:   123,
-		RedirectURI: "/admin",
+		RedirectURI: "/admin/",
 	}, nil
 }
 
@@ -479,7 +497,7 @@ func (s *stubAdminAuthService) HandleCallback(context.Context, string, string) (
 	return &auth.AdminCallbackResult{
 		Token:        "admin-stub-token",
 		ExpiresAt:    456,
-		RedirectPath: "/admin",
+		RedirectPath: "/admin/",
 	}, nil
 }
 
@@ -531,8 +549,49 @@ func (s *stubBookingService) Book(context.Context, model.BookingRequest) (*model
 
 type stubAdminService struct{}
 
+func (s *stubAdminService) GetProfile(context.Context) (*model.AdminProfile, error) {
+	now := time.Now().UTC()
+	return &model.AdminProfile{
+		Name:        model.NewLocalizedText("管理者", "Admin"),
+		Title:       model.NewLocalizedText("肩書", "Title"),
+		Affiliation: model.NewLocalizedText("所属", "Affiliation"),
+		Lab:         model.NewLocalizedText("ラボ", "Lab"),
+		Summary:     model.NewLocalizedText("要約", "Summary"),
+		Skills: []model.LocalizedText{
+			model.NewLocalizedText("Go", "Go"),
+			model.NewLocalizedText("React", "React"),
+		},
+		FocusAreas: []model.LocalizedText{
+			model.NewLocalizedText("AI", "AI"),
+		},
+		UpdatedAt: &now,
+	}, nil
+}
+
+func (s *stubAdminService) UpdateProfile(ctx context.Context, input adminsvc.ProfileInput) (*model.AdminProfile, error) {
+	return &model.AdminProfile{
+		Name:        input.Name,
+		Title:       input.Title,
+		Affiliation: input.Affiliation,
+		Lab:         input.Lab,
+		Summary:     input.Summary,
+		Skills:      input.Skills,
+		FocusAreas:  input.FocusAreas,
+	}, nil
+}
+
 func (s *stubAdminService) ListProjects(context.Context) ([]model.AdminProject, error) {
-	return nil, nil
+	return []model.AdminProject{
+		{
+			ID:          1,
+			Title:       model.NewLocalizedText("プロジェクト", "Project"),
+			Description: model.NewLocalizedText("説明", "Description"),
+			TechStack:   []string{"Go"},
+			LinkURL:     "https://example.com",
+			Year:        2024,
+			Published:   true,
+		},
+	}, nil
 }
 
 func (s *stubAdminService) GetProject(context.Context, int64) (*model.AdminProject, error) {
@@ -571,43 +630,32 @@ func (s *stubAdminService) DeleteResearch(context.Context, int64) error {
 	return nil
 }
 
-func (s *stubAdminService) ListBlogPosts(context.Context) ([]model.BlogPost, error) {
-	return nil, nil
+func (s *stubAdminService) ListContactMessages(context.Context) ([]model.ContactMessage, error) {
+	now := time.Now().UTC()
+	return []model.ContactMessage{
+		{
+			ID:        "contact-1",
+			Name:      "Example",
+			Email:     "example@example.com",
+			Topic:     "Inquiry",
+			Message:   "Hello",
+			Status:    model.ContactStatusPending,
+			AdminNote: "",
+			CreatedAt: now,
+			UpdatedAt: now,
+		},
+	}, nil
 }
 
-func (s *stubAdminService) GetBlogPost(context.Context, int64) (*model.BlogPost, error) {
-	return &model.BlogPost{}, nil
+func (s *stubAdminService) GetContactMessage(context.Context, string) (*model.ContactMessage, error) {
+	return &model.ContactMessage{}, nil
 }
 
-func (s *stubAdminService) CreateBlogPost(context.Context, adminsvc.BlogPostInput) (*model.BlogPost, error) {
-	return &model.BlogPost{}, nil
+func (s *stubAdminService) UpdateContactMessage(context.Context, string, adminsvc.ContactUpdateInput) (*model.ContactMessage, error) {
+	return &model.ContactMessage{}, nil
 }
 
-func (s *stubAdminService) UpdateBlogPost(context.Context, int64, adminsvc.BlogPostInput) (*model.BlogPost, error) {
-	return &model.BlogPost{}, nil
-}
-
-func (s *stubAdminService) DeleteBlogPost(context.Context, int64) error {
-	return nil
-}
-
-func (s *stubAdminService) ListMeetings(context.Context) ([]model.Meeting, error) {
-	return nil, nil
-}
-
-func (s *stubAdminService) GetMeeting(context.Context, int64) (*model.Meeting, error) {
-	return &model.Meeting{}, nil
-}
-
-func (s *stubAdminService) CreateMeeting(context.Context, adminsvc.MeetingInput) (*model.Meeting, error) {
-	return &model.Meeting{}, nil
-}
-
-func (s *stubAdminService) UpdateMeeting(context.Context, int64, adminsvc.MeetingInput) (*model.Meeting, error) {
-	return &model.Meeting{}, nil
-}
-
-func (s *stubAdminService) DeleteMeeting(context.Context, int64) error {
+func (s *stubAdminService) DeleteContactMessage(context.Context, string) error {
 	return nil
 }
 
@@ -616,6 +664,10 @@ func (s *stubAdminService) ListBlacklist(context.Context) ([]model.BlacklistEntr
 }
 
 func (s *stubAdminService) AddBlacklistEntry(context.Context, adminsvc.BlacklistInput) (*model.BlacklistEntry, error) {
+	return &model.BlacklistEntry{}, nil
+}
+
+func (s *stubAdminService) UpdateBlacklistEntry(context.Context, int64, adminsvc.BlacklistInput) (*model.BlacklistEntry, error) {
 	return &model.BlacklistEntry{}, nil
 }
 
@@ -628,5 +680,16 @@ func (s *stubAdminService) IsEmailBlacklisted(context.Context, string) (bool, er
 }
 
 func (s *stubAdminService) Summary(context.Context) (*model.AdminSummary, error) {
-	return &model.AdminSummary{}, nil
+	now := time.Now().UTC()
+	return &model.AdminSummary{
+		ProfileUpdatedAt:  &now,
+		SkillCount:        3,
+		FocusAreaCount:    2,
+		PublishedProjects: 1,
+		DraftProjects:     0,
+		PublishedResearch: 1,
+		DraftResearch:     0,
+		PendingContacts:   1,
+		BlacklistEntries:  1,
+	}, nil
 }

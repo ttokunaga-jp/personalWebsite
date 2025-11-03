@@ -11,11 +11,16 @@ auth:
   state_secret: "replace-with-random-string"
   state_ttl_seconds: 300
   admin:
-    default_redirect_uri: "/admin"
+    default_redirect_uri: "/admin/"
     allowed_emails:
       - "admin@example.com"
     allowed_domains:
       - "example.com"
+    session_cookie_name: "ps_admin_jwt"
+    session_cookie_path: "/"
+    session_cookie_secure: true
+    session_cookie_http_only: true
+    session_cookie_same_site: "lax"
 
 google:
   client_id: "your-google-oauth-client-id"

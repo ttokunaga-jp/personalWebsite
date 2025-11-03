@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"context"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,9 +23,10 @@ type visitor struct {
 
 // RateLimiter enforces per-IP request throttling to mitigate abuse.
 type RateLimiter struct {
-	cfg      config.SecurityConfig
-	visitors sync.Map
-	ttl      time.Duration
+	cfg            config.SecurityConfig
+	visitors       sync.Map
+	ttl            time.Duration
+	trustedProxies []*net.IPNet
 }
 
 // NewRateLimiter constructs the limiter and wires cleanup into the Fx lifecycle.
@@ -35,7 +38,12 @@ func newRateLimiter(lc fx.Lifecycle, cfg *config.AppConfig) *RateLimiter {
 	if cfg == nil {
 		return &RateLimiter{}
 	}
-	rl := &RateLimiter{cfg: cfg.Security, ttl: 10 * time.Minute}
+	trusted := newTrustedProxyList(cfg.Server.TrustedProxies)
+	rl := &RateLimiter{
+		cfg:            cfg.Security,
+		ttl:            10 * time.Minute,
+		trustedProxies: trusted,
+	}
 
 	if lc != nil {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -62,7 +70,10 @@ func (r *RateLimiter) Handler() gin.HandlerFunc {
 			return
 		}
 
-		ip := c.ClientIP()
+		ip := resolveClientIP(c, r.trustedProxies)
+		if strings.TrimSpace(ip) == "" {
+			ip = "unknown"
+		}
 		if r.isWhitelisted(ip) {
 			c.Next()
 			return

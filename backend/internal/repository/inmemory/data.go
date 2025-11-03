@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	defaultProfile = &model.Profile{
+	defaultAdminProfile = &model.AdminProfile{
 		Name:        model.NewLocalizedText("高見 拓実", "Takumi Takami"),
 		Title:       model.NewLocalizedText("ソフトウェアエンジニア / リサーチャー", "Software Engineer / Researcher"),
 		Affiliation: model.NewLocalizedText("架空大学", "Example University"),
@@ -22,7 +22,18 @@ var (
 			model.NewLocalizedText("GCP", "GCP"),
 			model.NewLocalizedText("機械学習", "Machine Learning"),
 		},
+		FocusAreas: []model.LocalizedText{
+			model.NewLocalizedText("AI支援開発", "AI-assisted development"),
+			model.NewLocalizedText("分散システム", "Distributed systems"),
+			model.NewLocalizedText("開発プロセス改善", "Development workflow improvement"),
+		},
+		UpdatedAt: func() *time.Time {
+			t := time.Date(2024, 5, 1, 9, 0, 0, 0, time.UTC)
+			return &t
+		}(),
 	}
+
+	defaultProfile = adminProfileToPublic(defaultAdminProfile)
 
 	defaultAdminProjects = []model.AdminProject{
 		{
@@ -120,6 +131,31 @@ var (
 			Published: false,
 			CreatedAt: time.Date(2024, 2, 11, 9, 0, 0, 0, time.UTC),
 			UpdatedAt: time.Date(2024, 2, 20, 9, 0, 0, 0, time.UTC),
+		},
+	}
+
+	defaultContactMessages = []model.ContactMessage{
+		{
+			ID:        "contact-1",
+			Name:      "Akari Yamada",
+			Email:     "akari@example.com",
+			Topic:     "プロジェクト相談",
+			Message:   "最新のリサーチ成果について詳しく伺いたいです。",
+			Status:    model.ContactStatusPending,
+			AdminNote: "",
+			CreatedAt: time.Date(2024, 5, 10, 10, 29, 0, 0, time.UTC),
+			UpdatedAt: time.Date(2024, 5, 10, 10, 29, 0, 0, time.UTC),
+		},
+		{
+			ID:        "contact-2",
+			Name:      "Lucas Chen",
+			Email:     "lucas@example.com",
+			Topic:     "AIプロダクト連携",
+			Message:   "AI駆動ポートフォリオに関してAPI連携を検討しています。",
+			Status:    model.ContactStatusInReview,
+			AdminNote: "メールで詳細ヒアリング中",
+			CreatedAt: time.Date(2024, 5, 12, 22, 0, 0, 0, time.UTC),
+			UpdatedAt: time.Date(2024, 5, 13, 9, 0, 0, 0, time.UTC),
 		},
 	}
 

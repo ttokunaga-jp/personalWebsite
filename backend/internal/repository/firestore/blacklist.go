@@ -90,6 +90,55 @@ func (r *blacklistRepository) AddBlacklistEntry(ctx context.Context, entry *mode
 	return created, nil
 }
 
+func (r *blacklistRepository) UpdateBlacklistEntry(ctx context.Context, entry *model.BlacklistEntry) (*model.BlacklistEntry, error) {
+	if entry == nil {
+		return nil, repository.ErrInvalidInput
+	}
+	if entry.ID == 0 {
+		return nil, repository.ErrInvalidInput
+	}
+
+	email := normalizeEmail(entry.Email)
+	if email == "" {
+		return nil, repository.ErrInvalidInput
+	}
+	reason := strings.TrimSpace(entry.Reason)
+
+	if existing, err := r.FindBlacklistEntryByEmail(ctx, email); err == nil && existing.ID != entry.ID {
+		return nil, repository.ErrDuplicate
+	} else if err != nil && err != repository.ErrNotFound {
+		return nil, err
+	}
+
+	docRef := r.base.doc(blacklistCollection, strconv.FormatInt(entry.ID, 10))
+	if _, err := docRef.Update(ctx, []firestore.Update{
+		{Path: "email", Value: email},
+		{Path: "reason", Value: reason},
+	}); err != nil {
+		if notFound(err) {
+			return nil, repository.ErrNotFound
+		}
+		return nil, fmt.Errorf("firestore blacklist: update %d: %w", entry.ID, err)
+	}
+
+	snapshot, err := docRef.Get(ctx)
+	if err != nil {
+		if notFound(err) {
+			return nil, repository.ErrNotFound
+		}
+		return nil, fmt.Errorf("firestore blacklist: fetch %d: %w", entry.ID, err)
+	}
+	var payload blacklistDocument
+	if err := snapshot.DataTo(&payload); err != nil {
+		return nil, fmt.Errorf("firestore blacklist: decode %d: %w", entry.ID, err)
+	}
+	if payload.ID == 0 {
+		payload.ID = entry.ID
+	}
+	updated := mapBlacklistDocument(payload)
+	return &updated, nil
+}
+
 func (r *blacklistRepository) RemoveBlacklistEntry(ctx context.Context, id int64) error {
 	docRef := r.base.doc(blacklistCollection, strconv.FormatInt(id, 10))
 	if _, err := docRef.Delete(ctx); err != nil {

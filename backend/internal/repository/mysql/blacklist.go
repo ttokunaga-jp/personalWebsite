@@ -39,6 +39,15 @@ SELECT
 FROM blacklist b
 WHERE b.email = ?`
 
+const getBlacklistByIDQuery = `
+SELECT
+	b.id,
+	b.email,
+	b.reason,
+	b.created_at
+FROM blacklist b
+WHERE b.id = ?`
+
 const insertBlacklistQuery = `
 INSERT INTO blacklist (
 	email,
@@ -46,6 +55,12 @@ INSERT INTO blacklist (
 	created_at
 )
 VALUES (?, ?, NOW())`
+
+const updateBlacklistQuery = `
+UPDATE blacklist SET
+	email = ?,
+	reason = ?
+WHERE id = ?`
 
 const deleteBlacklistQuery = `DELETE FROM blacklist WHERE id = ?`
 
@@ -79,13 +94,15 @@ func (r *blacklistRepository) AddBlacklistEntry(ctx context.Context, entry *mode
 		return nil, repository.ErrInvalidInput
 	}
 
+	reason := strings.TrimSpace(entry.Reason)
+
 	if _, err := r.FindBlacklistEntryByEmail(ctx, email); err == nil {
 		return nil, repository.ErrDuplicate
 	} else if err != nil && err != repository.ErrNotFound {
 		return nil, err
 	}
 
-	res, err := r.db.ExecContext(ctx, insertBlacklistQuery, email, entry.Reason)
+	res, err := r.db.ExecContext(ctx, insertBlacklistQuery, email, reason)
 	if err != nil {
 		return nil, fmt.Errorf("insert blacklist entry: %w", err)
 	}
@@ -101,6 +118,41 @@ func (r *blacklistRepository) AddBlacklistEntry(ctx context.Context, entry *mode
 	}
 	created.ID = id
 	return created, nil
+}
+
+func (r *blacklistRepository) UpdateBlacklistEntry(ctx context.Context, entry *model.BlacklistEntry) (*model.BlacklistEntry, error) {
+	if entry == nil {
+		return nil, repository.ErrInvalidInput
+	}
+	if entry.ID == 0 {
+		return nil, repository.ErrInvalidInput
+	}
+
+	email := strings.ToLower(strings.TrimSpace(entry.Email))
+	if email == "" {
+		return nil, repository.ErrInvalidInput
+	}
+	reason := strings.TrimSpace(entry.Reason)
+
+	if existing, err := r.FindBlacklistEntryByEmail(ctx, email); err == nil && existing.ID != entry.ID {
+		return nil, repository.ErrDuplicate
+	} else if err != nil && err != repository.ErrNotFound {
+		return nil, err
+	}
+
+	res, err := r.db.ExecContext(ctx, updateBlacklistQuery, email, reason, entry.ID)
+	if err != nil {
+		return nil, fmt.Errorf("update blacklist entry %d: %w", entry.ID, err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("rows affected update blacklist %d: %w", entry.ID, err)
+	}
+	if affected == 0 {
+		return nil, repository.ErrNotFound
+	}
+
+	return r.getBlacklistEntryByID(ctx, entry.ID)
 }
 
 func (r *blacklistRepository) RemoveBlacklistEntry(ctx context.Context, id int64) error {
@@ -133,6 +185,18 @@ func (r *blacklistRepository) FindBlacklistEntryByEmail(ctx context.Context, ema
 		return nil, fmt.Errorf("get blacklist by email %s: %w", email, err)
 	}
 
+	entry := mapBlacklistRow(row)
+	return &entry, nil
+}
+
+func (r *blacklistRepository) getBlacklistEntryByID(ctx context.Context, id int64) (*model.BlacklistEntry, error) {
+	var row blacklistRow
+	if err := r.db.GetContext(ctx, &row, getBlacklistByIDQuery, id); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, repository.ErrNotFound
+		}
+		return nil, fmt.Errorf("get blacklist by id %d: %w", id, err)
+	}
 	entry := mapBlacklistRow(row)
 	return &entry, nil
 }

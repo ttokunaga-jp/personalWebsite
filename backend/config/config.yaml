@@ -6,6 +6,12 @@ server:
   tls_key_file: ""
 auth:
   disabled: false
+  admin:
+    session_cookie_name: "ps_admin_jwt"
+    session_cookie_path: "/"
+    session_cookie_secure: false
+    session_cookie_http_only: true
+    session_cookie_same_site: "lax"
 security:
   enable_csrf: true
   csrf_signing_key: "local-dev-csrf-secret-change-me"

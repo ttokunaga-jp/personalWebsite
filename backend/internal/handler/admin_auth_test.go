@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 
+	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/errs"
 	authsvc "github.com/takumi/personal-website/internal/service/auth"
 )
@@ -26,7 +27,7 @@ func TestAdminAuthCallbackSetsCookieAndRedirects(t *testing.T) {
 			RedirectPath: "/admin/dashboard",
 		},
 	}
-	handler := NewAdminAuthHandler(service, nil, nil)
+	handler := NewAdminAuthHandler(service, nil, nil, testAuthConfig())
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -57,7 +58,7 @@ func TestAdminAuthCallbackValidatesQueryParameters(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
 
-	handler := NewAdminAuthHandler(&stubAdminAuthService{}, nil, nil)
+	handler := NewAdminAuthHandler(&stubAdminAuthService{}, nil, nil, testAuthConfig())
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -77,7 +78,7 @@ func TestAdminAuthCallbackPropagatesServiceErrors(t *testing.T) {
 	service := &stubAdminAuthService{
 		callbackErr: errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "invalid oauth state", nil),
 	}
-	handler := NewAdminAuthHandler(service, nil, nil)
+	handler := NewAdminAuthHandler(service, nil, nil, testAuthConfig())
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -108,7 +109,7 @@ func TestAdminSessionRehydratesFromCookie(t *testing.T) {
 		expiresAt:   time.Now().Add(45 * time.Minute),
 	}
 
-	handler := NewAdminAuthHandler(&stubAdminAuthService{}, issuer, verifier)
+	handler := NewAdminAuthHandler(&stubAdminAuthService{}, issuer, verifier, testAuthConfig())
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -142,6 +143,18 @@ func TestAdminSessionRehydratesFromCookie(t *testing.T) {
 	}
 	require.NotNil(t, sessionCookie)
 	require.Equal(t, "refreshed-token", sessionCookie.Value)
+}
+
+func testAuthConfig() config.AuthConfig {
+	return config.AuthConfig{
+		Admin: config.AdminAuthConfig{
+			SessionCookieName:     "ps_admin_jwt",
+			SessionCookiePath:     "/",
+			SessionCookieSecure:   true,
+			SessionCookieHTTPOnly: true,
+			SessionCookieSameSite: "lax",
+		},
+	}
 }
 
 type stubAdminAuthService struct {

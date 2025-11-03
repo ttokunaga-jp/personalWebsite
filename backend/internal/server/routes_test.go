@@ -56,17 +56,16 @@ func TestRegisterRoutes(t *testing.T) {
 		},
 	}
 
-	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
-		JWTSecret:        "test-secret",
-		Issuer:           "personal-website",
-		Audience:         []string{"personal-website-admin"},
-		ClockSkewSeconds: 30,
-		Disabled:         true,
-	})
-	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier)
-	adminSvc := &stubAdminService{}
-
 	appCfg := &config.AppConfig{
+		Auth: config.AuthConfig{
+			Admin: config.AdminAuthConfig{
+				SessionCookieName:     "ps_admin_jwt",
+				SessionCookiePath:     "/",
+				SessionCookieHTTPOnly: true,
+				SessionCookieSecure:   true,
+				SessionCookieSameSite: "lax",
+			},
+		},
 		Contact: config.ContactConfig{
 			Topics:           []string{"Research collaboration"},
 			RecaptchaSiteKey: "test-site-key",
@@ -74,6 +73,16 @@ func TestRegisterRoutes(t *testing.T) {
 			ConsentText:      "Testing purposes only.",
 		},
 	}
+
+	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
+		JWTSecret:        "test-secret",
+		Issuer:           "personal-website",
+		Audience:         []string{"personal-website-admin"},
+		ClockSkewSeconds: 30,
+		Disabled:         true,
+	})
+	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier, appCfg.Auth)
+	adminSvc := &stubAdminService{}
 
 	registerRoutes(
 		engine,
@@ -84,7 +93,7 @@ func TestRegisterRoutes(t *testing.T) {
 		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
-		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}),
+		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}, appCfg.Auth),
 		jwtMiddleware,
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
@@ -406,18 +415,16 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 		},
 	}
 
-	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
-		JWTSecret:        "test-jwt-secret",
-		Issuer:           "personal-website",
-		Audience:         []string{"personal-website-admin"},
-		ClockSkewSeconds: 30,
-		Disabled:         true,
-	})
-	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier)
-	adminSvc := &stubAdminService{}
-	securityHandler := handler.NewSecurityHandler(csrfManager, cfg)
-
 	appCfg := &config.AppConfig{
+		Auth: config.AuthConfig{
+			Admin: config.AdminAuthConfig{
+				SessionCookieName:     "ps_admin_jwt",
+				SessionCookiePath:     "/",
+				SessionCookieHTTPOnly: true,
+				SessionCookieSecure:   true,
+				SessionCookieSameSite: "lax",
+			},
+		},
 		Contact: config.ContactConfig{
 			Topics:           []string{"Research collaboration"},
 			RecaptchaSiteKey: "test-site-key",
@@ -425,6 +432,17 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 			ConsentText:      "Testing purposes only.",
 		},
 	}
+
+	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
+		JWTSecret:        "test-jwt-secret",
+		Issuer:           "personal-website",
+		Audience:         []string{"personal-website-admin"},
+		ClockSkewSeconds: 30,
+		Disabled:         true,
+	})
+	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier, appCfg.Auth)
+	adminSvc := &stubAdminService{}
+	securityHandler := handler.NewSecurityHandler(csrfManager, cfg)
 
 	registerRoutes(
 		engine,
@@ -435,7 +453,7 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
-		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}),
+		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}, appCfg.Auth),
 		jwtMiddleware,
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),

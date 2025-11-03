@@ -8,23 +8,69 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/errs"
 	authsvc "github.com/takumi/personal-website/internal/service/auth"
 )
 
+type adminSessionCookieOptions struct {
+	name     string
+	domain   string
+	path     string
+	secure   bool
+	httpOnly bool
+	sameSite http.SameSite
+}
+
+func newAdminSessionCookieOptions(cfg config.AdminAuthConfig) adminSessionCookieOptions {
+	name := strings.TrimSpace(cfg.SessionCookieName)
+	if name == "" {
+		name = "ps_admin_jwt"
+	}
+
+	path := strings.TrimSpace(cfg.SessionCookiePath)
+	if path == "" {
+		path = "/"
+	}
+
+	return adminSessionCookieOptions{
+		name:     name,
+		domain:   strings.TrimSpace(cfg.SessionCookieDomain),
+		path:     path,
+		secure:   cfg.SessionCookieSecure,
+		httpOnly: cfg.SessionCookieHTTPOnly,
+		sameSite: parseSameSite(cfg.SessionCookieSameSite),
+	}
+}
+
+func parseSameSite(value string) http.SameSite {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	case "lax":
+		return http.SameSiteLaxMode
+	default:
+		return http.SameSiteLaxMode
+	}
+}
+
 // AdminAuthHandler exposes admin-specific OAuth login endpoints.
 type AdminAuthHandler struct {
-	service  authsvc.AdminService
-	issuer   authsvc.TokenIssuer
-	verifier authsvc.TokenVerifier
+	service   authsvc.AdminService
+	issuer    authsvc.TokenIssuer
+	verifier  authsvc.TokenVerifier
+	cookieCfg adminSessionCookieOptions
 }
 
 // NewAdminAuthHandler constructs the handler with the provided service.
-func NewAdminAuthHandler(service authsvc.AdminService, issuer authsvc.TokenIssuer, verifier authsvc.TokenVerifier) *AdminAuthHandler {
+func NewAdminAuthHandler(service authsvc.AdminService, issuer authsvc.TokenIssuer, verifier authsvc.TokenVerifier, authCfg config.AuthConfig) *AdminAuthHandler {
 	return &AdminAuthHandler{
-		service:  service,
-		issuer:   issuer,
-		verifier: verifier,
+		service:   service,
+		issuer:    issuer,
+		verifier:  verifier,
+		cookieCfg: newAdminSessionCookieOptions(authCfg.Admin),
 	}
 }
 
@@ -69,7 +115,7 @@ func (h *AdminAuthHandler) Callback(c *gin.Context) {
 
 	if strings.TrimSpace(result.Token) != "" {
 		expires := time.Unix(result.ExpiresAt, 0)
-		setAdminSessionCookie(c.Writer, result.Token, expires)
+		setAdminSessionCookie(c.Writer, result.Token, expires, h.cookieCfg)
 	}
 
 	c.Header("Cache-Control", "no-store")
@@ -85,7 +131,12 @@ func (h *AdminAuthHandler) Session(c *gin.Context) {
 	token := extractBearerToken(authHeader)
 	tokenSource := "header"
 	if token == "" {
-		if cookie, err := c.Cookie("ps_admin_jwt"); err == nil {
+		if cookieName := strings.TrimSpace(h.cookieCfg.name); cookieName != "" {
+			if cookie, err := c.Cookie(cookieName); err == nil {
+				token = strings.TrimSpace(cookie)
+				tokenSource = "cookie"
+			}
+		} else if cookie, err := c.Cookie("ps_admin_jwt"); err == nil {
 			token = strings.TrimSpace(cookie)
 			tokenSource = "cookie"
 		}
@@ -134,7 +185,7 @@ func (h *AdminAuthHandler) Session(c *gin.Context) {
 		}
 		refreshedToken = issuedToken
 		expiresAt = issuedExpiry
-		setAdminSessionCookie(c.Writer, issuedToken, issuedExpiry)
+		setAdminSessionCookie(c.Writer, issuedToken, issuedExpiry, h.cookieCfg)
 	} else if tokenSource == "cookie" {
 		// Provide the existing cookie token to the SPA when rehydrating without Authorization headers.
 		refreshedToken = token
@@ -168,18 +219,32 @@ func buildAdminRedirect(path, token string) string {
 	return path + "#" + fragment
 }
 
-func setAdminSessionCookie(w http.ResponseWriter, token string, expires time.Time) {
+func setAdminSessionCookie(w http.ResponseWriter, token string, expires time.Time, opts adminSessionCookieOptions) {
 	if strings.TrimSpace(token) == "" {
 		return
 	}
 
+	name := strings.TrimSpace(opts.name)
+	if name == "" {
+		name = "ps_admin_jwt"
+	}
+
+	path := strings.TrimSpace(opts.path)
+	if path == "" {
+		path = "/"
+	}
+
 	cookie := &http.Cookie{
-		Name:     "ps_admin_jwt",
+		Name:     name,
 		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
+		Path:     path,
+		HttpOnly: opts.httpOnly,
+		Secure:   opts.secure,
+		SameSite: opts.sameSite,
+	}
+
+	if domain := strings.TrimSpace(opts.domain); domain != "" {
+		cookie.Domain = domain
 	}
 
 	if !expires.IsZero() && expires.After(time.Now()) {

@@ -6,12 +6,14 @@ import {
 } from "../../lib/useApiResource";
 
 import {
+  transformContactConfig,
   transformProfile,
   transformProjects,
   transformResearchEntries,
-  type RawProfileResponse,
-  type RawProject,
-  type RawResearchEntry,
+  type RawContactConfig,
+  type RawProfileDocument,
+  type RawProjectDocument,
+  type RawResearchDocument,
 } from "./transform";
 import type {
   ContactAvailabilityResponse,
@@ -81,16 +83,80 @@ function createMockAvailability(): ContactAvailabilityResponse {
 
 function createMockContactConfig(): ContactConfigResponse {
   return {
+    heroTitle: "Schedule a conversation",
+    heroDescription:
+      "Pick a topic and a preferred timeslot to coordinate with Takumi. A confirmation email will follow after review.",
     topics: [
-      "Research collaboration",
-      "Project consultation",
-      "Speaking engagement",
-      "Mentoring session",
+      { id: "research", label: "Research collaboration" },
+      { id: "consultation", label: "Project consultation" },
+      { id: "speaking", label: "Speaking engagement" },
+      { id: "mentoring", label: "Mentoring session" },
     ],
-    recaptchaSiteKey: import.meta.env.VITE_RECAPTCHA_SITE_KEY ?? "",
-    minimumLeadHours: 48,
     consentText:
       "Provided details are used only to coordinate the requested meeting. Expect a reply within two business days.",
+    minimumLeadHours: 48,
+    recaptchaSiteKey: import.meta.env.VITE_RECAPTCHA_SITE_KEY ?? "",
+    supportEmail: "contact@example.com",
+    calendarTimezone: "Asia/Tokyo",
+    googleCalendarId: "mock-calendar",
+    bookingWindowDays: 14,
+  };
+}
+
+type RawBookingResult = {
+  meeting: {
+    id?: number | string;
+    name?: string | null;
+    email?: string | null;
+    datetime?: string | null;
+    durationMinutes?: number | null;
+    meetUrl?: string | null;
+    calendarEventId?: string | null;
+    status?: string | null;
+    notes?: string | null;
+    confirmationSentAt?: string | null;
+    lastNotificationSentAt?: string | null;
+    lookupHash?: string | null;
+    googleCalendarStatus?: string | null;
+    cancellationReason?: string | null;
+  };
+  calendarEventId?: string | null;
+  supportEmail?: string | null;
+  calendarTimezone?: string | null;
+};
+
+function normalizeString(value?: string | null): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function transformBookingResult(raw: RawBookingResult): BookingResult {
+  const meeting = raw.meeting ?? {};
+  const id =
+    meeting.id !== undefined && meeting.id !== null
+      ? String(meeting.id)
+      : "";
+
+  return {
+    meeting: {
+      id,
+      name: normalizeString(meeting.name) ?? "",
+      email: normalizeString(meeting.email) ?? "",
+      datetime: meeting.datetime ?? "",
+      durationMinutes: meeting.durationMinutes ?? 0,
+      meetUrl: normalizeString(meeting.meetUrl),
+      calendarEventId: normalizeString(meeting.calendarEventId),
+      status: (meeting.status ?? "pending") as BookingResult["meeting"]["status"],
+      notes: normalizeString(meeting.notes),
+      confirmationSentAt: meeting.confirmationSentAt ?? undefined,
+      lastNotificationSentAt: meeting.lastNotificationSentAt ?? undefined,
+      lookupHash: meeting.lookupHash ?? undefined,
+      googleCalendarStatus: meeting.googleCalendarStatus ?? undefined,
+      cancellationReason: meeting.cancellationReason ?? undefined,
+    },
+    calendarEventId: normalizeString(raw.calendarEventId),
+    supportEmail: normalizeString(raw.supportEmail),
+    calendarTimezone: normalizeString(raw.calendarTimezone),
   };
 }
 
@@ -101,7 +167,7 @@ export const publicApi = {
       return transformProfile(undefined);
     }
 
-    const response = await apiClient.get<ApiSuccessResponse<RawProfileResponse>>(
+    const response = await apiClient.get<ApiSuccessResponse<RawProfileDocument>>(
       `${BASE_PATH}/profile`,
       {
         ...withAbortSignal(signal),
@@ -116,7 +182,7 @@ export const publicApi = {
     }
 
     const response = await apiClient.get<
-      ApiSuccessResponse<RawResearchEntry[]>
+      ApiSuccessResponse<RawResearchDocument[]>
     >(`${BASE_PATH}/research`, {
       ...withAbortSignal(signal),
     });
@@ -128,7 +194,7 @@ export const publicApi = {
       return transformProjects(undefined);
     }
 
-    const response = await apiClient.get<ApiSuccessResponse<RawProject[]>>(
+    const response = await apiClient.get<ApiSuccessResponse<RawProjectDocument[]>>(
       `${BASE_PATH}/projects`,
       {
         ...withAbortSignal(signal),
@@ -158,11 +224,11 @@ export const publicApi = {
     }
 
     const response = await apiClient.get<
-      ApiSuccessResponse<ContactConfigResponse>
+      ApiSuccessResponse<RawContactConfig>
     >(`${BASE_PATH}/contact/config`, {
       ...withAbortSignal(signal),
     });
-    return unwrapData(response.data);
+    return transformContactConfig(unwrapData(response.data));
   },
   async createBooking(
     payload: CreateBookingPayload,
@@ -170,24 +236,26 @@ export const publicApi = {
     if (USE_MOCK_PUBLIC_API) {
       return {
         meeting: {
-          id: Date.now(),
+          id: String(Date.now()),
           name: payload.name,
           email: payload.email,
           datetime: payload.startTime,
           durationMinutes: payload.durationMinutes,
-          meetUrl: "",
-          calendarEventId: "",
+          meetUrl: undefined,
+          calendarEventId: undefined,
           status: "pending",
           notes: payload.agenda,
         },
-        calendarEventId: "",
+        calendarEventId: undefined,
+        supportEmail: "contact@example.com",
+        calendarTimezone: "Asia/Tokyo",
       };
     }
 
     const response = await apiClient.post<
-      ApiSuccessResponse<BookingResult>
+      ApiSuccessResponse<RawBookingResult>
     >(`${BASE_PATH}/contact/bookings`, payload);
-    return unwrapData(response.data);
+    return transformBookingResult(unwrapData(response.data));
   },
 };
 

@@ -14,14 +14,14 @@ import (
 )
 
 type ContactHandler struct {
-	submission   service.ContactService
+	contact      service.ContactService
 	availability service.AvailabilityService
 	cfg          config.ContactConfig
 }
 
-func NewContactHandler(submission service.ContactService, availability service.AvailabilityService, cfg *config.AppConfig) *ContactHandler {
+func NewContactHandler(contact service.ContactService, availability service.AvailabilityService, cfg *config.AppConfig) *ContactHandler {
 	handler := &ContactHandler{
-		submission:   submission,
+		contact:      contact,
 		availability: availability,
 	}
 	if cfg != nil {
@@ -37,7 +37,7 @@ func (h *ContactHandler) SubmitContact(c *gin.Context) {
 		return
 	}
 
-	submission, err := h.submission.SubmitContact(c.Request.Context(), &req)
+	submission, err := h.contact.SubmitContact(c.Request.Context(), &req)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -81,17 +81,13 @@ func (h *ContactHandler) GetAvailability(c *gin.Context) {
 }
 
 func (h *ContactHandler) GetConfig(c *gin.Context) {
-	response := model.ContactConfigResponse{
-		Topics:           append([]string(nil), h.cfg.Topics...),
-		RecaptchaSiteKey: h.cfg.RecaptchaSiteKey,
-		MinimumLeadHours: h.cfg.MinimumLeadHours,
-		ConsentText:      h.cfg.ConsentText,
-	}
-	if response.MinimumLeadHours <= 0 {
-		response.MinimumLeadHours = 24
+	settings, err := h.contact.GetContactSettings(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"data": response,
+		"data": settings,
 	})
 }

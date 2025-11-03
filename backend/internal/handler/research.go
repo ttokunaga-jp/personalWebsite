@@ -17,7 +17,9 @@ func NewResearchHandler(service service.ResearchService) *ResearchHandler {
 }
 
 func (h *ResearchHandler) ListResearch(c *gin.Context) {
-	research, err := h.service.ListResearch(c.Request.Context())
+	includeDrafts := c.Query("includeDrafts") == "true"
+
+	research, err := h.service.ListResearchDocuments(c.Request.Context(), includeDrafts)
 	if err != nil {
 		respondError(c, err)
 		return

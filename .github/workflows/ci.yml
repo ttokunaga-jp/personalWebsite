@@ -79,6 +79,9 @@ jobs:
           terraform init -backend=false
           terraform validate
 
+      - name: Verify MySQL schema
+        run: make db-verify
+
       - name: Run lint
         run: make lint
 

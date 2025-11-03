@@ -34,10 +34,10 @@ func TestRegisterRoutes(t *testing.T) {
 
 	engine := gin.New()
 
-	profileSvc := service.NewProfileService(inmemory.NewProfileRepository())
-	projectSvc := service.NewProjectService(inmemory.NewProjectRepository())
-	researchSvc := service.NewResearchService(inmemory.NewResearchRepository())
-	contactSvc := service.NewContactService(inmemory.NewContactRepository())
+	profileSvc := service.NewProfileService(inmemory.NewContentProfileRepository())
+	projectSvc := service.NewProjectService(inmemory.NewProjectDocumentRepository())
+	researchSvc := service.NewResearchService(inmemory.NewResearchDocumentRepository())
+	contactSvc := service.NewContactService(inmemory.NewContactRepository(), inmemory.NewContactFormSettingsRepository())
 	availabilitySvc := &stubAvailabilityService{
 		response: &model.AvailabilityResponse{
 			Timezone:    "Asia/Tokyo",
@@ -397,10 +397,10 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 		engine.Use(csrfMiddleware.Handler())
 	}
 
-	profileSvc := service.NewProfileService(inmemory.NewProfileRepository())
-	projectSvc := service.NewProjectService(inmemory.NewProjectRepository())
-	researchSvc := service.NewResearchService(inmemory.NewResearchRepository())
-	contactSvc := service.NewContactService(inmemory.NewContactRepository())
+	profileSvc := service.NewProfileService(inmemory.NewContentProfileRepository())
+	projectSvc := service.NewProjectService(inmemory.NewProjectDocumentRepository())
+	researchSvc := service.NewResearchService(inmemory.NewResearchDocumentRepository())
+	contactSvc := service.NewContactService(inmemory.NewContactRepository(), inmemory.NewContactFormSettingsRepository())
 	availabilitySvc := &stubAvailabilityService{
 		response: &model.AvailabilityResponse{
 			Timezone:    "Asia/Tokyo",

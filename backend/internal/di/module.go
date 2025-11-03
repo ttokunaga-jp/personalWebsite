@@ -41,7 +41,13 @@ var Module = fx.Module("di",
 		auth.NewService,
 		auth.NewAdminService,
 		auth.NewJWTVerifier,
+		provideTechCatalogRepository,
 		provideProfileRepository,
+		provideContentProfileRepository,
+		provideProjectDocumentRepository,
+		provideResearchDocumentRepository,
+		provideContactSettingsRepository,
+		provideHomePageConfigRepository,
 		provider.NewAdminProfileRepository,
 		provideProjectRepository,
 		provider.NewAdminProjectRepository,
@@ -143,6 +149,19 @@ func provideGoogleTokenProvider(client *http.Client, cfg *config.AppConfig, stor
 	return google.NewFallbackTokenProvider(providers...)
 }
 
+func provideTechCatalogRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.TechCatalogRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewTechCatalogRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewTechCatalogRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewTechCatalogRepository(db, fs, cfg)
+	}
+}
+
 func provideCalendarClient(client *http.Client, provider google.TokenProvider, cfg *config.AppConfig) calendar.Client {
 	return google.NewCalendarAPIClient(client, provider, cfg.Contact.Timezone)
 }
@@ -171,6 +190,32 @@ func provideProfileRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.
 	}
 }
 
+func provideContentProfileRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.ContentProfileRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewContentProfileRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewContentProfileRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewContentProfileRepository(db, fs, cfg)
+	}
+}
+
+func provideProjectDocumentRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.ProjectDocumentRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewProjectDocumentRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewProjectDocumentRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewProjectDocumentRepository(db, fs, cfg)
+	}
+}
+
 func provideProjectRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.ProjectRepository {
 	driver := normalizedDriver(cfg)
 	switch driver {
@@ -181,6 +226,19 @@ func provideProjectRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.
 	default:
 		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
 		return provider.NewProjectRepository(db, fs, cfg)
+	}
+}
+
+func provideResearchDocumentRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.ResearchDocumentRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewResearchDocumentRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewResearchDocumentRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewResearchDocumentRepository(db, fs, cfg)
 	}
 }
 
@@ -197,6 +255,19 @@ func provideResearchRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore
 	}
 }
 
+func provideContactSettingsRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.ContactFormSettingsRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewContactFormSettingsRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewContactFormSettingsRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewContactFormSettingsRepository(db, fs, cfg)
+	}
+}
+
 func provideContactRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.ContactRepository {
 	driver := normalizedDriver(cfg)
 	switch driver {
@@ -207,6 +278,19 @@ func provideContactRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.
 	default:
 		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
 		return provider.NewContactRepository(db, fs, cfg)
+	}
+}
+
+func provideHomePageConfigRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.HomePageConfigRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewHomePageConfigRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewHomePageConfigRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewHomePageConfigRepository(db, fs, cfg)
 	}
 }
 

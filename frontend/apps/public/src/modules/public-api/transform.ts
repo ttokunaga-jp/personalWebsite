@@ -1,47 +1,235 @@
 import i18next from "i18next";
 
 import {
+  getCanonicalHomeConfig,
   getCanonicalProfile,
   getCanonicalProjects,
   getCanonicalResearchEntries,
 } from "../profile-content";
 
 import type {
+  ContactConfigResponse,
+  HomeChipSource,
+  HomePageConfig,
+  HomeQuickLink,
+  LocalizedText,
+  ProfileAffiliation,
+  ProfileLab,
   ProfileResponse,
+  ProfileTechSection,
+  ProfileTheme,
+  ProfileWorkHistoryItem,
   Project,
+  ProjectLink,
+  ResearchAsset,
   ResearchEntry,
+  ResearchLink,
+  SocialLink,
+  TechCatalogEntry,
+  TechContext,
+  TechMembership,
+  TechLevel,
 } from "./types";
+import type { SupportedLanguage } from "./types";
 
-type LocalizedText = {
-  ja?: string | null;
-  en?: string | null;
+type RawTechCatalogEntry = {
+  id?: number | string;
+  slug?: string | null;
+  displayName?: string | null;
+  category?: string | null;
+  level?: TechLevel | null;
+  icon?: string | null;
+  sortOrder?: number | null;
+  active?: boolean | null;
 };
 
-export type RawProfileResponse = {
-  name?: LocalizedText;
-  title?: LocalizedText;
-  affiliation?: LocalizedText;
-  lab?: LocalizedText;
-  summary?: LocalizedText;
-  skills?: LocalizedText[];
+type RawTechMembership = {
+  membershipId?: number | string;
+  context?: string | null;
+  note?: string | null;
+  sortOrder?: number | null;
+  tech?: RawTechCatalogEntry | null;
 };
 
-export type RawProject = {
-  id: number;
-  title?: LocalizedText;
-  description?: LocalizedText;
-  techStack?: string[];
-  linkUrl?: string;
-  year?: number;
+type RawProfileAffiliation = {
+  id?: number | string;
+  name?: string | null;
+  url?: string | null;
+  description?: LocalizedText | null;
+  startedAt?: string | null;
+  sortOrder?: number | null;
 };
 
-export type RawResearchEntry = {
-  id: number;
-  title?: LocalizedText;
-  summary?: LocalizedText;
-  contentMd?: LocalizedText;
-  year?: number;
+type RawProfileWorkHistory = {
+  id?: number | string;
+  organization?: LocalizedText | null;
+  role?: LocalizedText | null;
+  summary?: LocalizedText | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  externalUrl?: string | null;
+  sortOrder?: number | null;
 };
+
+type RawProfileTechSection = {
+  id?: number | string;
+  title?: LocalizedText | null;
+  layout?: string | null;
+  breakpoint?: string | null;
+  sortOrder?: number | null;
+  members?: RawTechMembership[] | null;
+};
+
+type RawProfileSocialLink = {
+  id?: number | string;
+  provider?: string | null;
+  label?: LocalizedText | null;
+  url?: string | null;
+  isFooter?: boolean | null;
+  sortOrder?: number | null;
+};
+
+type RawProfileLab = {
+  name?: LocalizedText | null;
+  advisor?: LocalizedText | null;
+  room?: LocalizedText | null;
+  url?: string | null;
+};
+
+export type RawProfileDocument = {
+  id?: number | string;
+  displayName?: string | null;
+  headline?: LocalizedText | null;
+  summary?: LocalizedText | null;
+  avatarUrl?: string | null;
+  location?: LocalizedText | null;
+  theme?: {
+    mode?: string | null;
+    accentColor?: string | null;
+  } | null;
+  lab?: RawProfileLab | null;
+  affiliations?: RawProfileAffiliation[] | null;
+  communities?: RawProfileAffiliation[] | null;
+  workHistory?: RawProfileWorkHistory[] | null;
+  techSections?: RawProfileTechSection[] | null;
+  socialLinks?: RawProfileSocialLink[] | null;
+  updatedAt?: string | null;
+};
+
+type RawHomeQuickLink = {
+  id?: number | string;
+  section?: string | null;
+  label?: LocalizedText | null;
+  description?: LocalizedText | null;
+  cta?: LocalizedText | null;
+  targetUrl?: string | null;
+  sortOrder?: number | null;
+};
+
+type RawHomeChipSource = {
+  id?: number | string;
+  source?: string | null;
+  label?: LocalizedText | null;
+  limit?: number | null;
+  sortOrder?: number | null;
+};
+
+export type RawHomePageConfig = {
+  heroSubtitle?: LocalizedText | null;
+  quickLinks?: RawHomeQuickLink[] | null;
+  chipSources?: RawHomeChipSource[] | null;
+  updatedAt?: string | null;
+};
+
+type RawProjectLink = {
+  id?: number | string;
+  type?: string | null;
+  label?: LocalizedText | null;
+  url?: string | null;
+  sortOrder?: number | null;
+};
+
+type RawProjectPeriod = {
+  start?: string | null;
+  end?: string | null;
+};
+
+export type RawProjectDocument = {
+  id?: number | string;
+  slug?: string | null;
+  title?: LocalizedText | null;
+  summary?: LocalizedText | null;
+  description?: LocalizedText | null;
+  coverImageUrl?: string | null;
+  primaryLink?: string | null;
+  links?: RawProjectLink[] | null;
+  period?: RawProjectPeriod | null;
+  tech?: RawTechMembership[] | null;
+  highlight?: boolean | null;
+  published?: boolean | null;
+  sortOrder?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+type RawResearchLink = {
+  id?: number | string;
+  type?: string | null;
+  label?: LocalizedText | null;
+  url?: string | null;
+  sortOrder?: number | null;
+};
+
+type RawResearchAsset = {
+  id?: number | string;
+  url?: string | null;
+  caption?: LocalizedText | null;
+  sortOrder?: number | null;
+};
+
+export type RawResearchDocument = {
+  id?: number | string;
+  slug?: string | null;
+  kind?: string | null;
+  title?: LocalizedText | null;
+  overview?: LocalizedText | null;
+  outcome?: LocalizedText | null;
+  outlook?: LocalizedText | null;
+  externalUrl?: string | null;
+  publishedAt?: string | null;
+  updatedAt?: string | null;
+  highlightImageUrl?: string | null;
+  imageAlt?: LocalizedText | null;
+  isDraft?: boolean | null;
+  tags?: Array<{
+    id?: number | string;
+    value?: string | null;
+  }> | null;
+  links?: RawResearchLink[] | null;
+  assets?: RawResearchAsset[] | null;
+  tech?: RawTechMembership[] | null;
+};
+
+type RawContactTopic = {
+  id?: string | null;
+  label?: LocalizedText | null;
+  description?: LocalizedText | null;
+};
+
+export type RawContactConfig = {
+  heroTitle?: LocalizedText | null;
+  heroDescription?: LocalizedText | null;
+  topics?: RawContactTopic[] | null;
+  consentText?: LocalizedText | null;
+  minimumLeadHours?: number | null;
+  recaptchaSiteKey?: string | null;
+  supportEmail?: string | null;
+  calendarTimezone?: string | null;
+  googleCalendarId?: string | null;
+  bookingWindowDays?: number | null;
+};
+
+const FALLBACK_LANGUAGE: SupportedLanguage = "en";
 
 function clone<T>(value: T): T {
   if (typeof structuredClone === "function") {
@@ -50,227 +238,605 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function resolveLanguage(): "en" | "ja" {
-  const language = i18next.language ?? "en";
+function resolveLanguage(): SupportedLanguage {
+  const language = i18next.language ?? FALLBACK_LANGUAGE;
   return language.toLowerCase().startsWith("ja") ? "ja" : "en";
 }
 
-function selectLocalizedText(text?: LocalizedText | null): string | undefined {
+function normaliseString(value?: string | null): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function toStringId(value: number | string | null | undefined, fallback: string): string {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+  return String(value);
+}
+
+function toNumber(value: number | null | undefined, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  return fallback;
+}
+
+function selectLocalizedText(
+  text: LocalizedText | null | undefined,
+  language: SupportedLanguage,
+  fallback?: string,
+): string | undefined {
   if (!text) {
-    return undefined;
+    return fallback;
   }
 
-  const language = resolveLanguage();
-  if (language === "ja" && text.ja) {
-    return text.ja;
+  const primary =
+    language === "ja"
+      ? normaliseString(text.ja)
+      : normaliseString(text.en);
+  if (primary) {
+    return primary;
   }
 
-  return text.en ?? text.ja ?? undefined;
+  const secondary =
+    language === "ja"
+      ? normaliseString(text.en)
+      : normaliseString(text.ja);
+  if (secondary) {
+    return secondary;
+  }
+
+  return fallback;
+}
+
+function mapTechCatalogEntry(raw?: RawTechCatalogEntry | null): TechCatalogEntry | null {
+  if (!raw) {
+    return null;
+  }
+  const displayName = normaliseString(raw.displayName);
+  if (!displayName) {
+    return null;
+  }
+  const slug = normaliseString(raw.slug) ?? displayName.toLowerCase().replace(/\s+/g, "-");
+
+  return {
+    id: toStringId(raw.id ?? slug, slug),
+    slug,
+    displayName,
+    category: normaliseString(raw.category),
+    level: (raw.level ?? "intermediate") as TechLevel,
+    icon: normaliseString(raw.icon),
+    sortOrder: toNumber(raw.sortOrder),
+    active: raw.active ?? true,
+  };
+}
+
+function mapTechMembership(raw: RawTechMembership | null | undefined): TechMembership | null {
+  if (!raw) {
+    return null;
+  }
+  const tech = mapTechCatalogEntry(raw.tech);
+  if (!tech) {
+    return null;
+  }
+
+  const context = raw.context === "supporting" ? "supporting" : "primary";
+
+  return {
+    id: toStringId(raw.membershipId ?? `${tech.id}-${context}`, `${tech.id}-${context}`),
+    context: context as TechContext,
+    note: normaliseString(raw.note),
+    sortOrder: toNumber(raw.sortOrder),
+    tech,
+  };
+}
+
+function mapAffiliations(
+  rows: RawProfileAffiliation[] | null | undefined,
+  language: SupportedLanguage,
+  fallback: ProfileAffiliation[],
+): ProfileAffiliation[] {
+  if (!rows?.length) {
+    return clone(fallback);
+  }
+
+  return rows
+    .map((row, index) => {
+      const name = normaliseString(row.name);
+      if (!name) {
+        return null;
+      }
+      return {
+        id: toStringId(row.id, `affiliation-${index}`),
+        name,
+        url: normaliseString(row.url),
+        description: selectLocalizedText(row.description ?? undefined, language),
+        startedAt: row.startedAt ?? "",
+        sortOrder: toNumber(row.sortOrder, index),
+      };
+    })
+    .filter((value): value is ProfileAffiliation => value !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function mapWorkHistory(
+  rows: RawProfileWorkHistory[] | null | undefined,
+  language: SupportedLanguage,
+  fallback: ProfileWorkHistoryItem[],
+): ProfileWorkHistoryItem[] {
+  if (!rows?.length) {
+    return clone(fallback);
+  }
+
+  return rows
+    .map((row, index) => {
+      const organization = selectLocalizedText(row.organization ?? undefined, language);
+      const role = selectLocalizedText(row.role ?? undefined, language);
+      if (!organization || !role) {
+        return null;
+      }
+      return {
+        id: toStringId(row.id, `work-${index}`),
+        organization,
+        role,
+        summary: selectLocalizedText(row.summary ?? undefined, language),
+        startedAt: row.startedAt ?? "",
+        endedAt: row.endedAt ?? undefined,
+        externalUrl: normaliseString(row.externalUrl),
+        sortOrder: toNumber(row.sortOrder, index),
+      };
+    })
+    .filter((value): value is ProfileWorkHistoryItem => value !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function mapTechSections(
+  sections: RawProfileTechSection[] | null | undefined,
+  language: SupportedLanguage,
+  fallback: ProfileTechSection[],
+): ProfileTechSection[] {
+  if (!sections?.length) {
+    return clone(fallback);
+  }
+
+  return sections
+    .map((section, index) => {
+      const title = selectLocalizedText(section.title ?? undefined, language);
+      if (!title) {
+        return null;
+      }
+
+      const members =
+        section.members
+          ?.map((member) => mapTechMembership(member))
+          .filter((member): member is TechMembership => Boolean(member))
+          .sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
+
+      return {
+        id: toStringId(section.id, `tech-section-${index}`),
+        title,
+        layout: section.layout ?? "grid",
+        breakpoint: section.breakpoint ?? "md",
+        sortOrder: toNumber(section.sortOrder, index),
+        members,
+      };
+    })
+    .filter((value): value is ProfileTechSection => value !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function mapSocialLinks(
+  links: RawProfileSocialLink[] | null | undefined,
+  language: SupportedLanguage,
+  fallback: SocialLink[],
+): SocialLink[] {
+  if (!links?.length) {
+    return clone(fallback);
+  }
+
+  return links
+    .map((link, index) => {
+      const url = normaliseString(link.url);
+      const label = selectLocalizedText(link.label ?? undefined, language);
+      const provider = (link.provider ?? "other").toLowerCase() as SocialLink["provider"];
+      if (!url || !label) {
+        return null;
+      }
+
+      return {
+        id: toStringId(link.id, `social-${index}`),
+        provider,
+        label,
+        url,
+        isFooter: Boolean(link.isFooter),
+        sortOrder: toNumber(link.sortOrder, index),
+      };
+    })
+    .filter((value): value is SocialLink => value !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function mapLab(
+  lab: RawProfileLab | null | undefined,
+  language: SupportedLanguage,
+  fallback: ProfileLab | undefined,
+): ProfileLab | undefined {
+  if (!lab) {
+    return fallback ? clone(fallback) : undefined;
+  }
+  const name = selectLocalizedText(lab.name ?? undefined, language, fallback?.name);
+  const advisor = selectLocalizedText(lab.advisor ?? undefined, language, fallback?.advisor);
+  const room = selectLocalizedText(lab.room ?? undefined, language, fallback?.room);
+  const url = normaliseString(lab.url) ?? fallback?.url;
+
+  if (!name && !advisor && !room && !url) {
+    return fallback ? clone(fallback) : undefined;
+  }
+
+  return {
+    name,
+    advisor,
+    room,
+    url,
+  };
+}
+
+function mapHomeQuickLinks(
+  links: RawHomeQuickLink[] | null | undefined,
+  language: SupportedLanguage,
+  fallback: HomeQuickLink[],
+): HomeQuickLink[] {
+  if (!links?.length) {
+    return clone(fallback);
+  }
+
+  return links
+    .map((link, index) => {
+      const label = selectLocalizedText(link.label ?? undefined, language);
+      const cta = selectLocalizedText(link.cta ?? undefined, language);
+      const targetUrl = normaliseString(link.targetUrl);
+      if (!label || !cta || !targetUrl) {
+        return null;
+      }
+
+      const section = (link.section ?? "profile") as HomeQuickLink["section"];
+
+      return {
+        id: toStringId(link.id, `home-link-${index}`),
+        section,
+        label,
+        description: selectLocalizedText(link.description ?? undefined, language),
+        cta,
+        targetUrl,
+        sortOrder: toNumber(link.sortOrder, index),
+      };
+    })
+    .filter((value): value is HomeQuickLink => value !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function mapHomeChipSources(
+  sources: RawHomeChipSource[] | null | undefined,
+  language: SupportedLanguage,
+  fallback: HomeChipSource[],
+): HomeChipSource[] {
+  if (!sources?.length) {
+    return clone(fallback);
+  }
+
+  return sources
+    .map((source, index) => {
+      const label = selectLocalizedText(source.label ?? undefined, language);
+      if (!label) {
+        return null;
+      }
+
+      const kind = (source.source ?? "tech") as HomeChipSource["source"];
+
+      return {
+        id: toStringId(source.id, `chip-source-${index}`),
+        source: kind,
+        label,
+        limit: Math.max(1, toNumber(source.limit, 6)),
+        sortOrder: toNumber(source.sortOrder, index),
+      };
+    })
+    .filter((value): value is HomeChipSource => value !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function transformHomeConfig(
+  raw: RawHomePageConfig | null | undefined,
+  language: SupportedLanguage,
+  fallback: HomePageConfig,
+): HomePageConfig {
+  if (!raw) {
+    return clone(fallback);
+  }
+
+  const heroSubtitle = selectLocalizedText(
+    raw.heroSubtitle ?? undefined,
+    language,
+    fallback.heroSubtitle,
+  );
+
+  const quickLinks = mapHomeQuickLinks(raw.quickLinks, language, fallback.quickLinks);
+  const chipSources = mapHomeChipSources(raw.chipSources, language, fallback.chipSources);
+
+  return {
+    heroSubtitle,
+    quickLinks,
+    chipSources,
+    updatedAt: raw.updatedAt ?? fallback.updatedAt,
+  };
 }
 
 export function transformProfile(
-  raw: RawProfileResponse | undefined,
+  raw: RawProfileDocument | undefined,
+  homeConfig?: RawHomePageConfig | undefined,
 ): ProfileResponse {
-  if (raw && typeof (raw as unknown as ProfileResponse).name === "string") {
-    return clone(raw as unknown as ProfileResponse);
-  }
+  const language = resolveLanguage();
 
-  const canonical = getCanonicalProfile(resolveLanguage());
-  const profile = clone(canonical);
+  const canonicalProfile = getCanonicalProfile(language);
+  const canonicalHome = getCanonicalHomeConfig(language);
+  const profile = clone(canonicalProfile);
 
-  if (!raw) {
-    return profile;
-  }
+  profile.id = toStringId(raw?.id ?? profile.id, "profile");
+  profile.displayName = normaliseString(raw?.displayName) ?? profile.displayName;
+  profile.headline = selectLocalizedText(raw?.headline ?? undefined, language, profile.headline);
+  profile.summary = selectLocalizedText(raw?.summary ?? undefined, language, profile.summary);
+  profile.avatarUrl = normaliseString(raw?.avatarUrl) ?? profile.avatarUrl;
+  profile.location = selectLocalizedText(raw?.location ?? undefined, language, profile.location);
 
-  const name = selectLocalizedText(raw.name);
-  if (name) {
-    profile.name = name;
-  }
-
-  const headline = selectLocalizedText(raw.title);
-  if (headline) {
-    profile.headline = headline;
-  }
-
-  const summary = selectLocalizedText(raw.summary);
-  if (summary) {
-    profile.summary = summary;
-  }
-
-  const affiliation = selectLocalizedText(raw.affiliation);
-  if (affiliation && profile.affiliations.length > 0) {
-    profile.affiliations[0] = {
-      ...profile.affiliations[0],
-      organization: affiliation,
+  const themeMode = raw?.theme?.mode;
+  if (themeMode === "light" || themeMode === "dark" || themeMode === "system") {
+    profile.theme = {
+      mode: themeMode as ProfileTheme["mode"],
+      accentColor: normaliseString(raw?.theme?.accentColor) ?? profile.theme.accentColor,
+    };
+  } else if (raw?.theme?.accentColor) {
+    profile.theme = {
+      ...profile.theme,
+      accentColor:
+        normaliseString(raw?.theme?.accentColor) ?? profile.theme.accentColor,
     };
   }
 
-  const labName = selectLocalizedText(raw.lab);
-  if (labName && profile.lab) {
-    profile.lab = { ...profile.lab, name: labName };
-  }
+  profile.lab = mapLab(raw?.lab ?? undefined, language, profile.lab);
 
-  if (raw.skills?.length) {
-    const skillNames = raw.skills
-      .map((skill) => selectLocalizedText(skill))
-      .filter((name): name is string => Boolean(name));
-
-    if (skillNames.length) {
-      const engineeringGroup =
-        profile.skillGroups.find(
-          (group) => group.id === "software-engineering",
-        ) ??
-        profile.skillGroups[0] ??
-        null;
-
-      if (engineeringGroup) {
-        const existingNames = new Set(
-          engineeringGroup.items.map((item) => item.name),
-        );
-        engineeringGroup.items = [
-          ...engineeringGroup.items,
-          ...skillNames
-            .filter((name) => !existingNames.has(name))
-            .map((name, index) => ({
-              id: `core-${index}`,
-              name,
-              level: "advanced" as const,
-            })),
-        ];
-      }
-    }
-  }
+  profile.affiliations = mapAffiliations(raw?.affiliations, language, profile.affiliations);
+  profile.communities = mapAffiliations(raw?.communities, language, profile.communities);
+  profile.workHistory = mapWorkHistory(raw?.workHistory, language, profile.workHistory);
+  profile.techSections = mapTechSections(raw?.techSections, language, profile.techSections);
+  profile.socialLinks = mapSocialLinks(raw?.socialLinks, language, profile.socialLinks);
+  profile.footerLinks = profile.socialLinks.filter((link) => link.isFooter);
+  profile.updatedAt = raw?.updatedAt ?? profile.updatedAt;
+  profile.home = transformHomeConfig(homeConfig ?? null, language, canonicalHome);
 
   return profile;
 }
 
-export function transformProjects(
-  projects: RawProject[] | undefined,
-): Project[] {
-  if (
-    projects?.length &&
-    typeof (projects[0] as unknown as Project).title === "string"
-  ) {
-    return clone(projects as unknown as Project[]);
+function mapProjectLinks(
+  links: RawProjectLink[] | null | undefined,
+  language: SupportedLanguage,
+  fallback: ProjectLink[],
+): ProjectLink[] {
+  if (!links?.length) {
+    return clone(fallback);
   }
 
-  const canonicalProjects = getCanonicalProjects(resolveLanguage());
+  return links
+    .map((link, index) => {
+      const label = selectLocalizedText(link.label ?? undefined, language);
+      const url = normaliseString(link.url);
+      if (!label || !url) {
+        return null;
+      }
+
+      const type = link.type ?? "other";
+
+      return {
+        id: toStringId(link.id, `project-link-${index}`),
+        type: type as ProjectLink["type"],
+        label,
+        url,
+        sortOrder: toNumber(link.sortOrder, index),
+      };
+    })
+    .filter((value): value is ProjectLink => value !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function transformProject(
+  raw: RawProjectDocument,
+  language: SupportedLanguage,
+  fallback: Project,
+): Project {
+  const project = clone(fallback);
+
+  project.id = toStringId(raw.id ?? project.id, `project-${project.id}`);
+  project.slug = normaliseString(raw.slug) ?? project.slug;
+  project.title = selectLocalizedText(raw.title ?? undefined, language, project.title ?? "");
+  project.summary = selectLocalizedText(raw.summary ?? undefined, language, project.summary);
+  project.description = selectLocalizedText(
+    raw.description ?? undefined,
+    language,
+    project.description,
+  );
+  project.coverImageUrl = normaliseString(raw.coverImageUrl) ?? project.coverImageUrl;
+  project.primaryLink = normaliseString(raw.primaryLink) ?? project.primaryLink;
+  project.links = mapProjectLinks(raw.links, language, project.links);
+  project.period = {
+    start: raw.period?.start ?? project.period?.start ?? null,
+    end: raw.period?.end ?? project.period?.end ?? null,
+  };
+  project.tech =
+    raw.tech
+      ?.map((item) => mapTechMembership(item))
+      .filter((item): item is TechMembership => Boolean(item))
+      .sort((a, b) => a.sortOrder - b.sortOrder) ?? project.tech;
+  project.highlight = Boolean(
+    raw.highlight ?? project.highlight ?? project.links.some((link) => link.type === "demo"),
+  );
+  project.published = raw.published ?? project.published ?? true;
+  project.sortOrder = toNumber(raw.sortOrder, project.sortOrder ?? 0);
+  project.createdAt = raw.createdAt ?? project.createdAt;
+  project.updatedAt = raw.updatedAt ?? project.updatedAt;
+
+  return project;
+}
+
+export function transformProjects(
+  projects: RawProjectDocument[] | undefined,
+): Project[] {
+  const language = resolveLanguage();
+  const canonical = getCanonicalProjects(language).map(clone);
 
   if (!projects?.length) {
-    return canonicalProjects.map(clone);
+    return canonical;
   }
 
-  const projectFallbackByTitle = new Map(
-    canonicalProjects.map((project) => [project.title.toLowerCase(), project]),
-  );
-
-  const projectFallbackById = new Map(
-    canonicalProjects.map((project, index) => [String(index + 1), project]),
-  );
-
-  return projects.map((project) => {
-    const localizedTitle = selectLocalizedText(project.title);
-    const fallback =
-      (localizedTitle
-        ? projectFallbackByTitle.get(localizedTitle.toLowerCase())
-        : undefined) ??
-      projectFallbackById.get(String(project.id)) ??
-      canonicalProjects[0];
-
-    const result = clone(fallback);
-
-    if (localizedTitle) {
-      result.title = localizedTitle;
-    }
-
-    const description = selectLocalizedText(project.description);
-    if (description) {
-      result.description = description;
-    }
-
-    if (project.techStack?.length) {
-      result.techStack = project.techStack;
-    }
-
-    if (project.linkUrl) {
-      const existingRepo = result.links.findIndex(
-        (link) => link.type === "repo",
-      );
-      if (existingRepo >= 0) {
-        result.links[existingRepo] = {
-          ...result.links[existingRepo],
-          url: project.linkUrl,
-        };
-      } else {
-        result.links = [
-          ...result.links,
-          { label: "Repository", url: project.linkUrl, type: "repo" },
-        ];
-      }
-    }
-
-    return result;
+  return projects.map((raw, index) => {
+    const fallback = canonical[index] ?? canonical[0];
+    return transformProject(raw, language, fallback);
   });
 }
 
-export function transformResearchEntries(
-  entries: RawResearchEntry[] | undefined,
-): ResearchEntry[] {
-  if (
-    entries?.length &&
-    typeof (entries[0] as unknown as ResearchEntry).title === "string"
-  ) {
-    return clone(entries as unknown as ResearchEntry[]);
+function mapResearchLinks(
+  links: RawResearchLink[] | null | undefined,
+  language: SupportedLanguage,
+  fallback: ResearchLink[],
+): ResearchLink[] {
+  if (!links?.length) {
+    return clone(fallback);
   }
 
-  const canonicalResearchEntries = getCanonicalResearchEntries(
-    resolveLanguage(),
-  );
+  return links
+    .map((link, index) => {
+      const label = selectLocalizedText(link.label ?? undefined, language);
+      const url = normaliseString(link.url);
+      if (!label || !url) {
+        return null;
+      }
+      return {
+        id: toStringId(link.id, `research-link-${index}`),
+        type: (link.type ?? "external") as ResearchLink["type"],
+        label,
+        url,
+        sortOrder: toNumber(link.sortOrder, index),
+      };
+    })
+    .filter((value): value is ResearchLink => value !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function mapResearchAssets(
+  assets: RawResearchAsset[] | null | undefined,
+  language: SupportedLanguage,
+  fallback: ResearchAsset[],
+): ResearchAsset[] {
+  if (!assets?.length) {
+    return clone(fallback);
+  }
+
+  return assets
+    .map((asset, index) => {
+      const url = normaliseString(asset.url);
+      if (!url) {
+        return null;
+      }
+      return {
+        id: toStringId(asset.id, `research-asset-${index}`),
+        url,
+        caption: selectLocalizedText(asset.caption ?? undefined, language),
+        sortOrder: toNumber(asset.sortOrder, index),
+      };
+    })
+    .filter((value): value is ResearchAsset => value !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function transformResearchEntry(
+  raw: RawResearchDocument,
+  language: SupportedLanguage,
+  fallback: ResearchEntry,
+): ResearchEntry {
+  const entry = clone(fallback);
+
+  entry.id = toStringId(raw.id ?? entry.id, `research-${entry.id}`);
+  entry.slug = normaliseString(raw.slug) ?? entry.slug;
+  entry.kind = (raw.kind ?? entry.kind ?? "research") as ResearchEntry["kind"];
+  entry.title = selectLocalizedText(raw.title ?? undefined, language, entry.title);
+  entry.overview = selectLocalizedText(raw.overview ?? undefined, language, entry.overview);
+  entry.outcome = selectLocalizedText(raw.outcome ?? undefined, language, entry.outcome);
+  entry.outlook = selectLocalizedText(raw.outlook ?? undefined, language, entry.outlook);
+  entry.externalUrl = normaliseString(raw.externalUrl) ?? entry.externalUrl;
+  entry.publishedAt = raw.publishedAt ?? entry.publishedAt;
+  entry.updatedAt = raw.updatedAt ?? entry.updatedAt;
+  entry.highlightImageUrl =
+    normaliseString(raw.highlightImageUrl) ?? entry.highlightImageUrl;
+  entry.imageAlt = selectLocalizedText(raw.imageAlt ?? undefined, language, entry.imageAlt);
+  entry.isDraft = raw.isDraft ?? entry.isDraft ?? false;
+  entry.tags =
+    raw.tags?.map((tag) => normaliseString(tag.value)).filter((tag): tag is string => Boolean(tag)) ??
+    entry.tags;
+  entry.links = mapResearchLinks(raw.links, language, entry.links);
+  entry.assets = mapResearchAssets(raw.assets, language, entry.assets);
+  entry.tech =
+    raw.tech
+      ?.map((tech) => mapTechMembership(tech))
+      .filter((tech): tech is TechMembership => Boolean(tech))
+      .sort((a, b) => a.sortOrder - b.sortOrder) ?? entry.tech;
+
+  return entry;
+}
+
+export function transformResearchEntries(
+  entries: RawResearchDocument[] | undefined,
+): ResearchEntry[] {
+  const language = resolveLanguage();
+  const canonical = getCanonicalResearchEntries(language).map(clone);
 
   if (!entries?.length) {
-    return canonicalResearchEntries.map(clone);
+    return canonical;
   }
 
-  const researchFallbackByTitle = new Map(
-    canonicalResearchEntries.map((entry) => [entry.title.toLowerCase(), entry]),
-  );
-
-  const researchFallbackById = new Map(
-    canonicalResearchEntries.map((entry, index) => [
-      String(index + 1),
-      entry,
-    ]),
-  );
-
-  return entries.map((entry) => {
-    const localizedTitle = selectLocalizedText(entry.title);
-    const fallback =
-      (localizedTitle
-        ? researchFallbackByTitle.get(localizedTitle.toLowerCase())
-        : undefined) ??
-      researchFallbackById.get(String(entry.id)) ??
-      canonicalResearchEntries[0];
-
-    const result = clone(fallback);
-
-    if (localizedTitle) {
-      result.title = localizedTitle;
-    }
-
-    const summary = selectLocalizedText(entry.summary);
-    if (summary) {
-      result.summary = summary;
-    }
-
-    const contentMarkdown = selectLocalizedText(entry.contentMd);
-    if (contentMarkdown) {
-      result.contentMarkdown = contentMarkdown;
-    }
-
-    if (!result.contentHtml && contentMarkdown) {
-      result.contentHtml = `<p>${contentMarkdown}</p>`;
-    }
-
-    return result;
+  return entries.map((raw, index) => {
+    const fallback = canonical[index] ?? canonical[0];
+    return transformResearchEntry(raw, language, fallback);
   });
+}
+
+export function transformContactConfig(
+  raw: RawContactConfig | undefined,
+): ContactConfigResponse {
+  const language = resolveLanguage();
+  const topics =
+    raw?.topics
+      ?.map((topic, index) => {
+        const label = selectLocalizedText(topic.label ?? undefined, language);
+        if (!label) {
+          return null;
+        }
+        return {
+          id: topic.id ?? `topic-${index}`,
+          label,
+          description: selectLocalizedText(topic.description ?? undefined, language),
+        };
+      })
+      .filter((topic): topic is ContactConfigResponse["topics"][number] => Boolean(topic)) ?? [];
+
+  return {
+    heroTitle: selectLocalizedText(raw?.heroTitle ?? undefined, language),
+    heroDescription: selectLocalizedText(raw?.heroDescription ?? undefined, language),
+    topics,
+    consentText: selectLocalizedText(raw?.consentText ?? undefined, language),
+    minimumLeadHours: Math.max(1, raw?.minimumLeadHours ?? 24),
+    recaptchaSiteKey: normaliseString(raw?.recaptchaSiteKey),
+    supportEmail: normaliseString(raw?.supportEmail),
+    calendarTimezone: normaliseString(raw?.calendarTimezone),
+    googleCalendarId: normaliseString(raw?.googleCalendarId),
+    bookingWindowDays: raw?.bookingWindowDays ?? undefined,
+  };
 }

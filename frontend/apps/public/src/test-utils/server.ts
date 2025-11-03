@@ -48,7 +48,7 @@ export const defaultHandlers = [
       ...defaultBookingResponse,
       meeting: {
         ...defaultBookingResponse.meeting,
-        id: Date.now(),
+        id: String(Date.now()),
         name: payload.name,
         email: payload.email,
         datetime: payload.startTime,

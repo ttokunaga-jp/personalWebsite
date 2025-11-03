@@ -180,6 +180,19 @@ variable "db_deletion_protection" {
   default     = true
 }
 
+# Firestore
+variable "firestore_database_id" {
+  description = "Target Firestore database ID"
+  type        = string
+  default     = "(default)"
+}
+
+variable "firestore_collection_prefix" {
+  description = "Prefix for Firestore collections (environment segregation)"
+  type        = string
+  default     = "dev"
+}
+
 # Storage
 variable "assets_bucket_name" {
   description = "Override for the assets bucket name (leave null to auto-generate)"

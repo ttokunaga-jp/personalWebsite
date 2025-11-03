@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-import type { SocialPlatform } from "../modules/public-api";
+import type { SocialProvider } from "../modules/public-api";
 
 type IconProps = SVGProps<SVGSVGElement>;
 type IconComponent = (props: IconProps) => JSX.Element;
@@ -42,15 +42,22 @@ const DefaultIcon: IconComponent = (props) => (
   </svg>
 );
 
-const iconMap: Partial<Record<SocialPlatform, IconComponent>> = {
+const ZennIcon: IconComponent = (props) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" focusable="false" {...props}>
+    <path d="M18.69 5.31A10 10 0 1 0 5.31 18.69 10 10 0 0 0 18.69 5.31ZM7.94 8.38h8.12V10h-4.8l4.8 5.62v1.62H7.94v-1.6h4.96l-4.96-5.8Z" />
+  </svg>
+);
+
+const iconMap: Partial<Record<SocialProvider, IconComponent>> = {
   github: GitHubIcon,
   twitter: TwitterIcon,
   x: TwitterIcon,
   linkedin: LinkedInIcon,
   email: MailIcon,
   website: GlobeIcon,
+  zenn: ZennIcon,
 };
 
-export function getSocialIcon(platform: SocialPlatform): IconComponent {
-  return iconMap[platform] ?? DefaultIcon;
+export function getSocialIcon(provider: SocialProvider): IconComponent {
+  return iconMap[provider] ?? DefaultIcon;
 }

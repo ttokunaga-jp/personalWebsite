@@ -2,55 +2,72 @@ package service
 
 import (
 	"context"
-	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/takumi/personal-website/internal/errs"
 	"github.com/takumi/personal-website/internal/model"
+	"github.com/takumi/personal-website/internal/repository"
 )
 
-type stubProfileRepository struct {
-	profile *model.Profile
-	err     error
+type stubContentProfileRepository struct {
+	document *model.ProfileDocument
+	err      error
 }
 
-func (s *stubProfileRepository) GetProfile(context.Context) (*model.Profile, error) {
+func (s *stubContentProfileRepository) GetProfileDocument(context.Context) (*model.ProfileDocument, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
-	return s.profile, nil
+	return s.document, nil
 }
 
-func TestProfileService_GetProfileSuccess(t *testing.T) {
+func TestProfileService_GetProfileDocumentSuccess(t *testing.T) {
 	t.Parallel()
 
-	expected := &model.Profile{
-		Name:        model.NewLocalizedText("氏名", "Name"),
-		Title:       model.NewLocalizedText("肩書き", "Title"),
-		Affiliation: model.NewLocalizedText("所属", "Affiliation"),
-		Lab:         model.NewLocalizedText("研究室", "Lab"),
-		Summary:     model.NewLocalizedText("概要", "Summary"),
+	expected := &model.ProfileDocument{
+		ID:          1,
+		DisplayName: "Takumi",
+		Headline:    model.NewLocalizedText("エンジニア", "Engineer"),
+		Summary:     model.NewLocalizedText("紹介", "Summary"),
+		Theme: model.ProfileTheme{
+			Mode:        model.ProfileThemeModeLight,
+			AccentColor: "#ff9900",
+		},
+		UpdatedAt: time.Now(),
 	}
 
-	service := NewProfileService(&stubProfileRepository{profile: expected})
+	svc := NewProfileService(&stubContentProfileRepository{document: expected})
 
-	actual, err := service.GetProfile(context.Background())
+	actual, err := svc.GetProfileDocument(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
 }
 
-func TestProfileService_GetProfileError(t *testing.T) {
+func TestProfileService_GetProfileDocumentError(t *testing.T) {
 	t.Parallel()
 
-	service := NewProfileService(&stubProfileRepository{err: errors.New("db failure")})
+	svc := NewProfileService(&stubContentProfileRepository{err: repository.ErrNotFound})
 
-	profile, err := service.GetProfile(context.Background())
-	require.Nil(t, profile)
+	document, err := svc.GetProfileDocument(context.Background())
+	require.Nil(t, document)
+	require.Error(t, err)
+
+	appErr := errs.From(err)
+	require.Equal(t, errs.CodeNotFound, appErr.Code)
+}
+
+func TestProfileService_EmptyProfileReturnsError(t *testing.T) {
+	t.Parallel()
+
+	svc := NewProfileService(&stubContentProfileRepository{document: nil})
+
+	doc, err := svc.GetProfileDocument(context.Background())
+	require.Nil(t, doc)
 	require.Error(t, err)
 
 	appErr := errs.From(err)
 	require.Equal(t, errs.CodeInternal, appErr.Code)
-	require.Contains(t, appErr.Message, "failed to load profile")
 }

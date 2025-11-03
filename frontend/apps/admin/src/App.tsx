@@ -168,6 +168,8 @@ function App() {
   const [projectForm, setProjectForm] = useState<ProjectFormState>({
     ...emptyProjectForm,
   });
+  const [projectTechQuery, setProjectTechQuery] = useState("");
+  const [showProjectPreview, setShowProjectPreview] = useState(false);
   const [researchForm, setResearchForm] = useState<ResearchFormState>({
     ...emptyResearchForm,
   });
@@ -185,6 +187,29 @@ function App() {
   const [editingBlacklistId, setEditingBlacklistId] =
     useState<number | null>(null);
 
+  const techSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    projects.forEach((project) => {
+      project.techStack.forEach((tech) => set.add(tech));
+    });
+    projectForm.techStack
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .forEach((tech) => set.add(tech));
+    return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [projects, projectForm.techStack]);
+
+  const filteredTechSuggestions = useMemo(() => {
+    const query = projectTechQuery.trim().toLowerCase();
+    if (!query) {
+      return techSuggestions.slice(0, 8);
+    }
+    return techSuggestions
+      .filter((tech) => tech.toLowerCase().includes(query))
+      .slice(0, 8);
+  }, [projectTechQuery, techSuggestions]);
+
   const handleUnauthorized = useCallback(() => {
     clearToken();
     setAuthState("unauthorized");
@@ -197,6 +222,8 @@ function App() {
     setContactEdits({});
     setProfileForm(createEmptyProfileForm());
     setProjectForm({ ...emptyProjectForm });
+    setProjectTechQuery("");
+    setShowProjectPreview(false);
     setResearchForm({ ...emptyResearchForm });
     setBlacklistForm({ ...emptyBlacklistForm });
     setEditingProjectId(null);
@@ -419,6 +446,8 @@ function App() {
     });
     setProjectForm({ ...emptyProjectForm });
     setEditingProjectId(null);
+    setProjectTechQuery("");
+    setShowProjectPreview(false);
   };
 
   const handleSubmitResearch = async (event: FormEvent<HTMLFormElement>) => {
@@ -473,6 +502,26 @@ function App() {
       });
     });
 
+  const handleAddTechToProject = useCallback(
+    (tech: string) => {
+      setProjectForm((prev) => {
+        const current = prev.techStack
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean);
+        if (current.includes(tech)) {
+          return prev;
+        }
+        return {
+          ...prev,
+          techStack: [...current, tech].join(", "),
+        };
+      });
+      setProjectTechQuery("");
+    },
+    [],
+  );
+
   const toggleResearchPublished = (item: AdminResearch) =>
     run(async () => {
       await adminApi.updateResearch(item.id, {
@@ -502,6 +551,8 @@ function App() {
       published: project.published,
       sortOrder: project.sortOrder != null ? project.sortOrder.toString() : "",
     });
+    setProjectTechQuery("");
+    setShowProjectPreview(false);
   };
 
   const handleEditResearch = (item: AdminResearch) => {
@@ -1172,6 +1223,35 @@ function App() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.techSearch")}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={projectTechQuery}
+                  onChange={(event) => setProjectTechQuery(event.target.value)}
+                  placeholder={t("fields.techSearchPlaceholder") ?? ""}
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {filteredTechSuggestions.length ? (
+                    filteredTechSuggestions.map((tech) => (
+                      <button
+                        type="button"
+                        key={`suggestion-${tech}`}
+                        className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-sky-400 hover:text-sky-600"
+                        onClick={() => handleAddTechToProject(tech)}
+                      >
+                        {tech}
+                      </button>
+                    ))
+                  ) : (
+                    <span className="text-xs text-slate-500">
+                      {t("fields.techSearchEmpty")}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
                   {t("fields.linkUrl")}
                 </label>
                 <input
@@ -1240,6 +1320,15 @@ function App() {
             </div>
             <div className="flex items-center justify-end gap-3">
               <button
+                type="button"
+                className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+                onClick={() => setShowProjectPreview((prev) => !prev)}
+              >
+                {showProjectPreview
+                  ? t("actions.hidePreview")
+                  : t("actions.runPreview")}
+              </button>
+              <button
                 type="submit"
                 className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                 disabled={loading}
@@ -1247,6 +1336,32 @@ function App() {
                 {t(editingProjectId != null ? "actions.update" : "actions.create")}
               </button>
             </div>
+            {showProjectPreview ? (
+              <pre className="mt-4 overflow-x-auto rounded-md border border-slate-200 bg-slate-900/80 p-4 text-xs text-slate-100 dark:border-slate-700">
+                {JSON.stringify(
+                  {
+                    title: {
+                      ja: projectForm.titleJa,
+                      en: projectForm.titleEn,
+                    },
+                    description: {
+                      ja: projectForm.descriptionJa,
+                      en: projectForm.descriptionEn,
+                    },
+                    techStack: projectForm.techStack
+                      .split(",")
+                      .map((value) => value.trim())
+                      .filter(Boolean),
+                    linkUrl: projectForm.linkUrl,
+                    year: projectForm.year,
+                    published: projectForm.published,
+                    sortOrder: projectForm.sortOrder,
+                  },
+                  null,
+                  2,
+                )}
+              </pre>
+            ) : null}
           </form>
 
           <div className="mt-6 space-y-4">

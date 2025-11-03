@@ -4,30 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { act } from "react";
 import { vi } from "vitest";
 
+import { canonicalProfileEn } from "./modules/profile-content";
 import { renderWithRouter } from "./test-utils/renderWithRouter";
-
-const profileResponse = {
-  name: "Takumi Tokunaga",
-  headline:
-    "Real-world information engineering student & full-stack engineer",
-  summary:
-    "Ritsumeikan University student building retrieval-augmented learning assistants and search infrastructure.",
-  affiliations: [
-    {
-      id: "aff-1",
-      organization: "Ritsumeikan University",
-      department: "College of Information Science and Engineering",
-      role: "B.S. Candidate",
-      startDate: "2023-04-01",
-      endDate: null,
-      isCurrent: true,
-    },
-  ],
-  workHistory: [],
-  skillGroups: [],
-  communities: [],
-  socialLinks: [],
-};
 
 let user = userEvent.setup();
 
@@ -45,8 +23,8 @@ describe("App", () => {
 
       if (typeof url === "string" && url.includes("/v1/public/profile")) {
         return Promise.resolve({
-          data: { data: profileResponse },
-        } as ApiResponse<{ data: typeof profileResponse }>);
+          data: { data: null },
+        } as ApiResponse<{ data: null }>);
       }
 
       return Promise.resolve({
@@ -67,7 +45,7 @@ describe("App", () => {
     });
 
     expect(
-      await screen.findByText(profileResponse.headline),
+      await screen.findByText(canonicalProfileEn.headline ?? ""),
     ).toBeInTheDocument();
     expect(await screen.findByText("healthy")).toBeInTheDocument();
   });

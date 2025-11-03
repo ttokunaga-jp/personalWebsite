@@ -92,6 +92,14 @@ module "cloudsql" {
   depends_on = [module.network]
 }
 
+module "firestore" {
+  source = "../../modules/firestore"
+
+  project_id         = var.project_id
+  database_id        = var.firestore_database_id
+  collection_prefix  = var.firestore_collection_prefix
+}
+
 module "assets_bucket" {
   source = "../../modules/storage"
 

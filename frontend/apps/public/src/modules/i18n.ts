@@ -49,6 +49,7 @@ export const resources = {
           communitiesFallback: "Community involvement will be listed shortly.",
           error:
             "We were unable to load the latest profile details. Please try again later.",
+          lastUpdated: "Profile last updated",
         },
         health: {
           title: "API status",
@@ -65,6 +66,23 @@ export const resources = {
           research: "Research",
           contact: "Contact",
           supporting: "Use the navigation above for full page views.",
+        },
+        tech: {
+          title: "Technology focus",
+          description:
+            "Core stacks and supporting tools powering current initiatives.",
+        },
+        work: {
+          title: "Recent initiatives",
+          description:
+            "Selected engagements highlighting scope, responsibilities, and impact.",
+          empty: "Work history will be published soon.",
+        },
+        chips: {
+          empty: "Highlights will be displayed once data is available.",
+        },
+        affiliations: {
+          title: "Affiliations overview",
         },
       },
       profile: {
@@ -97,6 +115,7 @@ export const resources = {
             name: "Lab",
             advisor: "Advisor",
             focus: "Focus area",
+            room: "Room",
             visit: "Visit lab site",
             empty: "Laboratory information will be published when available.",
           },
@@ -112,6 +131,9 @@ export const resources = {
               "Open source, academic, and industry communities that inform the work.",
             empty: "Community activities will be shared in the future.",
           },
+          social: {
+            title: "Social links",
+          },
         },
         error: "We could not refresh the profile data. Please reload the page.",
       },
@@ -121,11 +143,24 @@ export const resources = {
         description:
           "Markdown-backed publications, abstracts, and outcomes render here with responsive layouts.",
         placeholder:
-          "Content coming soon—integrate API-driven markdown rendering to showcase research output.",
+          "Content coming soon—integrate API-driven entries to showcase research output.",
         filters: {
-          all: "All topics",
+          all: "All entries",
+          research: "Research",
+          blog: "Blog",
+          tags: "Filter by tag",
+          tagAll: "All tags",
         },
-        noEntriesForTag: "No research entries tagged “{{tag}}” yet.",
+        kind: {
+          research: "Research",
+          blog: "Blog",
+        },
+        sections: {
+          outcome: "Outcomes",
+          outlook: "Next steps",
+        },
+        externalLink: "Open external article",
+        noEntriesForTag: "No entries tagged “{{tag}}” yet.",
         updatedOn: "Updated {{date}}",
         error: "Research entries could not be loaded. Please retry shortly.",
       },
@@ -141,6 +176,9 @@ export const resources = {
         },
         noMatchesForSelection: "No projects match the selected tech stack yet.",
         error: "Projects could not be retrieved from the API.",
+        highlight: {
+          title: "Highlight projects",
+        },
       },
       contact: {
         tagline: "Contact",
@@ -166,12 +204,16 @@ export const resources = {
           topic: "Topic",
           topicPlaceholder: "Select a topic",
           message: "Message",
+          slot: "Time slot",
+          slotPlaceholder: "Select a time slot",
           submit: "Request booking",
           submitting: "Submitting…",
           success:
-            "Thank you! Your request (ID: {{bookingId}}) has been received.",
+            "Thank you! Your request (ID: {{id}}) was recorded. A confirmation will be sent to {{email}}.",
           error: "We could not complete the booking. Please try again later.",
           configError: "Form configuration could not be loaded.",
+          consent:
+            "Your details are used solely for scheduling and will be removed after the meeting concludes.",
           errors: {
             nameRequired: "Please provide your name.",
             emailRequired: "An email address is required.",
@@ -182,6 +224,21 @@ export const resources = {
             slotRequired: "Select an available time slot.",
           },
         },
+        summary: {
+          title: "Booking summary",
+          timezone: "Times shown in {{timezone}}.",
+          timezoneFallback: "local time",
+          window: "Bookings accepted up to {{days}} days ahead.",
+          supportEmail: "For urgent updates contact",
+          calendarLinked: "Automatic Google Calendar syncing is enabled.",
+        },
+        bookingSummary: {
+          title: "Reservation details",
+          when: "Scheduled for {{datetime}}",
+          calendarEvent: "Calendar event ID: {{id}}",
+          joinLink: "Join session link",
+        },
+        error: "Contact configuration could not be loaded. Please try again later.",
       },
       admin: {
         tagline: "Admin",
@@ -251,6 +308,7 @@ export const resources = {
           communitiesFallback: "コミュニティ参加情報は後日掲載します。",
           error:
             "最新のプロフィール情報を取得できませんでした。時間をおいて再度お試しください。",
+          lastUpdated: "最終更新日時",
         },
         health: {
           title: "API ステータス",
@@ -268,6 +326,21 @@ export const resources = {
           contact: "お問い合わせ",
           supporting:
             "詳細は上部のナビゲーションから各ページへ移動してください。",
+        },
+        tech: {
+          title: "技術スタック",
+          description: "現在取り組む案件で活用している主要技術とサポート技術です。",
+        },
+        work: {
+          title: "直近の取り組み",
+          description: "責務と成果が明確な取り組みを抜粋して掲載しています。",
+          empty: "職務経歴は後ほど公開予定です。",
+        },
+        chips: {
+          empty: "ハイライト情報は準備が整い次第表示されます。",
+        },
+        affiliations: {
+          title: "所属サマリー",
         },
       },
       profile: {
@@ -298,6 +371,7 @@ export const resources = {
             name: "研究室",
             advisor: "指導教員",
             focus: "研究テーマ",
+            room: "居室",
             visit: "研究室サイトへ",
             empty: "研究室情報は準備中です。",
           },
@@ -313,6 +387,9 @@ export const resources = {
               "オープンソースや学術・産業コミュニティへの参画情報です。",
             empty: "コミュニティ参加情報は後日追加されます。",
           },
+          social: {
+            title: "ソーシャルリンク",
+          },
         },
         error:
           "プロフィール情報の取得に失敗しました。ページを再読み込みしてください。",
@@ -325,8 +402,21 @@ export const resources = {
         placeholder: "API 連携後に研究コンテンツがここに描画されます。",
         filters: {
           all: "すべて",
+          research: "研究",
+          blog: "ブログ",
+          tags: "タグで絞り込む",
+          tagAll: "すべてのタグ",
         },
-        noEntriesForTag: "「{{tag}}」タグの研究コンテンツはまだありません。",
+        kind: {
+          research: "研究",
+          blog: "ブログ",
+        },
+        sections: {
+          outcome: "成果",
+          outlook: "次のアクション",
+        },
+        externalLink: "外部記事を開く",
+        noEntriesForTag: "「{{tag}}」タグのエントリはまだありません。",
         updatedOn: "{{date}} 更新",
         error:
           "研究情報を取得できませんでした。時間をおいて再度お試しください。",
@@ -343,6 +433,9 @@ export const resources = {
         noMatchesForSelection:
           "選択した技術スタックに該当するプロジェクトはありません。",
         error: "プロジェクト情報を取得できませんでした。",
+        highlight: {
+          title: "注目プロジェクト",
+        },
       },
       contact: {
         tagline: "お問い合わせ",
@@ -367,13 +460,17 @@ export const resources = {
           topic: "トピック",
           topicPlaceholder: "トピックを選択してください",
           message: "メッセージ",
+          slot: "時間枠",
+          slotPlaceholder: "時間枠を選択してください",
           submit: "予約をリクエスト",
           submitting: "送信中…",
           success:
-            "ありがとうございます。リクエスト (ID: {{bookingId}}) を受け付けました。",
+            "ありがとうございます。リクエスト (ID: {{id}}) を受け付けました。確認メールを {{email}} に送信します。",
           error:
             "予約リクエストを送信できませんでした。時間をおいて再度お試しください。",
           configError: "フォーム設定の取得に失敗しました。",
+          consent:
+            "ご入力いただいた情報は日程調整のみに利用し、ミーティング終了後に削除します。",
           errors: {
             nameRequired: "お名前を入力してください。",
             emailRequired: "メールアドレスを入力してください。",
@@ -383,6 +480,22 @@ export const resources = {
             slotRequired: "予約する時間枠を選択してください。",
           },
         },
+        summary: {
+          title: "予約に関する情報",
+          timezone: "表示時刻は {{timezone}} 基準です。",
+          timezoneFallback: "ローカルタイム",
+          window: "{{days}} 日先まで予約を受け付けています。",
+          supportEmail: "お急ぎの場合は次のメールへご連絡ください：",
+          calendarLinked: "Google カレンダーへの自動連携が有効です。",
+        },
+        bookingSummary: {
+          title: "予約内容の確認",
+          when: "{{datetime}} に予定されています。",
+          calendarEvent: "カレンダーイベント ID: {{id}}",
+          joinLink: "ミーティングリンクを開く",
+        },
+        error:
+          "お問い合わせ設定を取得できませんでした。時間をおいて再度お試しください。",
       },
       admin: {
         tagline: "管理",

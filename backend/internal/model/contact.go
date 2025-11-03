@@ -14,11 +14,3 @@ type ContactSubmission struct {
 	Status  string `json:"status"`
 	Comment string `json:"comment"`
 }
-
-// ContactConfigResponse exposes public booking preferences to the frontend.
-type ContactConfigResponse struct {
-	Topics           []string `json:"topics"`
-	RecaptchaSiteKey string   `json:"recaptchaSiteKey"`
-	MinimumLeadHours int      `json:"minimumLeadHours"`
-	ConsentText      string   `json:"consentText"`
-}

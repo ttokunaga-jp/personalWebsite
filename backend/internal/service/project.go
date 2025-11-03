@@ -9,23 +9,24 @@ import (
 	"github.com/takumi/personal-website/internal/repository"
 )
 
-// ProjectService orchestrates project listing logic.
+// ProjectService orchestrates retrieval of project aggregates for public and admin flows.
 type ProjectService interface {
-	ListProjects(ctx context.Context) ([]model.Project, error)
+	ListProjectDocuments(ctx context.Context, includeDrafts bool) ([]model.ProjectDocument, error)
 }
 
 type projectService struct {
-	repo repository.ProjectRepository
+	repo repository.ProjectDocumentRepository
 }
 
-func NewProjectService(repo repository.ProjectRepository) ProjectService {
+// NewProjectService constructs a project service backed by the v2 document repository.
+func NewProjectService(repo repository.ProjectDocumentRepository) ProjectService {
 	return &projectService{repo: repo}
 }
 
-func (s *projectService) ListProjects(ctx context.Context) ([]model.Project, error) {
-	projects, err := s.repo.ListProjects(ctx)
+func (s *projectService) ListProjectDocuments(ctx context.Context, includeDrafts bool) ([]model.ProjectDocument, error) {
+	projects, err := s.repo.ListProjectDocuments(ctx, includeDrafts)
 	if err != nil {
-		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to load projects", err)
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to load project documents", err)
 	}
 	return projects, nil
 }

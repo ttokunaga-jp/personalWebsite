@@ -17,7 +17,7 @@ func NewProfileHandler(service service.ProfileService) *ProfileHandler {
 }
 
 func (h *ProfileHandler) GetProfile(c *gin.Context) {
-	profile, err := h.service.GetProfile(c.Request.Context())
+	profile, err := h.service.GetProfileDocument(c.Request.Context())
 	if err != nil {
 		respondError(c, err)
 		return

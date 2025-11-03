@@ -1,0 +1,223 @@
+# Firestore Collection Design for Content Model Refactor (Phase 1)
+#
+# Prefix handling:
+#   All collection names are composed by `firestore.collection_prefix` (if set)
+#   followed by the base name with an underscore separator. Example:
+#     prefix = "prod" => collection: "prod_profiles".
+#
+# Each document uses camelCase to align with API JSON payloads.
+
+collections:
+  profiles:
+    description: "Primary profile documents with affiliations, work history, community links, and social handles."
+    id_format: "profile_${autoId}"
+    fields:
+      displayName: string
+      headline: localizedText
+      summary: localizedText
+      avatarUrl: string
+      location: localizedText
+      theme:
+        mode: enum(light|dark|system)
+        accentColor: string
+      lab:
+        name: localizedText
+        advisor: localizedText?
+        room: localizedText?
+        url: string?
+      affiliations: array<profileAffiliation>
+      communities: array<profileAffiliation>
+      workHistory: array<profileWorkHistory>
+      techSections: array<profileTechSection>
+      socialLinks: array<profileSocialLink>
+      updatedAt: timestamp
+  tech_catalog:
+    description: "Master catalog of technologies used across profile, projects, and research/blog content."
+    id_format: "tech_${slug}"
+    fields:
+      slug: string
+      displayName: string
+      category: string?
+      level: enum(beginner|intermediate|advanced)
+      icon: string?
+      sortOrder: number
+      active: boolean
+      createdAt: timestamp
+      updatedAt: timestamp
+  tech_relationships:
+    description: "Join documents connecting tech catalog entries to content."
+    id_format: "rel_${entityType}_${entityId}_${techId}"
+    fields:
+      entityType: enum(profile_section|project|research_blog)
+      entityId: string
+      techId: string
+      context: enum(primary|supporting)
+      note: string?
+      sortOrder: number
+      createdAt: timestamp
+  projects:
+    description: "Project entries surfaced on the public site."
+    id_format: "project_${slug}"
+    fields:
+      slug: string
+      title: localizedText
+      summary: localizedText
+      description: localizedText?
+      coverImageUrl: string?
+      primaryLinkUrl: string?
+      links: array<projectLink>
+      period:
+        start: date?
+        end: date?
+      published: boolean
+      highlight: boolean
+      sortOrder: number
+      createdAt: timestamp
+      updatedAt: timestamp
+  research_blog_entries:
+    description: "Unified research/blog content. Stores references to external articles and assets."
+    id_format: "entry_${slug}"
+    fields:
+      slug: string
+      kind: enum(research|blog)
+      title: localizedText
+      overview: localizedText?
+      outcome: localizedText?
+      outlook: localizedText?
+      externalUrl: string
+      publishedAt: timestamp
+      updatedAt: timestamp
+      highlightImageUrl: string?
+      imageAlt: localizedText?
+      isDraft: boolean
+      tags: array<string>
+      links: array<researchBlogLink>
+      assets: array<researchBlogAsset>
+  home_page_config:
+    description: "Home hero + quick links + chip configuration."
+    id_format: "home_config"
+    fields:
+      profileId: string
+      heroSubtitle: localizedText?
+      quickLinks: array<homeQuickLink>
+      chipSources: array<homeChipSource>
+      updatedAt: timestamp
+  contact_form_settings:
+    description: "Form configuration, consent text, calendar integration."
+    id_format: "contact_config"
+    fields:
+      heroTitle: localizedText?
+      heroDescription: localizedText?
+      topics: array<contactTopic>
+      consentText: localizedText
+      minimumLeadHours: number
+      recaptchaPublicKey: string?
+      supportEmail: string
+      calendarTimezone: string
+      googleCalendarId: string?
+      bookingWindowDays: number
+      createdAt: timestamp
+      updatedAt: timestamp
+  meeting_reservations:
+    description: "Calendar booking records with notification metadata."
+    id_format: "reservation_${autoId}"
+    fields:
+      name: string
+      email: string
+      topic: string?
+      message: string?
+      startAt: timestamp
+      endAt: timestamp
+      durationMinutes: number
+      googleEventId: string?
+      googleCalendarStatus: enum(pending|confirmed|declined|cancelled)
+      status: enum(pending|confirmed|cancelled)
+      confirmationSentAt: timestamp?
+      lastNotificationSentAt: timestamp?
+      lookupHash: string
+      cancellationReason: string?
+      createdAt: timestamp
+      updatedAt: timestamp
+  meeting_notifications:
+    description: "Notification dispatch log for reservations."
+    id_format: "notification_${autoId}"
+    fields:
+      reservationId: string
+      notificationType: enum(confirmation_email|reminder_email|calendar_invite|cancellation_email)
+      status: enum(pending|sent|failed)
+      errorMessage: string?
+      createdAt: timestamp
+  blacklist:
+    description: "Email blacklist preventing abusive reservations."
+    id_format: "blacklist_${autoId}"
+    fields:
+      email: string
+      reason: string?
+      createdAt: timestamp
+  schedule_blackouts:
+    description: "Manual blackout windows (holidays, maintenance)."
+    id_format: "blackout_${autoId}"
+    fields:
+      startTime: timestamp
+      endTime: timestamp
+      createdAt: timestamp
+
+types:
+  localizedText:
+    ja: string?
+    en: string?
+  profileAffiliation:
+    name: string
+    url: string?
+    startedAt: timestamp
+    description: localizedText?
+  profileWorkHistory:
+    organization: localizedText
+    role: localizedText
+    summary: localizedText?
+    period:
+      start: timestamp
+      end: timestamp?
+    externalUrl: string?
+  profileTechSection:
+    title: localizedText?
+    membershipIds: array<string>
+    layout: enum(chips|list)
+    breakpoint: string
+    sortOrder: number
+  profileSocialLink:
+    provider: enum(github|zenn|linkedin|x|email|other)
+    label: localizedText?
+    url: string
+    isFooter: boolean
+    sortOrder: number
+  projectLink:
+    type: enum(repo|demo|article|slides|other)
+    label: localizedText?
+    url: string
+    sortOrder: number
+  researchBlogLink:
+    type: enum(paper|slides|video|code|external)
+    label: localizedText?
+    url: string
+    sortOrder: number
+  researchBlogAsset:
+    url: string
+    caption: localizedText?
+    sortOrder: number
+  homeQuickLink:
+    section: enum(profile|research_blog|projects|contact)
+    label: localizedText
+    description: localizedText?
+    cta: localizedText
+    targetUrl: string
+    sortOrder: number
+  homeChipSource:
+    sourceType: enum(affiliation|community|tech)
+    label: localizedText?
+    limit: number
+    sortOrder: number
+  contactTopic:
+    id: string
+    label: localizedText
+    description: localizedText?

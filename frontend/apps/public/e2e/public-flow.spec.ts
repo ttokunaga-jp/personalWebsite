@@ -46,11 +46,15 @@ test.beforeEach(async ({ page }) => {
     "**/api/v1/public/contact/bookings",
     async (route, request) => {
       const body = await request.postDataJSON();
+      const meetingId = `bk-${body?.slotId ?? "unknown"}`;
       await route.fulfill({
         json: {
           data: {
             ...defaultBookingResponse,
-            bookingId: `bk-${body?.slotId ?? "unknown"}`
+            meeting: {
+              ...defaultBookingResponse.meeting,
+              id: meetingId
+            }
           }
         }
       });
@@ -62,7 +66,10 @@ test("visitor walks through primary navigation and submits a booking", async ({ 
   await page.goto("/");
 
   await expect(
-    page.getByRole("heading", { name: profileFixture.headline })
+    page.getByRole("heading", {
+      name: profileFixture.headline ?? "",
+      exact: false
+    })
   ).toBeVisible();
 
   const primaryNavigation = page.getByLabel("Primary Navigation");
@@ -81,14 +88,16 @@ test("visitor walks through primary navigation and submits a booking", async ({ 
 
   await page.fill('input[name="name"]', "E2E Tester");
   await page.fill('input[name="email"]', "tester@example.com");
-  await page.selectOption('select[name="topic"]', contactConfigFixture.topics[0] ?? "");
+  await page.selectOption(
+    'select[name="topic"]',
+    contactConfigFixture.topics[0]?.id ?? ""
+  );
   await page.fill(
     'textarea[name="message"]',
     "Exploring possibilities for a robotics research collaboration."
   );
 
-  const slotButton = page.getByRole("button", { name: /Ends/ }).first();
-  await slotButton.click();
+  await page.selectOption('select[name="slotId"]', contactAvailabilityFixture.days[0]?.slots[0]?.id ?? "");
 
   await page.getByRole("button", { name: "Request booking" }).click();
 

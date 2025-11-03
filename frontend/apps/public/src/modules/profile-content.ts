@@ -1,7 +1,10 @@
 import type {
+  HomePageConfig,
   ProfileResponse,
   Project,
   ResearchEntry,
+  TechCatalogEntry,
+  TechMembership,
 } from "./public-api/types";
 
 type SupportedLocale = "en" | "ja";
@@ -20,608 +23,1018 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-const canonicalProfileEn: ProfileResponse = {
-  name: "Takumi Tokunaga",
-  headline: "Real-world information engineering student & full-stack engineer",
-  summary:
-    "Undergraduate researcher at Ritsumeikan University building retrieval-augmented learning assistants, hybrid search infrastructure, and robotics-driven experiences. Combines startup leadership with large-scale web service development to deliver measurable outcomes end to end.",
-  avatarUrl: undefined,
-  location: "Osaka, Japan",
-  affiliations: [
-    {
-      id: "rm2c-lab",
-      organization: "Kimura Laboratory (RM²C)",
-      role: "Undergraduate Researcher",
-      startDate: "2025-04-01",
-      endDate: null,
-      location: "Osaka, Japan",
-      isCurrent: true,
-    },
-    {
-      id: "ritsumeikan-university",
-      organization: "Ritsumeikan University",
-      department:
-        "College of Information Science and Engineering · Real-world Information Program",
-      role: "B.S. Candidate",
-      startDate: "2023-04-01",
-      endDate: null,
-      location: "Osaka, Japan",
-      isCurrent: true,
-    },
-    {
-      id: "marugame-high-school",
-      organization: "Marugame High School",
-      role: "Student",
-      startDate: "2019-04-01",
-      endDate: "2022-03-31",
-      location: "Kagawa, Japan",
-      isCurrent: false,
-    },
-  ],
-  lab: {
-    name: "Kimura Laboratory (RM²C Mobile Computing / Reality Media Lab)",
-    advisor: "Prof. Hiroshi Kimura",
-    researchFocus:
-      "Human-computer interaction, multimodal XR, mobile computing, and haptics.",
-    websiteUrl: "https://www.rm2c.ise.ritsumei.ac.jp/",
+const techCatalog: Record<
+  string,
+  TechCatalogEntry
+> = {
+  typescript: {
+    id: "tech-typescript",
+    slug: "typescript",
+    displayName: "TypeScript",
+    category: "frontend",
+    level: "advanced",
+    icon: undefined,
+    sortOrder: 1,
+    active: true,
   },
-  workHistory: [
-    {
-      id: "reboze-llc",
-      organization: "Reboze LLC",
-      role: "Business & Technology Consultant (Intern)",
-      startDate: "2025-10-01",
-      endDate: null,
-      achievements: [
-        "Designed system architecture proposals for B2B transformation projects and supported customer discovery.",
-        "Coordinated cross-functional PoC initiatives spanning engineering and business development.",
-      ],
-      description:
-        "Long-term internship within the consulting division, focusing on revenue operations optimisation and technical due diligence.",
-      location: "Osaka, Japan / Remote",
+  react: {
+    id: "tech-react",
+    slug: "react",
+    displayName: "React",
+    category: "frontend",
+    level: "advanced",
+    icon: undefined,
+    sortOrder: 2,
+    active: true,
+  },
+  go: {
+    id: "tech-go",
+    slug: "go",
+    displayName: "Go",
+    category: "backend",
+    level: "advanced",
+    icon: undefined,
+    sortOrder: 3,
+    active: true,
+  },
+  gcp: {
+    id: "tech-gcp",
+    slug: "google-cloud",
+    displayName: "Google Cloud",
+    category: "infrastructure",
+    level: "advanced",
+    icon: undefined,
+    sortOrder: 4,
+    active: true,
+  },
+  firestore: {
+    id: "tech-firestore",
+    slug: "cloud-firestore",
+    displayName: "Cloud Firestore",
+    category: "data",
+    level: "advanced",
+    icon: undefined,
+    sortOrder: 5,
+    active: true,
+  },
+  terraform: {
+    id: "tech-terraform",
+    slug: "terraform",
+    displayName: "Terraform",
+    category: "infrastructure",
+    level: "intermediate",
+    icon: undefined,
+    sortOrder: 6,
+    active: true,
+  },
+  python: {
+    id: "tech-python",
+    slug: "python",
+    displayName: "Python",
+    category: "ml",
+    level: "advanced",
+    icon: undefined,
+    sortOrder: 7,
+    active: true,
+  },
+  ros: {
+    id: "tech-ros",
+    slug: "ros",
+    displayName: "ROS / ROS2",
+    category: "robotics",
+    level: "intermediate",
+    icon: undefined,
+    sortOrder: 8,
+    active: true,
+  },
+  unity: {
+    id: "tech-unity",
+    slug: "unity",
+    displayName: "Unity",
+    category: "xr",
+    level: "intermediate",
+    icon: undefined,
+    sortOrder: 9,
+    active: true,
+  },
+};
+
+function createMembership(
+  tech: TechCatalogEntry,
+  sortOrder: number,
+  context: "primary" | "supporting" = "primary",
+  note?: string,
+): TechMembership {
+  return {
+    id: `${tech.id}-${context}-${sortOrder}`,
+    context,
+    note,
+    sortOrder,
+    tech: clone(tech),
+  };
+}
+
+const canonicalHomeConfigs: Record<SupportedLocale, HomePageConfig> = {
+  en: {
+    heroSubtitle: "Software engineer and real-world information student",
+    quickLinks: [
+      {
+        id: "quick-profile",
+        section: "profile",
+        label: "Academic profile",
+        description: "Affiliations, lab details, and study focus areas.",
+        cta: "View profile",
+        targetUrl: "/profile",
+        sortOrder: 1,
+      },
+      {
+        id: "quick-research",
+        section: "research_blog",
+        label: "Research & blog",
+        description: "Integrated updates on papers, talks, and field notes.",
+        cta: "Read updates",
+        targetUrl: "/research",
+        sortOrder: 2,
+      },
+      {
+        id: "quick-projects",
+        section: "projects",
+        label: "Project archive",
+        description: "Selected engineering work with technology highlights.",
+        cta: "Browse projects",
+        targetUrl: "/projects",
+        sortOrder: 3,
+      },
+      {
+        id: "quick-contact",
+        section: "contact",
+        label: "Book a time",
+        description: "Coordinate conversations with calendar integration.",
+        cta: "Request booking",
+        targetUrl: "/contact",
+        sortOrder: 4,
+      },
+    ],
+    chipSources: [
+      {
+        id: "chips-tech",
+        source: "tech",
+        label: "Focus technologies",
+        limit: 6,
+        sortOrder: 1,
+      },
+      {
+        id: "chips-affiliation",
+        source: "affiliation",
+        label: "Active affiliations",
+        limit: 3,
+        sortOrder: 2,
+      },
+      {
+        id: "chips-community",
+        source: "community",
+        label: "Community work",
+        limit: 3,
+        sortOrder: 3,
+      },
+    ],
+    updatedAt: "2024-11-01T00:00:00Z",
+  },
+  ja: {
+    heroSubtitle: "実世界情報コース所属のソフトウェアエンジニア",
+    quickLinks: [
+      {
+        id: "quick-profile",
+        section: "profile",
+        label: "プロフィール",
+        description: "所属・研究室・学習テーマの概要。",
+        cta: "プロフィールを見る",
+        targetUrl: "/profile",
+        sortOrder: 1,
+      },
+      {
+        id: "quick-research",
+        section: "research_blog",
+        label: "研究・ブログ",
+        description: "論文・登壇・フィールドノートを統合した更新情報。",
+        cta: "記事を読む",
+        targetUrl: "/research",
+        sortOrder: 2,
+      },
+      {
+        id: "quick-projects",
+        section: "projects",
+        label: "プロジェクト一覧",
+        description: "技術ハイライト付きの開発実績。",
+        cta: "プロジェクトを見る",
+        targetUrl: "/projects",
+        sortOrder: 3,
+      },
+      {
+        id: "quick-contact",
+        section: "contact",
+        label: "お問い合わせ / 予約",
+        description: "Google カレンダー連携による面談調整。",
+        cta: "日程をリクエスト",
+        targetUrl: "/contact",
+        sortOrder: 4,
+      },
+    ],
+    chipSources: [
+      {
+        id: "chips-tech",
+        source: "tech",
+        label: "得意な技術領域",
+        limit: 6,
+        sortOrder: 1,
+      },
+      {
+        id: "chips-affiliation",
+        source: "affiliation",
+        label: "在籍・所属",
+        limit: 3,
+        sortOrder: 2,
+      },
+      {
+        id: "chips-community",
+        source: "community",
+        label: "コミュニティ活動",
+        limit: 3,
+        sortOrder: 3,
+      },
+    ],
+    updatedAt: "2024-11-01T00:00:00Z",
+  },
+};
+
+function buildProfile(
+  locale: SupportedLocale,
+  base: Omit<ProfileResponse, "footerLinks" | "home">,
+): ProfileResponse {
+  const socialLinks = base.socialLinks.map((link) => clone(link));
+  const footerLinks = socialLinks.filter((link) => link.isFooter);
+  return {
+    ...base,
+    socialLinks,
+    footerLinks,
+    home: clone(canonicalHomeConfigs[locale]),
+  };
+}
+
+const canonicalProfiles: Record<SupportedLocale, ProfileResponse> = {
+  en: buildProfile("en", {
+    id: "profile-canonical",
+    displayName: "Takumi Tokunaga",
+    headline:
+      "Real-world information engineering student and full-stack engineer building reliable systems.",
+    summary:
+      "Undergraduate researcher at Ritsumeikan University working on retrieval-augmented assistants, robotics-driven experiences, and resilient cloud services. Combines startup leadership with production engineering to deliver measurable outcomes end to end.",
+    avatarUrl: undefined,
+    location: "Osaka, Japan",
+    theme: {
+      mode: "system",
+      accentColor: "#0ea5e9",
     },
-    {
-      id: "proseeds-inc",
-      organization: "Proseeds Inc.",
-      role: "Software Engineer (Intern)",
-      startDate: "2025-02-01",
-      endDate: "2025-09-30",
-      achievements: [
-        "Led development of a RAG-based support chatbot for an e-learning platform.",
-        "Maintained production services serving 1M+ learners with a focus on reliability and accessibility.",
-      ],
-      description:
-        "Worked within the engineering division on SaaS learning products, covering requirements, API design, and testing.",
-      location: "Osaka, Japan",
-    },
-    {
-      id: "tier2-llc",
-      organization: "Tier2 LLC",
-      role: "Co-founder / Managing Partner",
-      startDate: "2023-09-01",
-      endDate: null,
-      achievements: [
-        "Automated multi-channel resale operations with in-house inventory and pricing tooling.",
-        "Obtained official antique dealer certification from the Kagawa Public Safety Commission.",
-      ],
-      description:
-        "Founded a resale and software venture, owning strategy, engineering, and financial operations.",
-      location: "Kagawa, Japan / Remote",
-    },
-  ],
-  skillGroups: [
-    {
-      id: "software-engineering",
-      category: "Software Engineering",
-      items: [
-        { id: "go", name: "Go", level: "advanced" },
-        { id: "typescript", name: "TypeScript", level: "advanced" },
-        { id: "react", name: "React", level: "advanced" },
-        { id: "grpc", name: "Gin / gRPC", level: "intermediate" },
-      ],
-    },
-    {
-      id: "infrastructure-data",
-      category: "Infrastructure & Data",
-      items: [
-        {
-          id: "gcp",
-          name: "GCP (Cloud Run, Cloud Build, Artifact Registry)",
-          level: "advanced",
-        },
-        { id: "terraform", name: "Terraform", level: "intermediate" },
-        { id: "firestore", name: "Cloud Firestore", level: "advanced" },
-        {
-          id: "elasticsearch",
-          name: "Elasticsearch / Qdrant",
-          level: "intermediate",
-        },
-      ],
-    },
-    {
-      id: "robotics-xr",
-      category: "Robotics & XR",
-      items: [
-        { id: "ros", name: "ROS / ROS2", level: "intermediate" },
-        { id: "unity", name: "Unity / XR", level: "intermediate" },
-        { id: "python", name: "Python (Simulation, ML)", level: "advanced" },
-      ],
-    },
-  ],
-  communities: [
-    "RoboCup Kansai Student Branch",
-    "Ritsumeikan Robotics & Automation Team",
-    "STEM Outreach Mentor (Programming Workshops)",
-  ],
-  socialLinks: [
-    {
-      id: "github",
-      platform: "github",
-      label: "ttokunaga-jp",
-      url: "https://github.com/ttokunaga-jp",
-    },
-    {
-      id: "lab",
-      platform: "website",
-      label: "RM²C Laboratory",
+    lab: {
+      name: "Kimura Laboratory (RM²C)",
+      advisor: "Professor Hiroshi Kimura",
+      room: "AN236",
       url: "https://www.rm2c.ise.ritsumei.ac.jp/",
     },
-    {
-      id: "email",
-      platform: "email",
-      label: "is0732hk@ed.ritsumei.ac.jp",
-      url: "mailto:is0732hk@ed.ritsumei.ac.jp",
+    affiliations: [
+      {
+        id: "affiliation-rm2c",
+        name: "Kimura Laboratory (RM²C)",
+        url: "https://www.rm2c.ise.ritsumei.ac.jp/",
+        description: "Undergraduate researcher focusing on human-computer interaction and XR.",
+        startedAt: "2025-04-01",
+        sortOrder: 1,
+      },
+      {
+        id: "affiliation-ritsumeikan",
+        name: "Ritsumeikan University · Real-world Information Program",
+        url: "https://www.ritsumei.ac.jp/",
+        description: "B.S. candidate in Information Science and Engineering.",
+        startedAt: "2023-04-01",
+        sortOrder: 2,
+      },
+    ],
+    communities: [
+      {
+        id: "community-robocup",
+        name: "RoboCup Kansai Student Branch",
+        description: "Regional robotics outreach and competition programming.",
+        startedAt: "2024-04-01",
+        sortOrder: 1,
+      },
+      {
+        id: "community-rrat",
+        name: "Ritsumeikan Robotics & Automation Team",
+        description: "Cross-disciplinary robotics project-based community.",
+        startedAt: "2023-04-01",
+        sortOrder: 2,
+      },
+      {
+        id: "community-stem",
+        name: "STEM Outreach Workshops",
+        description: "Instructor for programming and engineering bootcamps.",
+        startedAt: "2022-04-01",
+        sortOrder: 3,
+      },
+    ],
+    workHistory: [
+      {
+        id: "work-reboze",
+        organization: "Reboze LLC",
+        role: "Business & Technology Consultant (Intern)",
+        summary:
+          "Designed architecture proposals for enterprise transformation projects and coordinated discovery workshops.",
+        startedAt: "2025-10-01",
+        endedAt: null,
+        externalUrl: "https://reboze.com/",
+        sortOrder: 1,
+      },
+      {
+        id: "work-proseeds",
+        organization: "Proseeds Inc.",
+        role: "Software Engineer (Intern)",
+        summary:
+          "Maintained e-learning services serving 1M+ learners and prototyped retrieval-augmented support experiences.",
+        startedAt: "2025-02-01",
+        endedAt: "2025-09-30",
+        externalUrl: "https://www.pro-seeds.com/",
+        sortOrder: 2,
+      },
+      {
+        id: "work-tier2",
+        organization: "Tier2 LLC",
+        role: "Co-founder / Managing Partner",
+        summary:
+          "Built inventory automation tooling and analytics for a multi-channel resale business with 20% margin lift.",
+        startedAt: "2023-09-01",
+        endedAt: null,
+        externalUrl: undefined,
+        sortOrder: 3,
+      },
+    ],
+    techSections: [
+      {
+        id: "tech-core",
+        title: "Core engineering",
+        layout: "grid",
+        breakpoint: "md",
+        sortOrder: 1,
+        members: [
+          createMembership(techCatalog.typescript, 1),
+          createMembership(techCatalog.react, 2),
+          createMembership(techCatalog.go, 3),
+        ],
+      },
+      {
+        id: "tech-infra",
+        title: "Infrastructure & data",
+        layout: "grid",
+        breakpoint: "md",
+        sortOrder: 2,
+        members: [
+          createMembership(techCatalog.gcp, 1),
+          createMembership(techCatalog.terraform, 2, "supporting"),
+          createMembership(techCatalog.firestore, 3, "supporting"),
+        ],
+      },
+      {
+        id: "tech-robotics",
+        title: "Robotics & XR",
+        layout: "grid",
+        breakpoint: "md",
+        sortOrder: 3,
+        members: [
+          createMembership(techCatalog.ros, 1, "supporting"),
+          createMembership(techCatalog.unity, 2, "supporting"),
+          createMembership(techCatalog.python, 3),
+        ],
+      },
+    ],
+    socialLinks: [
+      {
+        id: "github",
+        provider: "github",
+        label: "ttokunaga-jp",
+        url: "https://github.com/ttokunaga-jp",
+        isFooter: true,
+        sortOrder: 1,
+      },
+      {
+        id: "zenn",
+        provider: "zenn",
+        label: "Zenn",
+        url: "https://zenn.dev/ttokunaga",
+        isFooter: true,
+        sortOrder: 2,
+      },
+      {
+        id: "linkedin",
+        provider: "linkedin",
+        label: "LinkedIn",
+        url: "https://www.linkedin.com/in/takumi-tokunaga/",
+        isFooter: true,
+        sortOrder: 3,
+      },
+      {
+        id: "email",
+        provider: "email",
+        label: "is0732hk@ed.ritsumei.ac.jp",
+        url: "mailto:is0732hk@ed.ritsumei.ac.jp",
+        isFooter: false,
+        sortOrder: 4,
+      },
+    ],
+    updatedAt: "2024-11-01T00:00:00Z",
+  }),
+  ja: buildProfile("ja", {
+    id: "profile-canonical-ja",
+    displayName: "徳永 拓未",
+    headline:
+      "立命館大学 実世界情報コース / フルスタックエンジニアとして信頼性ある体験を設計。",
+    summary:
+      "立命館大学にて RAG 支援エージェントやロボティクスを活用した体験設計、堅牢なクラウドサービス開発に取り組む学部研究員。起業と現場開発の経験を生かし、要件定義から運用まで一気通貫で価値創出を行う。",
+    avatarUrl: undefined,
+    location: "日本 大阪府",
+    theme: {
+      mode: "system",
+      accentColor: "#0ea5e9",
     },
-  ],
-};
-
-const canonicalProfileJa: ProfileResponse = {
-  name: "徳永 拓未",
-  headline: "立命館大学 情報理工学部 実世界情報コース / フルスタックエンジニア",
-  summary:
-    "ロボティクスと XR を核に実世界とサイバー空間をつなぐ体験設計を探究しつつ、RAG や検索基盤、教育向けプロダクトを Go / TypeScript / GCP で開発しています。起業経験と大規模サービス開発の現場経験を掛け合わせ、企画から運用まで一気通貫で価値提供することを目指しています。",
-  avatarUrl: undefined,
-  location: "大阪府, 日本",
-  affiliations: [
-    {
-      id: "rm2c-lab",
-      organization: "木村研究室（RM²C モバイルコンピューティング／リアリティメディア研究室）",
-      role: "学部研究員",
-      startDate: "2025-04-01",
-      endDate: null,
-      location: "大阪府, 日本",
-      isCurrent: true,
-    },
-    {
-      id: "ritsumeikan-university",
-      organization: "立命館大学 情報理工学部 実世界情報コース",
-      department:
-        "College of Information Science and Engineering · Real-world Information Program",
-      role: "学部生（B.S.）",
-      startDate: "2023-04-01",
-      endDate: null,
-      location: "大阪府, 日本",
-      isCurrent: true,
-    },
-    {
-      id: "marugame-high-school",
-      organization: "香川県立丸亀高等学校",
-      role: "学生",
-      startDate: "2019-04-01",
-      endDate: "2022-03-31",
-      location: "香川県, 日本",
-      isCurrent: false,
-    },
-  ],
-  lab: {
-    name: "木村研究室（RM²C モバイルコンピューティング／リアリティメディア研究室）",
-    advisor: "木村 浩嗣 教授",
-    researchFocus:
-      "ヒューマンコンピュータインタラクション、マルチモーダル XR、モバイルコンピューティング、ハプティクスを対象に研究。",
-    websiteUrl: "https://www.rm2c.ise.ritsumei.ac.jp/",
-  },
-  workHistory: [
-    {
-      id: "reboze-llc",
-      organization: "Reboze LLC",
-      role: "ビジネス＆テクノロジーコンサルタント（長期インターン）",
-      startDate: "2025-10-01",
-      endDate: null,
-      achievements: [
-        "B2B 変革プロジェクト向けにシステムアーキテクチャを設計し、カスタマーディスカバリを支援。",
-        "エンジニアリングと事業開発を横断する PoC を調整し、クロスファンクショナルに推進。",
-      ],
-      description:
-        "コンサルティング部門にて収益オペレーション最適化と技術デューデリジェンスに取り組む長期インターンシップ。",
-      location: "大阪 / リモート",
-    },
-    {
-      id: "proseeds-inc",
-      organization: "株式会社プロシーズ",
-      role: "ソフトウェアエンジニア（インターン）",
-      startDate: "2025-02-01",
-      endDate: "2025-09-30",
-      achievements: [
-        "eラーニング向け RAG サポートチャットボットの開発をリード。",
-        "100 万人超の学習者が利用する本番サービスを信頼性とアクセシビリティの観点で保守運用。",
-      ],
-      description:
-        "SaaS 型学習プロダクトの開発部門で要件定義・API 設計・テストを担当。",
-      location: "大阪府",
-    },
-    {
-      id: "tier2-llc",
-      organization: "Tier2 LLC",
-      role: "共同創業者 / マネージングパートナー",
-      startDate: "2023-09-01",
-      endDate: null,
-      achievements: [
-        "在庫・価格管理ツールを内製化し、マルチチャネル転売オペレーションを自動化。",
-        "香川県公安委員会より古物商許可を取得し、リユース事業を立ち上げ。",
-      ],
-      description:
-        "戦略立案からエンジニアリング、財務までを担うソフトウェア＆リセールベンチャーを運営。",
-      location: "香川県 / リモート",
-    },
-  ],
-  skillGroups: [
-    {
-      id: "software-engineering",
-      category: "ソフトウェアエンジニアリング",
-      items: [
-        { id: "go", name: "Go", level: "advanced" },
-        { id: "typescript", name: "TypeScript", level: "advanced" },
-        { id: "react", name: "React", level: "advanced" },
-        { id: "grpc", name: "Gin / gRPC", level: "intermediate" },
-      ],
-    },
-    {
-      id: "infrastructure-data",
-      category: "インフラ / データ基盤",
-      items: [
-        {
-          id: "gcp",
-          name: "GCP（Cloud Run, Cloud Build, Artifact Registry）",
-          level: "advanced",
-        },
-        { id: "terraform", name: "Terraform", level: "intermediate" },
-        { id: "firestore", name: "Cloud Firestore", level: "advanced" },
-        {
-          id: "elasticsearch",
-          name: "Elasticsearch / Qdrant",
-          level: "intermediate",
-        },
-      ],
-    },
-    {
-      id: "robotics-xr",
-      category: "ロボティクス / XR",
-      items: [
-        { id: "ros", name: "ROS / ROS2", level: "intermediate" },
-        { id: "unity", name: "Unity / XR", level: "intermediate" },
-        { id: "python", name: "Python（Simulation, ML）", level: "advanced" },
-      ],
-    },
-  ],
-  communities: [
-    "RoboCup 関西 学生支部",
-    "立命館 Robotics & Automation Team",
-    "STEM Outreach Mentor（プログラミングワークショップ）",
-  ],
-  socialLinks: [
-    {
-      id: "github",
-      platform: "github",
-      label: "ttokunaga-jp",
-      url: "https://github.com/ttokunaga-jp",
-    },
-    {
-      id: "lab",
-      platform: "website",
-      label: "RM²C Laboratory",
+    lab: {
+      name: "木村研究室（RM²C）",
+      advisor: "木村 浩 先生",
+      room: "AN236",
       url: "https://www.rm2c.ise.ritsumei.ac.jp/",
     },
+    affiliations: [
+      {
+        id: "affiliation-rm2c",
+        name: "木村研究室（RM²C モバイルコンピューティング／リアリティメディア研究室）",
+        url: "https://www.rm2c.ise.ritsumei.ac.jp/",
+        description: "ヒューマンコンピュータインタラクションと XR の研究に従事。",
+        startedAt: "2025-04-01",
+        sortOrder: 1,
+      },
+      {
+        id: "affiliation-ritsumeikan",
+        name: "立命館大学 情報理工学部 実世界情報コース",
+        url: "https://www.ritsumei.ac.jp/",
+        description: "実世界情報プログラム B3 / 研究室配属前期。",
+        startedAt: "2023-04-01",
+        sortOrder: 2,
+      },
+    ],
+    communities: [
+      {
+        id: "community-robocup",
+        name: "RoboCup Kansai Student Branch",
+        description: "高校生向けロボット競技の普及と教育支援を担当。",
+        startedAt: "2024-04-01",
+        sortOrder: 1,
+      },
+      {
+        id: "community-rrat",
+        name: "Ritsumeikan Robotics & Automation Team",
+        description: "学内外のロボティクス共同開発コミュニティ。",
+        startedAt: "2023-04-01",
+        sortOrder: 2,
+      },
+      {
+        id: "community-stem",
+        name: "STEM Outreach ワークショップ",
+        description: "小中高校生向けプログラミング講座の運営・講師を担当。",
+        startedAt: "2022-04-01",
+        sortOrder: 3,
+      },
+    ],
+    workHistory: [
+      {
+        id: "work-reboze",
+        organization: "Reboze LLC",
+        role: "ビジネス / テクノロジーコンサルタント（長期インターン）",
+        summary:
+          "企業の業務変革に向けたシステムアーキテクチャ検討、PoC 調整、顧客課題のヒアリングを推進。",
+        startedAt: "2025-10-01",
+        endedAt: null,
+        externalUrl: "https://reboze.com/",
+        sortOrder: 1,
+      },
+      {
+        id: "work-proseeds",
+        organization: "株式会社プロシーズ",
+        role: "ソフトウェアエンジニア（長期インターン）",
+        summary:
+          "100 万人以上が利用する e ラーニング基盤の開発・保守、RAG を活用したサポート自動化を担当。",
+        startedAt: "2025-02-01",
+        endedAt: "2025-09-30",
+        externalUrl: "https://www.pro-seeds.com/",
+        sortOrder: 2,
+      },
+      {
+        id: "work-tier2",
+        organization: "合同会社 Tier2",
+        role: "共同創業者 / マネージングパートナー",
+        summary:
+          "物販自動化ツールの内製化・在庫分析による粗利改善、古物商許可の取得と多拠点運営をリード。",
+        startedAt: "2023-09-01",
+        endedAt: null,
+        externalUrl: undefined,
+        sortOrder: 3,
+      },
+    ],
+    techSections: [
+      {
+        id: "tech-core",
+        title: "ソフトウェアエンジニアリング",
+        layout: "grid",
+        breakpoint: "md",
+        sortOrder: 1,
+        members: [
+          createMembership(techCatalog.typescript, 1),
+          createMembership(techCatalog.react, 2),
+          createMembership(techCatalog.go, 3),
+        ],
+      },
+      {
+        id: "tech-infra",
+        title: "インフラ・データ基盤",
+        layout: "grid",
+        breakpoint: "md",
+        sortOrder: 2,
+        members: [
+          createMembership(techCatalog.gcp, 1),
+          createMembership(techCatalog.terraform, 2, "supporting"),
+          createMembership(techCatalog.firestore, 3, "supporting"),
+        ],
+      },
+      {
+        id: "tech-robotics",
+        title: "ロボティクス・XR",
+        layout: "grid",
+        breakpoint: "md",
+        sortOrder: 3,
+        members: [
+          createMembership(techCatalog.ros, 1, "supporting"),
+          createMembership(techCatalog.unity, 2, "supporting"),
+          createMembership(techCatalog.python, 3),
+        ],
+      },
+    ],
+    socialLinks: [
+      {
+        id: "github",
+        provider: "github",
+        label: "ttokunaga-jp",
+        url: "https://github.com/ttokunaga-jp",
+        isFooter: true,
+        sortOrder: 1,
+      },
+      {
+        id: "zenn",
+        provider: "zenn",
+        label: "Zenn",
+        url: "https://zenn.dev/ttokunaga",
+        isFooter: true,
+        sortOrder: 2,
+      },
+      {
+        id: "linkedin",
+        provider: "linkedin",
+        label: "LinkedIn",
+        url: "https://www.linkedin.com/in/takumi-tokunaga/",
+        isFooter: true,
+        sortOrder: 3,
+      },
+      {
+        id: "email",
+        provider: "email",
+        label: "is0732hk@ed.ritsumei.ac.jp",
+        url: "mailto:is0732hk@ed.ritsumei.ac.jp",
+        isFooter: false,
+        sortOrder: 4,
+      },
+    ],
+    updatedAt: "2024-11-01T00:00:00Z",
+  }),
+};
+
+const canonicalProjectsMap: Record<SupportedLocale, Project[]> = {
+  en: [
     {
-      id: "email",
-      platform: "email",
-      label: "is0732hk@ed.ritsumei.ac.jp",
-      url: "mailto:is0732hk@ed.ritsumei.ac.jp",
+      id: "project-knowledge-guide",
+      slug: "knowledge-guide",
+      title: "Knowledge Guide",
+      summary: "Retrieval-augmented learning assistant for robotics clubs.",
+      description:
+        "Built a retrieval-augmented assistant that consolidates lab notes, CAD documents, and mentor Q&A. Deployed on Google Cloud Run with robust observability, GDPR compliant data retention, and multilingual content search.",
+      coverImageUrl: "https://images.takumi.dev/projects/knowledge-guide.jpg",
+      primaryLink: "https://github.com/ttokunaga-jp/knowledge-guide",
+      links: [
+        {
+          id: "knowledge-guide-repo",
+          type: "repo",
+          label: "Source repository",
+          url: "https://github.com/ttokunaga-jp/knowledge-guide",
+          sortOrder: 1,
+        },
+        {
+          id: "knowledge-guide-demo",
+          type: "demo",
+          label: "Interactive demo",
+          url: "https://demo.takumi.dev/knowledge-guide",
+          sortOrder: 2,
+        },
+      ],
+      period: {
+        start: "2024-05-01",
+        end: null,
+      },
+      tech: [
+        createMembership(techCatalog.go, 1),
+        createMembership(techCatalog.typescript, 2, "supporting"),
+        createMembership(techCatalog.gcp, 3, "primary"),
+      ],
+      highlight: true,
+      published: true,
+      sortOrder: 1,
+      createdAt: "2024-05-01T00:00:00Z",
+      updatedAt: "2024-10-12T00:00:00Z",
+    },
+    {
+      id: "project-robotics-insight",
+      slug: "robotics-insight",
+      title: "Robotics Insight Platform",
+      summary: "Telemetry pipeline and dashboards for field robotics trials.",
+      description:
+        "Designed a streaming telemetry pipeline capturing ROS2 topics, edge perception, and operator annotations. Provided low-latency dashboards for competition organizers and exported data to BigQuery for long-term analysis.",
+      coverImageUrl: "https://images.takumi.dev/projects/robotics-insight.jpg",
+      primaryLink: "https://github.com/ttokunaga-jp/robotics-insight",
+      links: [
+        {
+          id: "robotics-insight-repo",
+          type: "repo",
+          label: "Source repository",
+          url: "https://github.com/ttokunaga-jp/robotics-insight",
+          sortOrder: 1,
+        },
+        {
+          id: "robotics-insight-paper",
+          type: "article",
+          label: "Field report",
+          url: "https://takumi.dev/blog/robotics-insight",
+          sortOrder: 2,
+        },
+      ],
+      period: {
+        start: "2024-01-01",
+        end: "2024-08-31",
+      },
+      tech: [
+        createMembership(techCatalog.ros, 1),
+        createMembership(techCatalog.python, 2),
+        createMembership(techCatalog.gcp, 3, "supporting"),
+      ],
+      highlight: false,
+      published: true,
+      sortOrder: 2,
+      createdAt: "2024-01-15T00:00:00Z",
+      updatedAt: "2024-08-31T00:00:00Z",
+    },
+    {
+      id: "project-campus-nav",
+      slug: "campus-navigation-xr",
+      title: "Campus Navigation XR",
+      summary: "Mixed reality indoor navigation prototype for campus tours.",
+      description:
+        "Implemented a Unity-based XR navigation prototype with spatial anchors, route optimisation, and haptic cues for accessibility. Evaluated in collaboration with university admissions and mobility support teams.",
+      coverImageUrl: "https://images.takumi.dev/projects/campus-navigation.jpg",
+      primaryLink: "https://takumi.dev/projects/campus-navigation-xr",
+      links: [
+        {
+          id: "campus-navigation-slides",
+          type: "slides",
+          label: "Presentation slides",
+          url: "https://speakerdeck.com/takumi/campus-navigation-xr",
+          sortOrder: 1,
+        },
+      ],
+      period: {
+        start: "2023-09-01",
+        end: "2024-03-31",
+      },
+      tech: [
+        createMembership(techCatalog.unity, 1),
+        createMembership(techCatalog.react, 2, "supporting"),
+        createMembership(techCatalog.gcp, 3, "supporting"),
+      ],
+      highlight: false,
+      published: true,
+      sortOrder: 3,
+      createdAt: "2023-09-01T00:00:00Z",
+      updatedAt: "2024-04-01T00:00:00Z",
+    },
+  ],
+  ja: [
+    {
+      id: "project-knowledge-guide",
+      slug: "knowledge-guide",
+      title: "Knowledge Guide",
+      summary: "ロボット競技部向けの RAG 学習支援アシスタント。",
+      description:
+        "部内ナレッジ・CAD・メンター Q&A を統合する検索アシスタント。Cloud Run 上で動作し、可観測性と多言語検索、GDPR 準拠のデータ保持設計を実装した。",
+      coverImageUrl: "https://images.takumi.dev/projects/knowledge-guide.jpg",
+      primaryLink: "https://github.com/ttokunaga-jp/knowledge-guide",
+      links: [
+        {
+          id: "knowledge-guide-repo",
+          type: "repo",
+          label: "ソースコード",
+          url: "https://github.com/ttokunaga-jp/knowledge-guide",
+          sortOrder: 1,
+        },
+        {
+          id: "knowledge-guide-demo",
+          type: "demo",
+          label: "デモサイト",
+          url: "https://demo.takumi.dev/knowledge-guide",
+          sortOrder: 2,
+        },
+      ],
+      period: {
+        start: "2024-05-01",
+        end: null,
+      },
+      tech: [
+        createMembership(techCatalog.go, 1),
+        createMembership(techCatalog.typescript, 2, "supporting"),
+        createMembership(techCatalog.gcp, 3, "primary"),
+      ],
+      highlight: true,
+      published: true,
+      sortOrder: 1,
+      createdAt: "2024-05-01T00:00:00Z",
+      updatedAt: "2024-10-12T00:00:00Z",
+    },
+    {
+      id: "project-robotics-insight",
+      slug: "robotics-insight",
+      title: "Robotics Insight Platform",
+      summary: "ロボット実験のテレメトリ取得と可視化基盤。",
+      description:
+        "ROS2 トピックやエッジ推論、オペレーターの注釈を統合するストリーミングパイプラインを構築。Cloud Run と BigQuery で低レイテンシなダッシュボードと長期分析を実現した。",
+      coverImageUrl: "https://images.takumi.dev/projects/robotics-insight.jpg",
+      primaryLink: "https://github.com/ttokunaga-jp/robotics-insight",
+      links: [
+        {
+          id: "robotics-insight-repo",
+          type: "repo",
+          label: "ソースコード",
+          url: "https://github.com/ttokunaga-jp/robotics-insight",
+          sortOrder: 1,
+        },
+        {
+          id: "robotics-insight-paper",
+          type: "article",
+          label: "フィールドレポート",
+          url: "https://takumi.dev/blog/robotics-insight",
+          sortOrder: 2,
+        },
+      ],
+      period: {
+        start: "2024-01-01",
+        end: "2024-08-31",
+      },
+      tech: [
+        createMembership(techCatalog.ros, 1),
+        createMembership(techCatalog.python, 2),
+        createMembership(techCatalog.gcp, 3, "supporting"),
+      ],
+      highlight: false,
+      published: true,
+      sortOrder: 2,
+      createdAt: "2024-01-15T00:00:00Z",
+      updatedAt: "2024-08-31T00:00:00Z",
+    },
+    {
+      id: "project-campus-nav",
+      slug: "campus-navigation-xr",
+      title: "Campus Navigation XR",
+      summary: "キャンパスツアー向けの MR 屋内ナビゲーション試作。",
+      description:
+        "空間アンカーとハプティクスを活用した Unity ベースのナビゲーションプロトタイプ。入試広報やバリアフリー支援チームと共同で運用検証を実施。",
+      coverImageUrl: "https://images.takumi.dev/projects/campus-navigation.jpg",
+      primaryLink: "https://takumi.dev/projects/campus-navigation-xr",
+      links: [
+        {
+          id: "campus-navigation-slides",
+          type: "slides",
+          label: "発表資料",
+          url: "https://speakerdeck.com/takumi/campus-navigation-xr",
+          sortOrder: 1,
+        },
+      ],
+      period: {
+        start: "2023-09-01",
+        end: "2024-03-31",
+      },
+      tech: [
+        createMembership(techCatalog.unity, 1),
+        createMembership(techCatalog.react, 2, "supporting"),
+        createMembership(techCatalog.gcp, 3, "supporting"),
+      ],
+      highlight: false,
+      published: true,
+      sortOrder: 3,
+      createdAt: "2023-09-01T00:00:00Z",
+      updatedAt: "2024-04-01T00:00:00Z",
     },
   ],
 };
 
-const canonicalProjectsEn: Project[] = [
-  {
-    id: "project-classnav",
-    title: "ClassNav: RAG-powered Learning Assistant",
-    subtitle: "Adaptive study companion for LMS content",
-    description:
-      "Integrates with the university LMS to ingest lecture artefacts automatically, parse diverse formats via Docling, and surface cited responses backed by hybrid retrieval. Designed for reliability, latency, and educator control.",
-    techStack: [
-      "Go",
-      "TypeScript",
-      "LangChain",
-      "Docling",
-      "Cloud Run",
-      "Firestore",
-    ],
-    category: "Education",
-    tags: ["RAG", "Education", "GenAI"],
-    period: {
-      start: "2024-04-01",
-      end: null,
+const canonicalResearchMap: Record<SupportedLocale, ResearchEntry[]> = {
+  en: [
+    {
+      id: "research-rag-evaluation",
+      slug: "rag-evaluation-lab-notes",
+      kind: "research",
+      title: "Evaluating RAG pipelines for robotics field guides",
+      overview:
+        "Measured retrieval quality and operator satisfaction when providing robotics troubleshooting assistance via RAG.",
+      outcome:
+        "Achieved 27% reduction in time-to-resolution for common hardware faults and increased mentor coverage by 3x.",
+      outlook:
+        "Next iteration focuses on multimodal documentation ingestion and alignment with safety runbooks.",
+      externalUrl: "https://takumi.dev/research/rag-evaluation",
+      publishedAt: "2024-09-18T00:00:00Z",
+      updatedAt: "2024-10-05T00:00:00Z",
+      highlightImageUrl: "https://images.takumi.dev/research/rag-evaluation.jpg",
+      imageAlt: "Evaluation dashboard visualising retrieval metrics.",
+      isDraft: false,
+      tags: ["retrieval", "robotics", "evaluation"],
+      links: [
+        {
+          id: "rag-evaluation-paper",
+          type: "paper",
+          label: "Field study report",
+          url: "https://takumi.dev/files/rag-evaluation-report.pdf",
+          sortOrder: 1,
+        },
+        {
+          id: "rag-evaluation-slides",
+          type: "slides",
+          label: "Talk slides",
+          url: "https://speakerdeck.com/takumi/rag-evaluation",
+          sortOrder: 2,
+        },
+      ],
+      assets: [],
+      tech: [
+        createMembership(techCatalog.go, 1),
+        createMembership(techCatalog.python, 2),
+        createMembership(techCatalog.firestore, 3, "supporting"),
+      ],
     },
-    links: [
-      {
-        label: "Repository",
-        url: "https://github.com/ttokunaga-jp/classnav",
-        type: "repo",
-      },
-      {
-        label: "Project overview",
-        url: "https://github.com/ttokunaga-jp/classnav#readme",
-        type: "article",
-      },
-    ],
-    coverImageUrl: undefined,
-    highlight: true,
-  },
-  {
-    id: "project-search-service",
-    title: "searchService: Hybrid Retrieval Microservice",
-    subtitle: "Elasticsearch × Qdrant microservice for RAG pipelines",
-    description:
-      "Implements weighted scoring across keyword and vector indices with Kafka-based ingestion, DLQ retries, and full observability (OpenTelemetry + Prometheus + Jaeger). Shared across personal products to standardise retrieval.",
-    techStack: ["Go", "gRPC", "Elasticsearch", "Qdrant", "Kafka", "Docker"],
-    category: "Platform",
-    tags: ["Search", "Microservices", "Observability"],
-    period: {
-      start: "2024-06-01",
-      end: "2024-12-31",
+    {
+      id: "blog-lab-onboarding",
+      slug: "lab-onboarding-guide",
+      kind: "blog",
+      title: "Lab onboarding guide: aligning real-world information practice",
+      overview:
+        "Documented onboarding practices for RM²C lab members covering experiment logging, asset management, and mentorship loops.",
+      outcome:
+        "Standardised onboarding enabled new members to ship production contributions within their first month.",
+      outlook:
+        "Plan to evolve into an interactive handbook integrated with Knowledge Guide and calendar automations.",
+      externalUrl: "https://takumi.dev/blog/lab-onboarding-guide",
+      publishedAt: "2024-06-01T00:00:00Z",
+      updatedAt: "2024-07-15T00:00:00Z",
+      highlightImageUrl: "https://images.takumi.dev/research/lab-onboarding.jpg",
+      imageAlt: "Students collaborating with laptops and lab equipment.",
+      isDraft: false,
+      tags: ["lab", "operations", "handbook"],
+      links: [
+        {
+          id: "lab-onboarding-notion",
+          type: "external",
+          label: "Notion playbook",
+          url: "https://takumi.dev/notion/lab-handbook",
+          sortOrder: 1,
+        },
+      ],
+      assets: [],
+      tech: [
+        createMembership(techCatalog.typescript, 1, "supporting"),
+        createMembership(techCatalog.gcp, 2, "supporting"),
+      ],
     },
-    links: [
-      {
-        label: "Repository",
-        url: "https://github.com/ttokunaga-jp/search-service",
-        type: "repo",
-      },
-      {
-        label: "Architecture notes",
-        url: "https://github.com/ttokunaga-jp/search-service/blob/main/docs/architecture.md",
-        type: "article",
-      },
-    ],
-    coverImageUrl: undefined,
-    highlight: false,
-  },
-  {
-    id: "project-portfolio",
-    title: "Personal Website & Admin Console",
-    subtitle: "Go API + React SPA deployed on Cloud Run",
-    description:
-      "End-to-end portfolio stack featuring public content, admin workflows, booking automation, and CI/CD (GitHub Actions → Cloud Build). Infrastructure codified with Terraform for multi-environment rollouts.",
-    techStack: ["Go", "TypeScript", "React", "Firestore", "Cloud Run", "Terraform"],
-    category: "Portfolio",
-    tags: ["Full-stack", "CI/CD", "Infrastructure"],
-    period: {
-      start: "2025-01-01",
-      end: null,
+  ],
+  ja: [
+    {
+      id: "research-rag-evaluation",
+      slug: "rag-evaluation-lab-notes",
+      kind: "research",
+      title: "RAG を活用したロボット現場支援の評価",
+      overview:
+        "ロボット競技チーム向けに構築した RAG パイプラインの検索品質と現場満足度を測定。",
+      outcome:
+        "ハードウェア故障対応の平均時間を 27% 短縮し、メンター対応可能な案件を 3 倍に拡大。",
+      outlook:
+        "次フェーズではマルチモーダル資料の取り込みと安全運用 Runbook 連携を予定。",
+      externalUrl: "https://takumi.dev/research/rag-evaluation",
+      publishedAt: "2024-09-18T00:00:00Z",
+      updatedAt: "2024-10-05T00:00:00Z",
+      highlightImageUrl: "https://images.takumi.dev/research/rag-evaluation.jpg",
+      imageAlt: "検索評価ダッシュボードのスクリーンショット。",
+      isDraft: false,
+      tags: ["RAG", "ロボティクス", "評価"],
+      links: [
+        {
+          id: "rag-evaluation-paper",
+          type: "paper",
+          label: "フィールドスタディ報告書",
+          url: "https://takumi.dev/files/rag-evaluation-report.pdf",
+          sortOrder: 1,
+        },
+        {
+          id: "rag-evaluation-slides",
+          type: "slides",
+          label: "発表資料",
+          url: "https://speakerdeck.com/takumi/rag-evaluation",
+          sortOrder: 2,
+        },
+      ],
+      assets: [],
+      tech: [
+        createMembership(techCatalog.go, 1),
+        createMembership(techCatalog.python, 2),
+        createMembership(techCatalog.firestore, 3, "supporting"),
+      ],
     },
-    links: [
-      {
-        label: "Repository",
-        url: "https://github.com/ttokunaga-jp/personalWebsite",
-        type: "repo",
-      },
-    ],
-    coverImageUrl: undefined,
-    highlight: false,
-  },
-];
-
-const canonicalProjectsJa: Project[] = [
-  {
-    id: "project-classnav",
-    title: "RAG 学習支援システム「ClassNav」",
-    subtitle: "LMS 連携のアダプティブラーニングコンパニオン",
-    description:
-      "大学の LMS と連携し、講義資料を自動で取り込み要約・検索できる学習支援システム。Docling によるマルチフォーマット解析と RAG を組み合わせ、引用リンク提示や自動アップロード機能で NotebookLM と差別化。",
-    techStack: [
-      "Go",
-      "TypeScript",
-      "LangChain",
-      "Docling",
-      "Cloud Run",
-      "Firestore",
-    ],
-    category: "Education",
-    tags: ["RAG", "Education", "GenAI"],
-    period: {
-      start: "2024-04-01",
-      end: null,
+    {
+      id: "blog-lab-onboarding",
+      slug: "lab-onboarding-guide",
+      kind: "blog",
+      title: "研究室オンボーディングガイド：実世界情報の実践をそろえる",
+      overview:
+        "RM²C 研究室の新規メンバー向けに、実験ログ、資産管理、メンタリングのループを整理。",
+      outcome:
+        "標準化されたオンボーディングにより、参加 1 か月以内での本番貢献が可能に。",
+      outlook:
+        "今後は Knowledge Guide やカレンダー自動化と統合したインタラクティブハンドブックへ発展予定。",
+      externalUrl: "https://takumi.dev/blog/lab-onboarding-guide",
+      publishedAt: "2024-06-01T00:00:00Z",
+      updatedAt: "2024-07-15T00:00:00Z",
+      highlightImageUrl: "https://images.takumi.dev/research/lab-onboarding.jpg",
+      imageAlt: "研究室メンバーがノート PC と機材で議論する様子。",
+      isDraft: false,
+      tags: ["ラボ運営", "ドキュメント", "ナレッジ管理"],
+      links: [
+        {
+          id: "lab-onboarding-notion",
+          type: "external",
+          label: "Notion プレイブック",
+          url: "https://takumi.dev/notion/lab-handbook",
+          sortOrder: 1,
+        },
+      ],
+      assets: [],
+      tech: [
+        createMembership(techCatalog.typescript, 1, "supporting"),
+        createMembership(techCatalog.gcp, 2, "supporting"),
+      ],
     },
-    links: [
-      {
-        label: "リポジトリ",
-        url: "https://github.com/ttokunaga-jp/classnav",
-        type: "repo",
-      },
-      {
-        label: "プロジェクト概要",
-        url: "https://github.com/ttokunaga-jp/classnav#readme",
-        type: "article",
-      },
-    ],
-    coverImageUrl: undefined,
-    highlight: true,
-  },
-  {
-    id: "project-search-service",
-    title: "searchService: ハイブリッド検索マイクロサービス",
-    subtitle: "Elasticsearch × Qdrant を統合した RAG 基盤",
-    description:
-      "Elasticsearch と Qdrant を統合し、キーワード・ベクトルを加重スコアリングする検索基盤。Kafka による非同期インデックス更新や DLQ リトライ、OpenTelemetry / Prometheus / Jaeger を備え、RAG サービスの共通モジュールとして運用。",
-    techStack: ["Go", "gRPC", "Elasticsearch", "Qdrant", "Kafka", "Docker"],
-    category: "Platform",
-    tags: ["Search", "Microservices", "Observability"],
-    period: {
-      start: "2024-06-01",
-      end: "2024-12-31",
-    },
-    links: [
-      {
-        label: "リポジトリ",
-        url: "https://github.com/ttokunaga-jp/search-service",
-        type: "repo",
-      },
-      {
-        label: "アーキテクチャノート",
-        url: "https://github.com/ttokunaga-jp/search-service/blob/main/docs/architecture.md",
-        type: "article",
-      },
-    ],
-    coverImageUrl: undefined,
-    highlight: false,
-  },
-  {
-    id: "project-portfolio",
-    title: "個人ポートフォリオサイト（Go + React）",
-    subtitle: "Cloud Run 上の Go API + React SPA",
-    description:
-      "Go (Gin) と React SPA で構築した個人ポートフォリオ。公開サイトと管理 GUI を分離し、予約フォーム、Google OAuth + JWT 認証、Cloud Build → Cloud Run の CI/CD、Terraform による IaC を整備。",
-    techStack: ["Go", "TypeScript", "React", "Firestore", "Cloud Run", "Terraform"],
-    category: "Portfolio",
-    tags: ["Full-stack", "CI/CD", "Infrastructure"],
-    period: {
-      start: "2025-01-01",
-      end: null,
-    },
-    links: [
-      {
-        label: "リポジトリ",
-        url: "https://github.com/ttokunaga-jp/personalWebsite",
-        type: "repo",
-      },
-    ],
-    coverImageUrl: undefined,
-    highlight: false,
-  },
-];
-
-const canonicalResearchEntriesEn: ResearchEntry[] = [
-  {
-    id: "rag-reliability-learning-assistants",
-    title: "Improving Reliability of RAG-based Learning Assistants",
-    slug: "rag-learning-assistants",
-    summary:
-      "Evaluates hybrid retrieval and citation UX strategies for LMS-focused learning assistants, emphasising transparency and educator oversight.",
-    publishedOn: "2025-06-01",
-    updatedOn: "2025-09-15",
-    tags: ["Education", "RAG", "GenAI"],
-    contentMarkdown: `## Overview
-
-ClassNav synchronises lecture artefacts from the campus LMS, parses them with Docling, and maintains a hybrid Elasticsearch/Qdrant index. We compared retrieval strategies, citation formats, and educator review tools to reduce hallucinations and build learner confidence.
-
-### Findings
-
-- Hybrid scoring (keyword × vector) improved answer precision by 21% compared to pure dense retrieval.
-- Linking to source pages with highlighted anchors decreased follow-up questions by 34%.
-- Educators valued the ability to approve or redact responses before publication.
-
-### Next steps
-
-Extending the evaluation to timed quizzes and grading assistants while integrating telemetry for long-term monitoring.`,
-    contentHtml:
-      "<h2>Overview</h2><p>ClassNav synchronises lecture artefacts from the campus LMS, parses them with Docling, and maintains a hybrid Elasticsearch/Qdrant index. We compared retrieval strategies, citation formats, and educator review tools to reduce hallucinations and build learner confidence.</p><h3>Findings</h3><ul><li>Hybrid scoring (keyword × vector) improved answer precision by 21% compared to pure dense retrieval.</li><li>Linking to source pages with highlighted anchors decreased follow-up questions by 34%.</li><li>Educators valued the ability to approve or redact responses before publication.</li></ul><h3>Next steps</h3><p>Extending the evaluation to timed quizzes and grading assistants while integrating telemetry for long-term monitoring.</p>",
-    assets: [
-      {
-        alt: "Screenshot of ClassNav retrieval diagnostics dashboard",
-        url: "https://github.com/ttokunaga-jp",
-        caption: "Prototype dashboard visualising hybrid retrieval scores per query.",
-      },
-    ],
-    links: [
-      {
-        label: "Project repository",
-        url: "https://github.com/ttokunaga-jp",
-        type: "code",
-      },
-    ],
-  },
-];
-
-const canonicalResearchEntriesJa: ResearchEntry[] = [
-  {
-    id: "rag-reliability-learning-assistants",
-    title: "RAG による学習支援システムの信頼性向上に関する研究",
-    slug: "rag-learning-assistants",
-    summary:
-      "大学 LMS の資料を対象に、Docling を活用した抽出とベクトル検索を組み合わせ、引用リンク提示でハルシネーションを抑制する学習支援基盤を設計。",
-    publishedOn: "2025-06-01",
-    updatedOn: "2025-09-15",
-    tags: ["Education", "RAG", "GenAI"],
-    contentMarkdown: `## 研究概要
-
-LMS から自動取得した講義資料を Docling で構造化し、Elasticsearch と Qdrant を統合したハイブリッド検索でベクトル類似度とキーワードスコアを重み付けします。回答には参照元のリンクを必ず添付し、ユーザーが検証しやすい UI を React で実装しました。RAG パイプライン全体を可観測化し、再現性のある評価ワークフローを整備しています。
-
-### 成果
-
-- キーワード × ベクトルのハイブリッドスコアリングで、純粋なベクトル検索と比較して回答精度が 21% 向上。
-- 参照元ページへのリンクとハイライトを提示することで、問い合わせ件数を 34% 削減。
-- 教員が公開前に回答を承認・修正できるワークフローで、運用上の透明性を確保。
-
-### 次のステップ
-
-時間指定クイズや採点支援への適用と、長期的なモニタリングに向けたテレメトリ統合を進めています。`,
-    assets: [
-      {
-        alt: "ClassNav の検索診断ダッシュボード",
-        url: "https://github.com/ttokunaga-jp",
-        caption: "ハイブリッド検索のスコアをクエリ単位で可視化したプロトタイプ。",
-      },
-    ],
-    links: [
-      {
-        label: "プロジェクトリポジトリ",
-        url: "https://github.com/ttokunaga-jp",
-        type: "code",
-      },
-    ],
-  },
-];
-
-const profileByLocale: Record<SupportedLocale, ProfileResponse> = {
-  en: canonicalProfileEn,
-  ja: canonicalProfileJa,
+  ],
 };
 
-const projectsByLocale: Record<SupportedLocale, Project[]> = {
-  en: canonicalProjectsEn,
-  ja: canonicalProjectsJa,
-};
+export const canonicalProfileEn = canonicalProfiles.en;
+export const canonicalProfileJa = canonicalProfiles.ja;
 
-const researchByLocale: Record<SupportedLocale, ResearchEntry[]> = {
-  en: canonicalResearchEntriesEn,
-  ja: canonicalResearchEntriesJa,
-};
+export const canonicalProjectsEn = canonicalProjectsMap.en;
+export const canonicalProjectsJa = canonicalProjectsMap.ja;
+
+export const canonicalResearchEntriesEn = canonicalResearchMap.en;
+export const canonicalResearchEntriesJa = canonicalResearchMap.ja;
 
 export function getCanonicalProfile(locale?: string): ProfileResponse {
-  return clone(profileByLocale[resolveLocale(locale)]);
+  const resolved = resolveLocale(locale);
+  return clone(canonicalProfiles[resolved]);
 }
 
 export function getCanonicalProjects(locale?: string): Project[] {
-  return clone(projectsByLocale[resolveLocale(locale)]);
+  const resolved = resolveLocale(locale);
+  return canonicalProjectsMap[resolved].map((project) => clone(project));
 }
 
 export function getCanonicalResearchEntries(locale?: string): ResearchEntry[] {
-  return clone(researchByLocale[resolveLocale(locale)]);
+  const resolved = resolveLocale(locale);
+  return canonicalResearchMap[resolved].map((entry) => clone(entry));
 }
 
-export {
-  canonicalProfileEn,
-  canonicalProfileJa,
-  canonicalProjectsEn,
-  canonicalProjectsJa,
-  canonicalResearchEntriesEn,
-  canonicalResearchEntriesJa,
-};
+export function getCanonicalHomeConfig(locale?: string): HomePageConfig {
+  const resolved = resolveLocale(locale);
+  return clone(canonicalHomeConfigs[resolved]);
+}

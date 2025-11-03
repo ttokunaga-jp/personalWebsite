@@ -2,9 +2,9 @@ import { FormEvent, useCallback, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  publicApi,
   useContactAvailability,
   useContactConfig,
-  publicApi,
 } from "../../modules/public-api";
 import { formatDateTime, formatTime } from "../../utils/date";
 
@@ -39,10 +39,11 @@ const initialFormState: FormState = {
 };
 
 export function ContactPage() {
-  const { t } = useTranslation();
-  const messageFieldId = useId();
-  const messageErrorId = useId();
-  const messageConsentId = useId();
+  const { t, i18n } = useTranslation();
+  const agendaFieldId = useId();
+  const agendaErrorId = useId();
+  const consentId = useId();
+
   const {
     data: availability,
     isLoading: isAvailabilityLoading,
@@ -53,17 +54,20 @@ export function ContactPage() {
     isLoading: isConfigLoading,
     error: configError,
   } = useContactConfig();
+
   const availableSlots = useMemo(() => {
     if (!availability?.days) {
       return [];
     }
     return availability.days.flatMap((day) =>
-      day.slots.map((slot) => ({
-        id: slot.id || slot.start,
-        start: slot.start,
-        end: slot.end,
-        isBookable: slot.isBookable,
-      })),
+      day.slots
+        .filter((slot) => slot.isBookable)
+        .map((slot) => ({
+          id: slot.id || slot.start,
+          day: day.date,
+          start: slot.start,
+          end: slot.end,
+        })),
     );
   }, [availability]);
 
@@ -72,11 +76,19 @@ export function ContactPage() {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [bookingResult, setBookingResult] = useState<
+    Awaited<ReturnType<typeof publicApi.createBooking>> | null
+  >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const timezoneLabel = useMemo(
-    () => availability?.timezone ?? "",
-    [availability],
+    () => availability?.timezone ?? config?.calendarTimezone ?? "",
+    [availability?.timezone, config?.calendarTimezone],
+  );
+
+  const selectedTopic = useMemo(
+    () => topics.find((topic) => topic.id === formState.topic) ?? null,
+    [topics, formState.topic],
   );
 
   const validate = useCallback(
@@ -125,7 +137,7 @@ export function ContactPage() {
 
   const loadRecaptchaToken = useCallback(async (): Promise<string> => {
     if (!config?.recaptchaSiteKey) {
-      throw new Error("Recaptcha site key not configured");
+      return "";
     }
 
     await new Promise<void>((resolve) => {
@@ -150,7 +162,7 @@ export function ContactPage() {
     });
 
     if (!window.grecaptcha) {
-      throw new Error("Recaptcha unavailable");
+      return "";
     }
 
     return window.grecaptcha.execute(config.recaptchaSiteKey, {
@@ -161,6 +173,7 @@ export function ContactPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setStatusMessage(null);
+    setBookingResult(null);
 
     const errors = validate(formState);
     setFormErrors(errors);
@@ -198,182 +211,103 @@ export function ContactPage() {
         recaptchaToken,
       });
 
+      setBookingResult(response);
       setStatusMessage(
-        t("contact.form.success", { bookingId: response.meeting.id }),
+        t("contact.form.success", {
+          id: response.meeting.id,
+          email: response.supportEmail ?? response.meeting.email,
+        }),
       );
       setFormState(initialFormState);
-      setFormErrors({});
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error(error);
-      }
+    } catch {
       setStatusMessage(t("contact.form.error"));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const selectSlot = (slotId: string) => {
-    setFormState((previous) => ({
-      ...previous,
-      slotId: previous.slotId === slotId ? "" : slotId,
-    }));
-  };
-
   return (
-    <section
-      id="contact"
-      className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-12 sm:px-8"
-    >
-      <header className="space-y-3">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-sky-500 dark:text-sky-400">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-12 sm:px-8">
+      <header className="space-y-3 text-center md:text-left">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
           {t("contact.tagline")}
         </p>
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50 sm:text-4xl">
-          {t("contact.title")}
+          {config?.heroTitle ?? t("contact.title")}
         </h1>
         <p className="text-base text-slate-600 dark:text-slate-300">
-          {t("contact.description")}
+          {config?.heroDescription ?? t("contact.description")}
         </p>
       </header>
-      <div className="rounded-xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          {t("contact.availability.title")}
-        </h2>
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          {t("contact.availability.description")}
-        </p>
-        <div
-          className="mt-4 flex flex-wrap gap-2"
-          role="group"
-          aria-label={t("contact.availability.groupLabel")}
+
+      <div className="grid gap-8 lg:grid-cols-[3fr,2fr]">
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="space-y-6 rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
         >
-          {isAvailabilityLoading && (
-            <>
-              <span className="inline-block h-10 w-28 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
-              <span className="inline-block h-10 w-28 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
-            </>
-          )}
-          {!isAvailabilityLoading && availableSlots.length === 0 ? (
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              {t("contact.availability.unavailable")}
-            </span>
-          ) : null}
-          {availableSlots.map((slot) => {
-            const isSelected = formState.slotId === slot.id;
-            return (
-              <button
-                key={slot.id}
-                type="button"
-                onClick={() => selectSlot(slot.id)}
-                className={`rounded-lg border px-3 py-2 text-sm transition ${
-                  isSelected
-                    ? "border-sky-500 bg-sky-500 text-white"
-                    : slot.isBookable
-                      ? "border-slate-300 text-slate-700 hover:border-sky-400 hover:text-sky-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-400 dark:hover:text-sky-300"
-                      : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-500"
-                }`}
-                aria-pressed={isSelected}
-                disabled={!slot.isBookable}
-              >
-                <span className="block font-medium">
-                  {formatDateTime(slot.start, availability?.timezone)}
-                </span>
-                <span className="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  {t("contact.availability.slotTo", {
-                    end: formatTime(slot.end, availability?.timezone),
-                  })}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        {formErrors.slotId ? (
-          <p className="mt-2 text-xs text-rose-500 dark:text-rose-400">
-            {formErrors.slotId}
-          </p>
-        ) : null}
-        {timezoneLabel ? (
-          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            {t("contact.availability.timezone", { timezone: timezoneLabel })}
-          </p>
-        ) : null}
-        {availabilityError ? (
-          <p
-            role="alert"
-            className="mt-3 text-xs text-rose-500 dark:text-rose-400"
-          >
-            {t("contact.availability.error")}
-          </p>
-        ) : null}
-      </div>
-
-      <form
-        onSubmit={handleSubmit}
-        noValidate
-        className="space-y-6 rounded-xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
-      >
-        <fieldset className="grid gap-4">
-          <legend className="sr-only">{t("contact.form.legend")}</legend>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700 dark:text-slate-200">
-              {t("contact.form.name")}
-            </span>
-            <input
-              type="text"
-              name="name"
-              autoComplete="name"
-              value={formState.name}
-              onChange={handleInputChange("name")}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm transition focus-visible:border-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:focus-visible:border-sky-400 dark:focus-visible:ring-sky-900/60"
-              aria-invalid={Boolean(formErrors.name)}
-            />
-            {formErrors.name ? (
-              <span className="text-xs text-rose-500 dark:text-rose-400">
-                {formErrors.name}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {t("contact.form.name")}
               </span>
-            ) : null}
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700 dark:text-slate-200">
-              {t("contact.form.email")}
-            </span>
-            <input
-              type="email"
-              name="email"
-              autoComplete="email"
-              value={formState.email}
-              onChange={handleInputChange("email")}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm transition focus-visible:border-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:focus-visible:border-sky-400 dark:focus-visible:ring-sky-900/60"
-              aria-invalid={Boolean(formErrors.email)}
-            />
-            {formErrors.email ? (
-              <span className="text-xs text-rose-500 dark:text-rose-400">
-                {formErrors.email}
+              <input
+                type="text"
+                name="name"
+                value={formState.name}
+                onChange={handleInputChange("name")}
+                required
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-500 dark:focus:ring-sky-900/30"
+              />
+              {formErrors.name ? (
+                <span className="text-xs text-rose-500 dark:text-rose-400">
+                  {formErrors.name}
+                </span>
+              ) : null}
+            </label>
+            <label className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {t("contact.form.email")}
               </span>
-            ) : null}
-          </label>
+              <input
+                type="email"
+                name="email"
+                value={formState.email}
+                onChange={handleInputChange("email")}
+                required
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-500 dark:focus:ring-sky-900/30"
+              />
+              {formErrors.email ? (
+                <span className="text-xs text-rose-500 dark:text-rose-400">
+                  {formErrors.email}
+                </span>
+              ) : null}
+            </label>
+          </div>
 
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700 dark:text-slate-200">
+          <label className="flex flex-col gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               {t("contact.form.topic")}
             </span>
             <select
               name="topic"
               value={formState.topic}
               onChange={handleInputChange("topic")}
-              disabled={topics.length === 0}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm transition focus-visible:border-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:disabled:bg-slate-900/20 dark:focus-visible:border-sky-400 dark:focus-visible:ring-sky-900/60"
-              aria-invalid={Boolean(formErrors.topic)}
+              required
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-500 dark:focus:ring-sky-900/30"
             >
               <option value="">{t("contact.form.topicPlaceholder")}</option>
               {topics.map((topic) => (
-                <option key={topic} value={topic}>
-                  {topic}
+                <option key={topic.id} value={topic.id}>
+                  {topic.label}
                 </option>
               ))}
             </select>
+            {selectedTopic?.description ? (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {selectedTopic.description}
+              </span>
+            ) : null}
             {formErrors.topic ? (
               <span className="text-xs text-rose-500 dark:text-rose-400">
                 {formErrors.topic}
@@ -381,67 +315,202 @@ export function ContactPage() {
             ) : null}
           </label>
 
-          <div className="flex flex-col gap-1 text-sm">
-            <label
-              className="font-medium text-slate-700 dark:text-slate-200"
-              htmlFor={messageFieldId}
-            >
+          <label className="flex flex-col gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               {t("contact.form.message")}
-            </label>
+            </span>
             <textarea
-              id={messageFieldId}
+              id={agendaFieldId}
               name="agenda"
-              rows={4}
               value={formState.agenda}
               onChange={handleInputChange("agenda")}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm transition focus-visible:border-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:focus-visible:border-sky-400 dark:focus-visible:ring-sky-900/60"
-              aria-invalid={Boolean(formErrors.agenda)}
-              aria-describedby={[
-                formErrors.agenda ? messageErrorId : null,
-                config?.consentText ? messageConsentId : null,
-              ]
-                .filter(Boolean)
-                .join(" ") || undefined}
+              required
+              aria-describedby={agendaErrorId}
+              rows={6}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-500 dark:focus:ring-sky-900/30"
             />
+            <span
+              id={consentId}
+              className="text-xs text-slate-500 dark:text-slate-400"
+            >
+              {config?.consentText ?? t("contact.form.consent")}
+            </span>
             {formErrors.agenda ? (
               <span
-                id={messageErrorId}
+                id={agendaErrorId}
                 className="text-xs text-rose-500 dark:text-rose-400"
               >
                 {formErrors.agenda}
               </span>
             ) : null}
-            {config?.consentText ? (
-              <p
-                id={messageConsentId}
-                className="text-xs text-slate-500 dark:text-slate-400"
-              >
-                {config.consentText}
+          </label>
+
+          <label className="flex flex-col gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {t("contact.form.slot")}
+            </span>
+            <select
+              name="slotId"
+              value={formState.slotId}
+              onChange={handleInputChange("slotId")}
+              required
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-500 dark:focus:ring-sky-900/30"
+            >
+              <option value="">{t("contact.form.slotPlaceholder")}</option>
+              {availableSlots.map((slot) => (
+                <option key={slot.id} value={slot.id}>
+                  {formatDateTime(slot.start, timezoneLabel)} (
+                  {formatTime(slot.start, timezoneLabel)} -{" "}
+                  {formatTime(slot.end, timezoneLabel)})
+                </option>
+              ))}
+            </select>
+            {formErrors.slotId ? (
+              <span className="text-xs text-rose-500 dark:text-rose-400">
+                {formErrors.slotId}
+              </span>
+            ) : null}
+          </label>
+
+          <button
+            type="submit"
+            disabled={isSubmitting || isAvailabilityLoading || isConfigLoading}
+            className="inline-flex w-full items-center justify-center rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-sky-500 dark:hover:bg-sky-400 dark:disabled:bg-slate-700"
+          >
+            {isSubmitting ? t("contact.form.submitting") : t("contact.form.submit")}
+          </button>
+
+          {statusMessage ? (
+            <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+              {statusMessage}
+            </p>
+          ) : null}
+        </form>
+
+        <aside className="space-y-6">
+          <section className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {t("contact.summary.title")}
+            </h2>
+            <ul className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+              <li>
+                {t("contact.summary.timezone", {
+                  timezone: timezoneLabel || t("contact.summary.timezoneFallback"),
+                })}
+              </li>
+              {config?.bookingWindowDays ? (
+                <li>
+                  {t("contact.summary.window", {
+                    days: config.bookingWindowDays,
+                  })}
+                </li>
+              ) : null}
+              {config?.supportEmail ? (
+                <li>
+                  {t("contact.summary.supportEmail")}{" "}
+                  <a
+                    href={`mailto:${config.supportEmail}`}
+                    className="font-medium text-sky-600 underline decoration-sky-200 underline-offset-4 dark:text-sky-400"
+                  >
+                    {config.supportEmail}
+                  </a>
+                </li>
+              ) : null}
+              {config?.googleCalendarId ? (
+                <li>{t("contact.summary.calendarLinked")}</li>
+              ) : null}
+            </ul>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {t("contact.availability.title")}
+            </h2>
+            {isAvailabilityLoading ? (
+              <div className="mt-3 space-y-2">
+                <span className="block h-4 w-40 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                <span className="block h-4 w-32 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+              </div>
+            ) : null}
+            {!isAvailabilityLoading && availability?.days?.length ? (
+              <ul className="mt-3 space-y-4 text-sm text-slate-600 dark:text-slate-300">
+                {availability.days.slice(0, 3).map((day) => (
+                  <li key={day.date}>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">
+                      {new Date(day.date).toLocaleDateString(i18n.language, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {day.slots
+                        .filter((slot) => slot.isBookable)
+                        .map((slot) => (
+                          <span
+                            key={slot.id}
+                            className="inline-flex items-center rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                          >
+                            {formatTime(slot.start, timezoneLabel)} –{" "}
+                            {formatTime(slot.end, timezoneLabel)}
+                          </span>
+                        ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {availabilityError ? (
+              <p className="mt-3 text-xs text-rose-500 dark:text-rose-400">
+                {t("contact.availability.error")}
               </p>
             ) : null}
-          </div>
-        </fieldset>
+          </section>
 
-        <button
-          type="submit"
-          disabled={isSubmitting || isConfigLoading}
-          className="inline-flex w-full items-center justify-center rounded-full bg-sky-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:bg-slate-300 dark:bg-sky-500 dark:text-slate-900 dark:hover:bg-sky-400 dark:focus-visible:ring-sky-300"
-        >
-          {isSubmitting
-            ? t("contact.form.submitting")
-            : t("contact.form.submit")}
-        </button>
-        {statusMessage ? (
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            {statusMessage}
-          </p>
-        ) : null}
-        {configError ? (
-          <p role="alert" className="text-xs text-rose-500 dark:text-rose-400">
-            {t("contact.form.configError")}
-          </p>
-        ) : null}
-      </form>
+          {bookingResult ? (
+            <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-700 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <h2 className="text-sm font-semibold uppercase tracking-wide">
+                {t("contact.bookingSummary.title")}
+              </h2>
+              <ul className="mt-3 space-y-2">
+                <li>
+                  {t("contact.bookingSummary.when", {
+                    datetime: formatDateTime(
+                      bookingResult.meeting.datetime,
+                      timezoneLabel,
+                    ),
+                  })}
+                </li>
+                {bookingResult.calendarEventId ? (
+                  <li>
+                    {t("contact.bookingSummary.calendarEvent", {
+                      id: bookingResult.calendarEventId,
+                    })}
+                  </li>
+                ) : null}
+                {bookingResult.meeting.meetUrl ? (
+                  <li>
+                    <a
+                      href={bookingResult.meeting.meetUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-sky-600 underline decoration-sky-200 underline-offset-4 dark:text-sky-400"
+                    >
+                      {t("contact.bookingSummary.joinLink")}
+                    </a>
+                  </li>
+                ) : null}
+              </ul>
+            </section>
+          ) : null}
+
+          {configError ? (
+            <p className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+              {t("contact.error")}
+            </p>
+          ) : null}
+        </aside>
+      </div>
     </section>
   );
 }

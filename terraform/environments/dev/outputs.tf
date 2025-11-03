@@ -57,3 +57,8 @@ output "monitoring_uptime_check_id" {
   description = "Uptime check ID for the API endpoint"
   value       = module.monitoring.uptime_check_id
 }
+
+output "firestore_collections" {
+  description = "Computed Firestore collection names (with prefix applied)"
+  value       = module.firestore.collections
+}

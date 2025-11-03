@@ -17,7 +17,9 @@ func NewProjectHandler(service service.ProjectService) *ProjectHandler {
 }
 
 func (h *ProjectHandler) ListProjects(c *gin.Context) {
-	projects, err := h.service.ListProjects(c.Request.Context())
+	includeDrafts := c.Query("includeDrafts") == "true"
+
+	projects, err := h.service.ListProjectDocuments(c.Request.Context(), includeDrafts)
 	if err != nil {
 		respondError(c, err)
 		return

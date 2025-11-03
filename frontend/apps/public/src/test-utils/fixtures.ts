@@ -62,15 +62,25 @@ export const contactAvailabilityFixture: ContactAvailabilityResponse = {
 };
 
 export const contactConfigFixture: ContactConfigResponse = {
-  topics: ["Research collaboration", "Speaking engagement"],
-  recaptchaSiteKey: "test-site-key",
+  heroTitle: "Let us coordinate a session",
+  heroDescription:
+    "Share your context and a preferred slot to schedule a conversation with Takumi.",
+  topics: [
+    { id: "research", label: "Research collaboration" },
+    { id: "speaking", label: "Speaking engagement" },
+  ],
   minimumLeadHours: 48,
   consentText: "We only use your information for scheduling purposes.",
+  recaptchaSiteKey: "test-site-key",
+  supportEmail: "contact@example.com",
+  calendarTimezone: "Asia/Tokyo",
+  googleCalendarId: "calendar-id",
+  bookingWindowDays: 14,
 };
 
 export const defaultBookingResponse: BookingResult = {
   meeting: {
-    id: 1,
+    id: "bk-1",
     name: "Jane Doe",
     email: "jane.doe@example.com",
     datetime: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24)),
@@ -79,6 +89,9 @@ export const defaultBookingResponse: BookingResult = {
     calendarEventId: "event-1",
     status: "pending",
     notes: "Initial consultation",
+    confirmationSentAt: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24 + 5 * 60 * 1000)),
   },
   calendarEventId: "event-1",
+  supportEmail: "contact@example.com",
+  calendarTimezone: "Asia/Tokyo",
 };

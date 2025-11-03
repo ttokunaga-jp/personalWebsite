@@ -19,10 +19,10 @@ describe("ProfilePage", () => {
 
     const items = await within(affiliationCard).findAllByRole("listitem");
     expect(items[0]).toHaveTextContent(
-      profileFixture.affiliations[0]?.organization ?? "",
+      profileFixture.affiliations[0]?.name ?? "",
     );
     expect(items[1]).toHaveTextContent(
-      profileFixture.affiliations[1]?.organization ?? "",
+      profileFixture.affiliations[1]?.name ?? "",
     );
 
     const skillsHeading = await screen.findByRole("heading", {
@@ -35,7 +35,7 @@ describe("ProfilePage", () => {
 
     expect(
       await within(skillsCard).findByText(
-        profileFixture.skillGroups[0]?.items[0]?.name ?? "",
+        profileFixture.techSections[0]?.members[0]?.tech.displayName ?? "",
       ),
     ).toBeInTheDocument();
   });

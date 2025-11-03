@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -19,20 +19,6 @@ declare global {
       ) => Promise<string>;
     };
   }
-}
-
-async function getFirstAvailableSlotButton() {
-  const slotGroup = await screen.findByRole("group", {
-    name: /available time slots/i,
-  });
-  const buttons = within(slotGroup).getAllByRole("button");
-  const enabledButton = buttons.find(
-    (button) => !button.hasAttribute("disabled"),
-  );
-  if (!enabledButton) {
-    throw new Error("No bookable slot button found");
-  }
-  return enabledButton;
 }
 
 describe("ContactPage", () => {
@@ -72,7 +58,7 @@ describe("ContactPage", () => {
       .spyOn(publicApi, "createBooking")
       .mockResolvedValue({
         meeting: {
-          id: 1,
+          id: "bk-1",
           name: "Jane Doe",
           email: "jane.doe@example.com",
           datetime: firstSlot?.start ?? "",
@@ -83,12 +69,14 @@ describe("ContactPage", () => {
                   60000,
               )
             : 30,
-          meetUrl: "",
+          meetUrl: "https://meet.example.com/mock",
           calendarEventId: "event-1",
           status: "pending",
           notes: "[Research collaboration] I would like to discuss possibilities for joint research in HRI.",
         },
         calendarEventId: "event-1",
+        supportEmail: contactConfigFixture.supportEmail,
+        calendarTimezone: contactConfigFixture.calendarTimezone,
       });
 
     window.grecaptcha = {
@@ -107,22 +95,25 @@ describe("ContactPage", () => {
 
     await user.type(nameInput, "  Jane Doe  ");
     await user.type(emailInput, "jane.doe@example.com");
-    await user.selectOptions(topicSelect, contactConfigFixture.topics[0] ?? "");
+    await user.selectOptions(
+      topicSelect,
+      contactConfigFixture.topics[0]?.id ?? "",
+    );
     await user.type(agendaTextarea, "I would like to discuss possibilities for joint research in HRI.");
 
-    const slotButton = await getFirstAvailableSlotButton();
-    await user.click(slotButton);
+    const slotSelect = await screen.findByLabelText("Time slot");
+    await user.selectOptions(slotSelect, firstSlot?.id ?? "");
 
     await user.click(screen.getByRole("button", { name: /request booking/i }));
 
     expect(
-      await screen.findByText(/Your request \(ID: 1\)/),
+      await screen.findByText(/Your request \(ID: bk-1\)/),
     ).toBeInTheDocument();
 
     expect(createBookingMock).toHaveBeenCalledWith({
       name: "Jane Doe",
       email: "jane.doe@example.com",
-      topic: contactConfigFixture.topics[0] ?? "",
+      topic: contactConfigFixture.topics[0]?.id ?? "",
       agenda:
         "I would like to discuss possibilities for joint research in HRI.",
       startTime: firstSlot?.start ?? "",
@@ -137,7 +128,7 @@ describe("ContactPage", () => {
     });
 
     expect(window.grecaptcha?.execute).toHaveBeenCalledWith(
-      contactConfigFixture.recaptchaSiteKey,
+      contactConfigFixture.recaptchaSiteKey ?? "",
       { action: "submit" },
     );
 

@@ -1,0 +1,48 @@
+# Firestore composite index definitions required by the content model refactor.
+# Deploy with:
+#   COLLECTION_PREFIX="dev_" envsubst < deploy/firestore/indexes.yaml > /tmp/indexes.yaml
+#   gcloud firestore indexes composite update /tmp/indexes.yaml
+
+indexes:
+  - collection: "${COLLECTION_PREFIX}research_blog_entries"
+    queryScope: COLLECTION
+    fields:
+      - fieldPath: kind
+        order: ASCENDING
+      - fieldPath: isDraft
+        order: ASCENDING
+      - fieldPath: publishedAt
+        order: DESCENDING
+  - collection: "${COLLECTION_PREFIX}research_blog_entries"
+    queryScope: COLLECTION
+    fields:
+      - fieldPath: kind
+        order: ASCENDING
+      - fieldPath: tags
+        arrayConfig: CONTAINS
+      - fieldPath: publishedAt
+        order: DESCENDING
+  - collection: "${COLLECTION_PREFIX}tech_relationships"
+    queryScope: COLLECTION
+    fields:
+      - fieldPath: entityType
+        order: ASCENDING
+      - fieldPath: entityId
+        order: ASCENDING
+      - fieldPath: sortOrder
+        order: ASCENDING
+  - collection: "${COLLECTION_PREFIX}meeting_reservations"
+    queryScope: COLLECTION
+    fields:
+      - fieldPath: lookupHash
+        order: ASCENDING
+      - fieldPath: createdAt
+        order: DESCENDING
+
+fieldOverrides:
+  - collection: "${COLLECTION_PREFIX}meeting_reservations"
+    fieldPath: message
+    ttl: false
+  - collection: "${COLLECTION_PREFIX}meeting_reservations"
+    fieldPath: cancellationReason
+    ttl: false

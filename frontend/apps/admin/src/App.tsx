@@ -271,6 +271,12 @@ function App() {
         const hashToken = extractTokenFromHash(window.location.hash ?? "");
         if (hashToken) {
           storeToken(hashToken);
+          setAuthState("authenticated");
+          void refreshAll();
+
+          const cleanUrl = `${window.location.pathname}${window.location.search}`;
+          window.history.replaceState(null, "", cleanUrl);
+          return;
         }
 
         const sessionRes = await adminApi.session();
@@ -289,6 +295,9 @@ function App() {
           return;
         }
         if (isUnauthorizedError(err)) {
+          if (getToken()) {
+            return;
+          }
           handleUnauthorized();
         } else {
           console.error(err);

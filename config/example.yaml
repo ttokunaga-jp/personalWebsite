@@ -11,7 +11,7 @@ auth:
   state_secret: "replace-with-random-string"
   state_ttl_seconds: 300
   admin:
-    default_redirect_uri: "/admin"
+    default_redirect_uri: "/admin/"
     allowed_emails:
       - "admin@example.com"
     allowed_domains:

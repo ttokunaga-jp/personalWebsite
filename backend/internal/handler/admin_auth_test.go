@@ -181,7 +181,7 @@ func (s *stubAdminAuthService) HandleCallback(context.Context, string, string) (
 	return &authsvc.AdminCallbackResult{
 		Token:        "default-token",
 		ExpiresAt:    time.Now().Add(15 * time.Minute).Unix(),
-		RedirectPath: "/admin",
+		RedirectPath: "/admin/",
 	}, nil
 }
 

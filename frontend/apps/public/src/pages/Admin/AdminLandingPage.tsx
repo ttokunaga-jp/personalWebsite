@@ -4,7 +4,7 @@ export function AdminLandingPage() {
   const { t } = useTranslation();
   const loginBase =
     import.meta.env.VITE_ADMIN_LOGIN_URL?.trim() || "/api/admin/auth/login";
-  const redirectParams = new URLSearchParams({ redirect_uri: "/admin" }).toString();
+  const redirectParams = new URLSearchParams({ redirect_uri: "/admin/" }).toString();
   const loginHref = loginBase.includes("?")
     ? `${loginBase}&${redirectParams}`
     : `${loginBase}?${redirectParams}`;

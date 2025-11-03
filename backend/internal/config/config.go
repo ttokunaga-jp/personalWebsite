@@ -178,7 +178,7 @@ func load() (*AppConfig, error) {
 	v.SetDefault("auth.state_secret", "local-dev-state-secret-change-me")
 	v.SetDefault("auth.state_ttl_seconds", 300)
 	v.SetDefault("auth.disabled", false)
-	v.SetDefault("auth.admin.default_redirect_uri", "/admin")
+	v.SetDefault("auth.admin.default_redirect_uri", "/admin/")
 	v.SetDefault("auth.admin.allowed_domains", []string{})
 	v.SetDefault("auth.admin.allowed_emails", []string{})
 	v.SetDefault("auth.admin.session_cookie_name", "ps_admin_jwt")

@@ -3,7 +3,6 @@ package admin
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -74,10 +73,55 @@ func TestService_Summary(t *testing.T) {
 	summary, err := svc.Summary(context.Background())
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, summary.PublishedProjects, 1)
+	require.GreaterOrEqual(t, summary.SkillCount, 1)
 	require.GreaterOrEqual(t, summary.BlacklistEntries, 1)
 }
 
+func TestService_UpdateProfileNormalisesInput(t *testing.T) {
+	t.Parallel()
+
+	svc := newTestService(t)
+	ctx := context.Background()
+	input := ProfileInput{
+		Name:        model.NewLocalizedText(" 名前 ", " Name "),
+		Title:       model.NewLocalizedText("肩書", "Title"),
+		Affiliation: model.NewLocalizedText("所属", "Affiliation"),
+		Lab:         model.NewLocalizedText("ラボ", "Lab"),
+		Summary:     model.NewLocalizedText(" 要約 ", " Summary "),
+		Skills: []model.LocalizedText{
+			{Ja: " Go ", En: " Go "},
+			{},
+		},
+		FocusAreas: []model.LocalizedText{
+			{Ja: " AI ", En: " AI "},
+			{Ja: "", En: ""},
+		},
+	}
+
+	profile, err := svc.UpdateProfile(ctx, input)
+	require.NoError(t, err)
+	require.Len(t, profile.Skills, 1)
+	require.Equal(t, "Go", profile.Skills[0].Ja)
+	require.Len(t, profile.FocusAreas, 1)
+	require.Equal(t, "AI", profile.FocusAreas[0].Ja)
+	require.NotNil(t, profile.UpdatedAt)
+}
+
+func TestService_UpdateContactMessageInvalidStatus(t *testing.T) {
+	t.Parallel()
+
+	svc := newTestService(t)
+	_, err := svc.UpdateContactMessage(context.Background(), "contact-1", ContactUpdateInput{Status: "unknown"})
+	require.Error(t, err)
+}
+
 func newTestService(t *testing.T) Service {
+	profileRepo := inmemory.NewProfileRepository()
+	adminProfileRepo, ok := profileRepo.(repository.AdminProfileRepository)
+	if !ok {
+		t.Fatalf("profile repository missing admin interface")
+	}
+
 	projectRepo := inmemory.NewProjectRepository()
 	adminProjectRepo, ok := projectRepo.(repository.AdminProjectRepository)
 	if !ok {
@@ -90,21 +134,15 @@ func newTestService(t *testing.T) Service {
 		t.Fatalf("research repository missing admin interface")
 	}
 
-	blogs := inmemory.NewBlogRepository()
-	meetings := inmemory.NewMeetingRepository()
+	contactRepo := inmemory.NewContactRepository()
+	adminContactRepo, ok := contactRepo.(repository.AdminContactRepository)
+	if !ok {
+		t.Fatalf("contact repository missing admin interface")
+	}
+
 	bl := inmemory.NewBlacklistRepository()
 
-	svc, err := NewService(adminProjectRepo, adminResearchRepo, blogs, meetings, bl)
-	require.NoError(t, err)
-
-	// Seed deterministic state for meeting creations to avoid time.Now drift.
-	_, err = svc.CreateMeeting(context.Background(), MeetingInput{
-		Name:            "Test User",
-		Email:           "test@example.com",
-		Datetime:        time.Date(2025, 1, 10, 9, 0, 0, 0, time.UTC),
-		DurationMinutes: 30,
-		Status:          model.MeetingStatusPending,
-	})
+	svc, err := NewService(adminProfileRepo, adminProjectRepo, adminResearchRepo, adminContactRepo, bl)
 	require.NoError(t, err)
 
 	return svc

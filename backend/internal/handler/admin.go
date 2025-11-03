@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -33,6 +32,36 @@ func (h *AdminHandler) Summary(c *gin.Context) {
 	c.JSON(http.StatusOK, summary)
 }
 
+// Profile management --------------------------------------------------------
+
+// GetProfile returns the current editable profile.
+func (h *AdminHandler) GetProfile(c *gin.Context) {
+	profile, err := h.svc.GetProfile(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, profile)
+}
+
+// UpdateProfile persists profile updates.
+func (h *AdminHandler) UpdateProfile(c *gin.Context) {
+	var req profileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid profile payload", err))
+		return
+	}
+
+	profile, err := h.svc.UpdateProfile(c.Request.Context(), req.toInput())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, profile)
+}
+
+// Project management -------------------------------------------------------
+
 func (h *AdminHandler) ListProjects(c *gin.Context) {
 	projects, err := h.svc.ListProjects(c.Request.Context())
 	if err != nil {
@@ -49,8 +78,7 @@ func (h *AdminHandler) CreateProject(c *gin.Context) {
 		return
 	}
 
-	input := req.toInput()
-	project, err := h.svc.CreateProject(c.Request.Context(), input)
+	project, err := h.svc.CreateProject(c.Request.Context(), req.toInput())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -100,6 +128,8 @@ func (h *AdminHandler) DeleteProject(c *gin.Context) {
 	}
 	c.Status(http.StatusNoContent)
 }
+
+// Research management ------------------------------------------------------
 
 func (h *AdminHandler) ListResearch(c *gin.Context) {
 	research, err := h.svc.ListResearch(c.Request.Context())
@@ -167,157 +197,67 @@ func (h *AdminHandler) DeleteResearch(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *AdminHandler) ListBlogPosts(c *gin.Context) {
-	posts, err := h.svc.ListBlogPosts(c.Request.Context())
+// Contact management -------------------------------------------------------
+
+func (h *AdminHandler) ListContacts(c *gin.Context) {
+	messages, err := h.svc.ListContactMessages(c.Request.Context())
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, posts)
+	c.JSON(http.StatusOK, messages)
 }
 
-func (h *AdminHandler) CreateBlogPost(c *gin.Context) {
-	var req blogPostRequest
+func (h *AdminHandler) GetContact(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid id", nil))
+		return
+	}
+
+	message, err := h.svc.GetContactMessage(c.Request.Context(), id)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, message)
+}
+
+func (h *AdminHandler) UpdateContact(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid id", nil))
+		return
+	}
+
+	var req contactUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid blog post payload", err))
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid contact payload", err))
 		return
 	}
-	input, err := req.toInput()
+
+	message, err := h.svc.UpdateContactMessage(c.Request.Context(), id, req.toInput())
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	post, svcErr := h.svc.CreateBlogPost(c.Request.Context(), input)
-	if svcErr != nil {
-		respondError(c, svcErr)
-		return
-	}
-	c.JSON(http.StatusCreated, post)
+	c.JSON(http.StatusOK, message)
 }
 
-func (h *AdminHandler) GetBlogPost(c *gin.Context) {
-	id, ok := parseIDParam(c)
-	if !ok {
+func (h *AdminHandler) DeleteContact(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid id", nil))
 		return
 	}
-	post, err := h.svc.GetBlogPost(c.Request.Context(), id)
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, post)
-}
-
-func (h *AdminHandler) UpdateBlogPost(c *gin.Context) {
-	id, ok := parseIDParam(c)
-	if !ok {
-		return
-	}
-	var req blogPostRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid blog post payload", err))
-		return
-	}
-	input, err := req.toInput()
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-	post, svcErr := h.svc.UpdateBlogPost(c.Request.Context(), id, input)
-	if svcErr != nil {
-		respondError(c, svcErr)
-		return
-	}
-	c.JSON(http.StatusOK, post)
-}
-
-func (h *AdminHandler) DeleteBlogPost(c *gin.Context) {
-	id, ok := parseIDParam(c)
-	if !ok {
-		return
-	}
-	if err := h.svc.DeleteBlogPost(c.Request.Context(), id); err != nil {
+	if err := h.svc.DeleteContactMessage(c.Request.Context(), id); err != nil {
 		respondError(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
 }
 
-func (h *AdminHandler) ListMeetings(c *gin.Context) {
-	meetings, err := h.svc.ListMeetings(c.Request.Context())
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, meetings)
-}
-
-func (h *AdminHandler) CreateMeeting(c *gin.Context) {
-	var req meetingRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid meeting payload", err))
-		return
-	}
-	input, err := req.toInput()
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-	meeting, svcErr := h.svc.CreateMeeting(c.Request.Context(), input)
-	if svcErr != nil {
-		respondError(c, svcErr)
-		return
-	}
-	c.JSON(http.StatusCreated, meeting)
-}
-
-func (h *AdminHandler) GetMeeting(c *gin.Context) {
-	id, ok := parseIDParam(c)
-	if !ok {
-		return
-	}
-	meeting, err := h.svc.GetMeeting(c.Request.Context(), id)
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, meeting)
-}
-
-func (h *AdminHandler) UpdateMeeting(c *gin.Context) {
-	id, ok := parseIDParam(c)
-	if !ok {
-		return
-	}
-	var req meetingRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid meeting payload", err))
-		return
-	}
-	input, err := req.toInput()
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-	meeting, svcErr := h.svc.UpdateMeeting(c.Request.Context(), id, input)
-	if svcErr != nil {
-		respondError(c, svcErr)
-		return
-	}
-	c.JSON(http.StatusOK, meeting)
-}
-
-func (h *AdminHandler) DeleteMeeting(c *gin.Context) {
-	id, ok := parseIDParam(c)
-	if !ok {
-		return
-	}
-	if err := h.svc.DeleteMeeting(c.Request.Context(), id); err != nil {
-		respondError(c, err)
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
+// Blacklist management ------------------------------------------------------
 
 func (h *AdminHandler) ListBlacklist(c *gin.Context) {
 	entries, err := h.svc.ListBlacklist(c.Request.Context())
@@ -342,6 +282,24 @@ func (h *AdminHandler) CreateBlacklist(c *gin.Context) {
 	c.JSON(http.StatusCreated, entry)
 }
 
+func (h *AdminHandler) UpdateBlacklist(c *gin.Context) {
+	id, ok := parseIDParam(c)
+	if !ok {
+		return
+	}
+	var req blacklistRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid blacklist payload", err))
+		return
+	}
+	entry, err := h.svc.UpdateBlacklistEntry(c.Request.Context(), id, req.toInput())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, entry)
+}
+
 func (h *AdminHandler) DeleteBlacklist(c *gin.Context) {
 	id, ok := parseIDParam(c)
 	if !ok {
@@ -354,6 +312,8 @@ func (h *AdminHandler) DeleteBlacklist(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// Helpers ------------------------------------------------------------------
+
 func parseIDParam(c *gin.Context) (int64, bool) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -362,6 +322,30 @@ func parseIDParam(c *gin.Context) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+// Request payloads ---------------------------------------------------------
+
+type profileRequest struct {
+	Name        model.LocalizedText   `json:"name"`
+	Title       model.LocalizedText   `json:"title"`
+	Affiliation model.LocalizedText   `json:"affiliation"`
+	Lab         model.LocalizedText   `json:"lab"`
+	Summary     model.LocalizedText   `json:"summary"`
+	Skills      []model.LocalizedText `json:"skills"`
+	FocusAreas  []model.LocalizedText `json:"focusAreas"`
+}
+
+func (r profileRequest) toInput() adminsvc.ProfileInput {
+	return adminsvc.ProfileInput{
+		Name:        r.Name,
+		Title:       r.Title,
+		Affiliation: r.Affiliation,
+		Lab:         r.Lab,
+		Summary:     r.Summary,
+		Skills:      r.Skills,
+		FocusAreas:  r.FocusAreas,
+	}
 }
 
 type projectRequest struct {
@@ -404,59 +388,20 @@ func (r researchRequest) toInput() adminsvc.ResearchInput {
 	}
 }
 
-type blogPostRequest struct {
-	Title       model.LocalizedText `json:"title"`
-	Summary     model.LocalizedText `json:"summary"`
-	ContentMD   model.LocalizedText `json:"contentMd"`
-	Tags        []string            `json:"tags"`
-	Published   bool                `json:"published"`
-	PublishedAt *string             `json:"publishedAt"`
+type contactUpdateRequest struct {
+	Topic     string `json:"topic"`
+	Message   string `json:"message"`
+	Status    string `json:"status"`
+	AdminNote string `json:"adminNote"`
 }
 
-func (r blogPostRequest) toInput() (adminsvc.BlogPostInput, error) {
-	var publishedAt *time.Time
-	if r.PublishedAt != nil && strings.TrimSpace(*r.PublishedAt) != "" {
-		parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(*r.PublishedAt))
-		if err != nil {
-			return adminsvc.BlogPostInput{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid publishedAt format", err)
-		}
-		publishedAt = &parsed
+func (r contactUpdateRequest) toInput() adminsvc.ContactUpdateInput {
+	return adminsvc.ContactUpdateInput{
+		Topic:     r.Topic,
+		Message:   r.Message,
+		Status:    model.ContactStatus(strings.TrimSpace(r.Status)),
+		AdminNote: r.AdminNote,
 	}
-	return adminsvc.BlogPostInput{
-		Title:       r.Title,
-		Summary:     r.Summary,
-		ContentMD:   r.ContentMD,
-		Tags:        r.Tags,
-		Published:   r.Published,
-		PublishedAt: publishedAt,
-	}, nil
-}
-
-type meetingRequest struct {
-	Name            string `json:"name"`
-	Email           string `json:"email"`
-	Datetime        string `json:"datetime"`
-	DurationMinutes int    `json:"durationMinutes"`
-	MeetURL         string `json:"meetUrl"`
-	Status          string `json:"status"`
-	Notes           string `json:"notes"`
-}
-
-func (r meetingRequest) toInput() (adminsvc.MeetingInput, error) {
-	parsedTime, err := time.Parse(time.RFC3339, strings.TrimSpace(r.Datetime))
-	if err != nil {
-		return adminsvc.MeetingInput{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid datetime", err)
-	}
-	status := model.MeetingStatus(strings.TrimSpace(r.Status))
-	return adminsvc.MeetingInput{
-		Name:            r.Name,
-		Email:           r.Email,
-		Datetime:        parsedTime,
-		DurationMinutes: r.DurationMinutes,
-		MeetURL:         r.MeetURL,
-		Status:          status,
-		Notes:           r.Notes,
-	}, nil
 }
 
 type blacklistRequest struct {

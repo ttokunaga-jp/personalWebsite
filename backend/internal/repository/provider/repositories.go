@@ -23,6 +23,14 @@ func NewProfileRepository(db *sqlx.DB, client *firestore.Client, cfg *config.App
 	}
 }
 
+// NewAdminProfileRepository exposes administrative profile capabilities.
+func NewAdminProfileRepository(repo repository.ProfileRepository) repository.AdminProfileRepository {
+	if adminRepo, ok := repo.(repository.AdminProfileRepository); ok {
+		return adminRepo
+	}
+	panic("profile repository does not implement admin interface")
+}
+
 // NewProjectRepository selects an appropriate project repository implementation.
 func NewProjectRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.ProjectRepository {
 	switch {
@@ -72,6 +80,14 @@ func NewContactRepository(db *sqlx.DB, client *firestore.Client, cfg *config.App
 		return repoFirestore.NewContactRepository(client, prefix(cfg))
 	}
 	return inmemory.NewContactRepository()
+}
+
+// NewAdminContactRepository exposes administrative contact moderation capabilities.
+func NewAdminContactRepository(repo repository.ContactRepository) repository.AdminContactRepository {
+	if adminRepo, ok := repo.(repository.AdminContactRepository); ok {
+		return adminRepo
+	}
+	panic("contact repository does not implement admin interface")
 }
 
 // NewAvailabilityRepository selects the appropriate implementation for schedule computation.

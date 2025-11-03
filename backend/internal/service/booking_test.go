@@ -287,6 +287,10 @@ func (s *stubBlacklistRepository) AddBlacklistEntry(context.Context, *model.Blac
 	return nil, nil
 }
 
+func (s *stubBlacklistRepository) UpdateBlacklistEntry(context.Context, *model.BlacklistEntry) (*model.BlacklistEntry, error) {
+	return nil, nil
+}
+
 func (s *stubBlacklistRepository) RemoveBlacklistEntry(context.Context, int64) error {
 	return nil
 }

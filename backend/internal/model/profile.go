@@ -8,4 +8,5 @@ type Profile struct {
 	Lab         LocalizedText   `json:"lab"`
 	Summary     LocalizedText   `json:"summary"`
 	Skills      []LocalizedText `json:"skills"`
+	FocusAreas  []LocalizedText `json:"focusAreas"`
 }

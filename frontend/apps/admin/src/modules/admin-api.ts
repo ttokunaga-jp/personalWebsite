@@ -2,13 +2,23 @@ import { apiClient } from "@shared/lib/api-client";
 import type { ApiClientPromise } from "@shared/lib/api-client";
 
 import type {
+  AdminProfile,
   AdminProject,
   AdminResearch,
   AdminSummary,
-  BlogPost,
   BlacklistEntry,
-  Meeting,
+  ContactMessage,
 } from "../types";
+
+type ProfilePayload = {
+  name: { ja?: string; en?: string };
+  title: { ja?: string; en?: string };
+  affiliation: { ja?: string; en?: string };
+  lab: { ja?: string; en?: string };
+  summary: { ja?: string; en?: string };
+  skills: { ja?: string; en?: string }[];
+  focusAreas: { ja?: string; en?: string }[];
+};
 
 type ProjectPayload = {
   title: { ja?: string; en?: string };
@@ -28,23 +38,11 @@ type ResearchPayload = {
   published: boolean;
 };
 
-type BlogPayload = {
-  title: { ja?: string; en?: string };
-  summary: { ja?: string; en?: string };
-  contentMd: { ja?: string; en?: string };
-  tags: string[];
-  published: boolean;
-  publishedAt?: string | null;
-};
-
-type MeetingPayload = {
-  name: string;
-  email: string;
-  datetime: string;
-  durationMinutes: number;
-  meetUrl: string;
+type ContactUpdatePayload = {
+  topic: string;
+  message: string;
   status: string;
-  notes: string;
+  adminNote: string;
 };
 
 type BlacklistPayload = {
@@ -80,6 +78,8 @@ async function unwrap<T>(promise: ApiClientPromise<T>): ApiResult<T> {
 type AdminApi = {
   health: () => ApiResult<{ status: string }>;
   fetchSummary: () => ApiResult<AdminSummary>;
+  getProfile: () => ApiResult<AdminProfile>;
+  updateProfile: (payload: ProfilePayload) => ApiResult<AdminProfile>;
   listProjects: () => ApiResult<AdminProject[]>;
   createProject: (payload: ProjectPayload) => ApiResult<AdminProject>;
   updateProject: (
@@ -96,21 +96,20 @@ type AdminApi = {
   ) => ApiResult<AdminResearch>;
   deleteResearch: (id: number) => ApiResult<void>;
 
-  listBlogs: () => ApiResult<BlogPost[]>;
-  createBlog: (payload: BlogPayload) => ApiResult<BlogPost>;
-  updateBlog: (id: number, payload: BlogPayload) => ApiResult<BlogPost>;
-  deleteBlog: (id: number) => ApiResult<void>;
-
-  listMeetings: () => ApiResult<Meeting[]>;
-  createMeeting: (payload: MeetingPayload) => ApiResult<Meeting>;
-  updateMeeting: (
-    id: number,
-    payload: MeetingPayload,
-  ) => ApiResult<Meeting>;
-  deleteMeeting: (id: number) => ApiResult<void>;
+  listContacts: () => ApiResult<ContactMessage[]>;
+  getContact: (id: string) => ApiResult<ContactMessage>;
+  updateContact: (
+    id: string,
+    payload: ContactUpdatePayload,
+  ) => ApiResult<ContactMessage>;
+  deleteContact: (id: string) => ApiResult<void>;
 
   listBlacklist: () => ApiResult<BlacklistEntry[]>;
   createBlacklist: (
+    payload: BlacklistPayload,
+  ) => ApiResult<BlacklistEntry>;
+  updateBlacklist: (
+    id: number,
     payload: BlacklistPayload,
   ) => ApiResult<BlacklistEntry>;
   deleteBlacklist: (id: number) => ApiResult<void>;
@@ -124,6 +123,9 @@ type AdminApi = {
 export const adminApi: AdminApi = {
   health: () => unwrap(apiClient.get<{ status: string }>("/admin/health")),
   fetchSummary: () => unwrap(apiClient.get<AdminSummary>("/admin/summary")),
+  getProfile: () => unwrap(apiClient.get<AdminProfile>("/admin/profile")),
+  updateProfile: (payload: ProfilePayload) =>
+    unwrap(apiClient.put<AdminProfile>("/admin/profile", payload)),
   listProjects: () => unwrap(apiClient.get<AdminProject[]>("/admin/projects")),
   createProject: (payload: ProjectPayload) =>
     unwrap(apiClient.post<AdminProject>("/admin/projects", payload)),
@@ -140,25 +142,19 @@ export const adminApi: AdminApi = {
   deleteResearch: (id: number) =>
     unwrap(apiClient.delete<void>(`/admin/research/${id}`)),
 
-  listBlogs: () => unwrap(apiClient.get<BlogPost[]>("/admin/blogs")),
-  createBlog: (payload: BlogPayload) =>
-    unwrap(apiClient.post<BlogPost>("/admin/blogs", payload)),
-  updateBlog: (id: number, payload: BlogPayload) =>
-    unwrap(apiClient.put<BlogPost>(`/admin/blogs/${id}`, payload)),
-  deleteBlog: (id: number) =>
-    unwrap(apiClient.delete<void>(`/admin/blogs/${id}`)),
-
-  listMeetings: () => unwrap(apiClient.get<Meeting[]>("/admin/meetings")),
-  createMeeting: (payload: MeetingPayload) =>
-    unwrap(apiClient.post<Meeting>("/admin/meetings", payload)),
-  updateMeeting: (id: number, payload: MeetingPayload) =>
-    unwrap(apiClient.put<Meeting>(`/admin/meetings/${id}`, payload)),
-  deleteMeeting: (id: number) =>
-    unwrap(apiClient.delete<void>(`/admin/meetings/${id}`)),
+  listContacts: () => unwrap(apiClient.get<ContactMessage[]>("/admin/contacts")),
+  getContact: (id: string) =>
+    unwrap(apiClient.get<ContactMessage>(`/admin/contacts/${id}`)),
+  updateContact: (id: string, payload: ContactUpdatePayload) =>
+    unwrap(apiClient.put<ContactMessage>(`/admin/contacts/${id}`, payload)),
+  deleteContact: (id: string) =>
+    unwrap(apiClient.delete<void>(`/admin/contacts/${id}`)),
 
   listBlacklist: () => unwrap(apiClient.get<BlacklistEntry[]>("/admin/blacklist")),
   createBlacklist: (payload: BlacklistPayload) =>
     unwrap(apiClient.post<BlacklistEntry>("/admin/blacklist", payload)),
+  updateBlacklist: (id: number, payload: BlacklistPayload) =>
+    unwrap(apiClient.put<BlacklistEntry>(`/admin/blacklist/${id}`, payload)),
   deleteBlacklist: (id: number) =>
     unwrap(apiClient.delete<void>(`/admin/blacklist/${id}`)),
   session: () =>

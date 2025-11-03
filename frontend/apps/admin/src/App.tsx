@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { adminApi, DomainError } from "./modules/admin-api";
@@ -8,18 +8,85 @@ import {
   useAuthSession,
 } from "./modules/auth-session";
 import type {
+  AdminProfile,
   AdminProject,
   AdminResearch,
   AdminSummary,
-  BlogPost,
   BlacklistEntry,
-  Meeting,
-  MeetingStatus,
+  ContactMessage,
+  ContactStatus,
+  LocalizedText,
 } from "./types";
 
 const currentYear = new Date().getFullYear();
+const contactStatuses: ContactStatus[] = [
+  "pending",
+  "in_review",
+  "resolved",
+  "archived",
+];
 
-const emptyProjectForm = {
+type ProfileFormState = {
+  name: LocalizedText;
+  title: LocalizedText;
+  affiliation: LocalizedText;
+  lab: LocalizedText;
+  summary: LocalizedText;
+  skills: LocalizedText[];
+  focusAreas: LocalizedText[];
+};
+
+type ProjectFormState = {
+  titleJa: string;
+  titleEn: string;
+  descriptionJa: string;
+  descriptionEn: string;
+  techStack: string;
+  linkUrl: string;
+  year: string;
+  published: boolean;
+  sortOrder: string;
+};
+
+type ResearchFormState = {
+  titleJa: string;
+  titleEn: string;
+  summaryJa: string;
+  summaryEn: string;
+  contentJa: string;
+  contentEn: string;
+  year: string;
+  published: boolean;
+};
+
+type BlacklistFormState = {
+  email: string;
+  reason: string;
+};
+
+type ContactEditState = {
+  topic: string;
+  message: string;
+  status: ContactStatus;
+  adminNote: string;
+};
+
+type AuthState = "checking" | "authenticated" | "unauthorized";
+
+const isUnauthorizedError = (error: unknown): boolean =>
+  error instanceof DomainError && error.status === 401;
+
+const createEmptyProfileForm = (): ProfileFormState => ({
+  name: { ja: "", en: "" },
+  title: { ja: "", en: "" },
+  affiliation: { ja: "", en: "" },
+  lab: { ja: "", en: "" },
+  summary: { ja: "", en: "" },
+  skills: [{ ja: "", en: "" }],
+  focusAreas: [{ ja: "", en: "" }],
+});
+
+const emptyProjectForm: ProjectFormState = {
   titleJa: "",
   titleEn: "",
   descriptionJa: "",
@@ -31,7 +98,7 @@ const emptyProjectForm = {
   sortOrder: "",
 };
 
-const emptyResearchForm = {
+const emptyResearchForm: ResearchFormState = {
   titleJa: "",
   titleEn: "",
   summaryJa: "",
@@ -42,57 +109,81 @@ const emptyResearchForm = {
   published: false,
 };
 
-const emptyBlogForm = {
-  titleJa: "",
-  titleEn: "",
-  summaryJa: "",
-  summaryEn: "",
-  contentJa: "",
-  contentEn: "",
-  tags: "",
-  published: false,
-  publishedAt: "",
-};
-
-const emptyMeetingForm = {
-  name: "",
-  email: "",
-  datetime: new Date().toISOString().slice(0, 16),
-  durationMinutes: "30",
-  meetUrl: "",
-  status: "pending" as MeetingStatus,
-  notes: "",
-};
-
-const emptyBlacklistForm = {
+const emptyBlacklistForm: BlacklistFormState = {
   email: "",
   reason: "",
 };
 
-type AuthState = "checking" | "authenticated" | "unauthorized";
+function profileToForm(profile: AdminProfile | null): ProfileFormState {
+  if (!profile) {
+    return createEmptyProfileForm();
+  }
+  const skills = profile.skills.length > 0 ? profile.skills : [{ ja: "", en: "" }];
+  const focusAreas =
+    profile.focusAreas.length > 0
+      ? profile.focusAreas
+      : [{ ja: "", en: "" }];
+  return {
+    name: { ...profile.name },
+    title: { ...profile.title },
+    affiliation: { ...profile.affiliation },
+    lab: { ...profile.lab },
+    summary: { ...profile.summary },
+    skills: skills.map((item) => ({ ...item })),
+    focusAreas: focusAreas.map((item) => ({ ...item })),
+  };
+}
 
-const isUnauthorizedError = (error: unknown): boolean =>
-  error instanceof DomainError && error.status === 401;
+function buildContactEditMap(
+  contacts: ContactMessage[],
+): Record<string, ContactEditState> {
+  return contacts.reduce<Record<string, ContactEditState>>((acc, contact) => {
+    acc[contact.id] = {
+      topic: contact.topic,
+      message: contact.message,
+      status: contact.status,
+      adminNote: contact.adminNote,
+    };
+    return acc;
+  }, {});
+}
 
 function App() {
   const { t } = useTranslation();
   const { token, setToken: storeToken, clearToken } = useAuthSession();
+
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [status, setStatus] = useState("unknown");
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [projects, setProjects] = useState<AdminProject[]>([]);
   const [research, setResearch] = useState<AdminResearch[]>([]);
-  const [blogs, setBlogs] = useState<BlogPost[]>([]);
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [contacts, setContacts] = useState<ContactMessage[]>([]);
   const [blacklist, setBlacklist] = useState<BlacklistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [projectForm, setProjectForm] = useState({ ...emptyProjectForm });
-  const [researchForm, setResearchForm] = useState({ ...emptyResearchForm });
-  const [blogForm, setBlogForm] = useState({ ...emptyBlogForm });
-  const [meetingForm, setMeetingForm] = useState({ ...emptyMeetingForm });
-  const [blacklistForm, setBlacklistForm] = useState({ ...emptyBlacklistForm });
+  const [profileForm, setProfileForm] = useState<ProfileFormState>(
+    createEmptyProfileForm(),
+  );
+  const [projectForm, setProjectForm] = useState<ProjectFormState>({
+    ...emptyProjectForm,
+  });
+  const [researchForm, setResearchForm] = useState<ResearchFormState>({
+    ...emptyResearchForm,
+  });
+  const [blacklistForm, setBlacklistForm] = useState<BlacklistFormState>({
+    ...emptyBlacklistForm,
+  });
+  const [contactEdits, setContactEdits] = useState<
+    Record<string, ContactEditState>
+  >({});
+
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
+  const [editingResearchId, setEditingResearchId] = useState<number | null>(
+    null,
+  );
+  const [editingBlacklistId, setEditingBlacklistId] =
+    useState<number | null>(null);
 
   const handleUnauthorized = useCallback(() => {
     clearToken();
@@ -101,9 +192,16 @@ function App() {
     setSummary(null);
     setProjects([]);
     setResearch([]);
-    setBlogs([]);
-    setMeetings([]);
+    setContacts([]);
     setBlacklist([]);
+    setContactEdits({});
+    setProfileForm(createEmptyProfileForm());
+    setProjectForm({ ...emptyProjectForm });
+    setResearchForm({ ...emptyResearchForm });
+    setBlacklistForm({ ...emptyBlacklistForm });
+    setEditingProjectId(null);
+    setEditingResearchId(null);
+    setEditingBlacklistId(null);
     setError(null);
   }, [clearToken]);
 
@@ -127,25 +225,26 @@ function App() {
     try {
       const [
         summaryRes,
+        profileRes,
         projectRes,
         researchRes,
-        blogRes,
-        meetingRes,
+        contactRes,
         blacklistRes,
       ] = await Promise.all([
         adminApi.fetchSummary(),
+        adminApi.getProfile(),
         adminApi.listProjects(),
         adminApi.listResearch(),
-        adminApi.listBlogs(),
-        adminApi.listMeetings(),
+        adminApi.listContacts(),
         adminApi.listBlacklist(),
       ]);
 
       setSummary(summaryRes.data);
+      setProfileForm(profileToForm(profileRes.data));
       setProjects(projectRes.data);
       setResearch(researchRes.data);
-      setBlogs(blogRes.data);
-      setMeetings(meetingRes.data);
+      setContacts(contactRes.data);
+      setContactEdits(buildContactEditMap(contactRes.data));
       setBlacklist(blacklistRes.data);
       setError(null);
     } catch (err) {
@@ -161,30 +260,7 @@ function App() {
   }, [handleUnauthorized]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const tokenFromHash = extractTokenFromHash(window.location.hash);
-    if (!tokenFromHash) {
-      return;
-    }
-
-    storeToken(tokenFromHash);
-    setAuthState("authenticated");
-    void refreshAll();
-    const cleanUrl = `${window.location.pathname}${window.location.search}`;
-    window.history.replaceState(null, "", cleanUrl);
-  }, [refreshAll, storeToken]);
-
-  useEffect(() => {
-    if (authState !== "checking") {
-      return;
-    }
-
-    if (token) {
-      setAuthState("authenticated");
-      void refreshAll();
+    if (authState === "authenticated") {
       return;
     }
 
@@ -192,10 +268,12 @@ function App() {
 
     const resumeSession = async () => {
       try {
-        const sessionRes = await adminApi.session();
-        if (cancelled) {
-          return;
+        const hashToken = extractTokenFromHash(window.location.hash ?? "");
+        if (hashToken) {
+          storeToken(hashToken);
         }
+
+        const sessionRes = await adminApi.session();
         const sessionToken = sessionRes.data.token?.trim();
         if (sessionToken) {
           storeToken(sessionToken);
@@ -288,7 +366,23 @@ function App() {
     handleUnauthorized();
   }, [handleUnauthorized]);
 
-  const handleCreateProject = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSaveProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const payload = {
+      name: { ...profileForm.name },
+      title: { ...profileForm.title },
+      affiliation: { ...profileForm.affiliation },
+      lab: { ...profileForm.lab },
+      summary: { ...profileForm.summary },
+      skills: profileForm.skills.map((item) => ({ ...item })),
+      focusAreas: profileForm.focusAreas.map((item) => ({ ...item })),
+    };
+    await run(async () => {
+      await adminApi.updateProfile(payload);
+    });
+  };
+
+  const handleSubmitProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const payload = {
       title: { ja: projectForm.titleJa, en: projectForm.titleEn },
@@ -308,12 +402,17 @@ function App() {
     };
 
     await run(async () => {
-      await adminApi.createProject(payload);
-      setProjectForm({ ...emptyProjectForm });
+      if (editingProjectId != null) {
+        await adminApi.updateProject(editingProjectId, payload);
+      } else {
+        await adminApi.createProject(payload);
+      }
     });
+    setProjectForm({ ...emptyProjectForm });
+    setEditingProjectId(null);
   };
 
-  const handleCreateResearch = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmitResearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const payload = {
       title: { ja: researchForm.titleJa, en: researchForm.titleEn },
@@ -324,56 +423,17 @@ function App() {
     };
 
     await run(async () => {
-      await adminApi.createResearch(payload);
-      setResearchForm({ ...emptyResearchForm });
+      if (editingResearchId != null) {
+        await adminApi.updateResearch(editingResearchId, payload);
+      } else {
+        await adminApi.createResearch(payload);
+      }
     });
+    setResearchForm({ ...emptyResearchForm });
+    setEditingResearchId(null);
   };
 
-  const handleCreateBlog = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const publishedAt = blogForm.publishedAt
-      ? new Date(blogForm.publishedAt).toISOString()
-      : null;
-    const payload = {
-      title: { ja: blogForm.titleJa, en: blogForm.titleEn },
-      summary: { ja: blogForm.summaryJa, en: blogForm.summaryEn },
-      contentMd: { ja: blogForm.contentJa, en: blogForm.contentEn },
-      tags: blogForm.tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-      published: blogForm.published,
-      publishedAt,
-    };
-
-    await run(async () => {
-      await adminApi.createBlog(payload);
-      setBlogForm({ ...emptyBlogForm });
-    });
-  };
-
-  const handleCreateMeeting = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const payload = {
-      name: meetingForm.name,
-      email: meetingForm.email,
-      datetime: new Date(meetingForm.datetime).toISOString(),
-      durationMinutes: Number(meetingForm.durationMinutes) || 30,
-      meetUrl: meetingForm.meetUrl,
-      status: meetingForm.status,
-      notes: meetingForm.notes,
-    };
-
-    await run(async () => {
-      await adminApi.createMeeting(payload);
-      setMeetingForm({
-        ...emptyMeetingForm,
-        datetime: new Date().toISOString().slice(0, 16),
-      });
-    });
-  };
-
-  const handleCreateBlacklist = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmitBlacklist = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const payload = {
       email: blacklistForm.email.trim(),
@@ -381,9 +441,14 @@ function App() {
     };
 
     await run(async () => {
-      await adminApi.createBlacklist(payload);
-      setBlacklistForm({ ...emptyBlacklistForm });
+      if (editingBlacklistId != null) {
+        await adminApi.updateBlacklist(editingBlacklistId, payload);
+      } else {
+        await adminApi.createBlacklist(payload);
+      }
     });
+    setBlacklistForm({ ...emptyBlacklistForm });
+    setEditingBlacklistId(null);
   };
 
   const toggleProjectPublished = (project: AdminProject) =>
@@ -410,37 +475,120 @@ function App() {
       });
     });
 
-  const toggleBlogPublished = (post: BlogPost) =>
-    run(async () => {
-      await adminApi.updateBlog(post.id, {
-        title: post.title,
-        summary: post.summary,
-        contentMd: post.contentMd,
-        tags: post.tags,
-        published: !post.published,
-        publishedAt: post.publishedAt ?? null,
-      });
-    });
-
-  const updateMeetingStatus = (meeting: Meeting, status: MeetingStatus) =>
-    run(async () => {
-      await adminApi.updateMeeting(meeting.id, {
-        name: meeting.name,
-        email: meeting.email,
-        datetime: meeting.datetime,
-        durationMinutes: meeting.durationMinutes,
-        meetUrl: meeting.meetUrl,
-        status,
-        notes: meeting.notes,
-      });
-    });
-
   const deleteProject = (id: number) => run(() => adminApi.deleteProject(id));
   const deleteResearch = (id: number) => run(() => adminApi.deleteResearch(id));
-  const deleteBlog = (id: number) => run(() => adminApi.deleteBlog(id));
-  const deleteMeeting = (id: number) => run(() => adminApi.deleteMeeting(id));
   const deleteBlacklistEntry = (id: number) =>
     run(() => adminApi.deleteBlacklist(id));
+
+  const handleEditProject = (project: AdminProject) => {
+    setEditingProjectId(project.id);
+    setProjectForm({
+      titleJa: project.title.ja ?? "",
+      titleEn: project.title.en ?? "",
+      descriptionJa: project.description.ja ?? "",
+      descriptionEn: project.description.en ?? "",
+      techStack: project.techStack.join(", "),
+      linkUrl: project.linkUrl,
+      year: project.year.toString(),
+      published: project.published,
+      sortOrder: project.sortOrder != null ? project.sortOrder.toString() : "",
+    });
+  };
+
+  const handleEditResearch = (item: AdminResearch) => {
+    setEditingResearchId(item.id);
+    setResearchForm({
+      titleJa: item.title.ja ?? "",
+      titleEn: item.title.en ?? "",
+      summaryJa: item.summary.ja ?? "",
+      summaryEn: item.summary.en ?? "",
+      contentJa: item.contentMd.ja ?? "",
+      contentEn: item.contentMd.en ?? "",
+      year: item.year.toString(),
+      published: item.published,
+    });
+  };
+
+  const handleEditBlacklist = (entry: BlacklistEntry) => {
+    setEditingBlacklistId(entry.id);
+    setBlacklistForm({
+      email: entry.email,
+      reason: entry.reason,
+    });
+  };
+
+  const resetProjectForm = () => {
+    setProjectForm({ ...emptyProjectForm });
+    setEditingProjectId(null);
+  };
+
+  const resetResearchForm = () => {
+    setResearchForm({ ...emptyResearchForm });
+    setEditingResearchId(null);
+  };
+
+  const resetBlacklistForm = () => {
+    setBlacklistForm({ ...emptyBlacklistForm });
+    setEditingBlacklistId(null);
+  };
+
+  const handleContactEditChange = (
+    id: string,
+    field: keyof ContactEditState,
+    value: string,
+  ) => {
+    setContactEdits((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: field === "status" ? (value as ContactStatus) : value,
+      },
+    }));
+  };
+
+  const handleSaveContact = async (id: string) => {
+    const edit = contactEdits[id];
+    if (!edit) {
+      return;
+    }
+    await run(async () => {
+      await adminApi.updateContact(id, {
+        topic: edit.topic,
+        message: edit.message,
+        status: edit.status,
+        adminNote: edit.adminNote,
+      });
+    });
+  };
+
+  const handleResetContact = (contact: ContactMessage) => {
+    setContactEdits((prev) => ({
+      ...prev,
+      [contact.id]: {
+        topic: contact.topic,
+        message: contact.message,
+        status: contact.status,
+        adminNote: contact.adminNote,
+      },
+    }));
+  };
+
+  const handleDeleteContact = (id: string) =>
+    run(() => adminApi.deleteContact(id));
+
+  const profileUpdatedDisplay = useMemo(() => {
+    if (!summary?.profileUpdatedAt) {
+      return t("summary.notUpdated");
+    }
+    const date = new Date(summary.profileUpdatedAt);
+    if (Number.isNaN(date.getTime())) {
+      return t("summary.notUpdated");
+    }
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  }, [summary?.profileUpdatedAt, t]);
 
   if (authState === "checking") {
     return (
@@ -509,66 +657,436 @@ function App() {
           <h2 className="text-lg font-semibold text-slate-800">
             {t("dashboard.systemStatus")}
           </h2>
-          <div className="mt-4 flex flex-wrap gap-6">
-            <div className="flex-1 min-w-[220px] rounded-md bg-slate-900 p-4 text-white">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-md bg-slate-900 p-4 text-white">
               <span className="font-mono uppercase tracking-wide text-slate-400">
                 {t("dashboard.apiStatus")}
               </span>
               <p className="text-2xl font-bold text-emerald-400">{status}</p>
             </div>
-            {summary && (
-              <div className="flex-1 min-w-[220px] rounded-md border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  {t("summary.title")}
-                </h3>
-                <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                  <li>
-                    Projects: {summary.publishedProjects} published /{" "}
-                    {summary.draftProjects} draft
-                  </li>
-                  <li>
-                    Research: {summary.publishedResearch} published /{" "}
-                    {summary.draftResearch} draft
-                  </li>
-                  <li>
-                    Blogs: {summary.publishedBlogs} published /{" "}
-                    {summary.draftBlogs} draft
-                  </li>
-                  <li>Pending meetings: {summary.pendingMeetings}</li>
-                  <li>Blacklist entries: {summary.blacklistEntries}</li>
-                </ul>
-              </div>
-            )}
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                {t("summary.profileUpdated")}
+              </span>
+              <p className="mt-1 text-lg font-semibold text-slate-800">
+                {profileUpdatedDisplay}
+              </p>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                {t("summary.skillCount")}
+              </span>
+              <p className="mt-1 text-lg font-semibold text-slate-800">
+                {summary?.skillCount ?? 0}
+              </p>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                {t("summary.focusAreaCount")}
+              </span>
+              <p className="mt-1 text-lg font-semibold text-slate-800">
+                {summary?.focusAreaCount ?? 0}
+              </p>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                {t("summary.projects")}
+              </span>
+              <p className="mt-1 text-lg font-semibold text-slate-800">
+                {summary
+                  ? `${summary.publishedProjects} / ${summary.draftProjects}`
+                  : "0 / 0"}
+              </p>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                {t("summary.research")}
+              </span>
+              <p className="mt-1 text-lg font-semibold text-slate-800">
+                {summary
+                  ? `${summary.publishedResearch} / ${summary.draftResearch}`
+                  : "0 / 0"}
+              </p>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                {t("summary.pendingContacts")}
+              </span>
+              <p className="mt-1 text-lg font-semibold text-slate-800">
+                {summary?.pendingContacts ?? 0}
+              </p>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-4">
+              <span className="text-xs font-semibold uppercase text-slate-500">
+                {t("summary.blacklist")}
+              </span>
+              <p className="mt-1 text-lg font-semibold text-slate-800">
+                {summary?.blacklistEntries ?? 0}
+              </p>
+            </div>
           </div>
         </section>
 
-        {loading && (
-          <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-slate-600">{t("status.loading")}</p>
-          </section>
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {t(error)}
+          </div>
         )}
 
-        {!loading && error && (
-          <section className="rounded-lg border border-rose-200 bg-white p-6 shadow-sm">
-            <p className="text-rose-600">{t(error)}</p>
-          </section>
-        )}
-
-        {!loading && !error && (
-          <>
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-              <header className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">
-                  {t("projects.title")}
-                </h2>
-              </header>
-              <form
-                className="grid gap-3 md:grid-cols-2"
-                onSubmit={handleCreateProject}
-              >
+        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-800">
+            {t("profile.title")}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">{t("profile.description")}</p>
+          <form className="mt-4 space-y-4" onSubmit={handleSaveProfile}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.nameJa")}
+                </label>
                 <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Title (ja)"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={profileForm.name.ja ?? ""}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      name: { ...prev.name, ja: event.target.value },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.nameEn")}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={profileForm.name.en ?? ""}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      name: { ...prev.name, en: event.target.value },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.titleJa")}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={profileForm.title.ja ?? ""}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      title: { ...prev.title, ja: event.target.value },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.titleEn")}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={profileForm.title.en ?? ""}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      title: { ...prev.title, en: event.target.value },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.affiliationJa")}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={profileForm.affiliation.ja ?? ""}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      affiliation: {
+                        ...prev.affiliation,
+                        ja: event.target.value,
+                      },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.affiliationEn")}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={profileForm.affiliation.en ?? ""}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      affiliation: {
+                        ...prev.affiliation,
+                        en: event.target.value,
+                      },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.labJa")}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={profileForm.lab.ja ?? ""}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      lab: { ...prev.lab, ja: event.target.value },
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.labEn")}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={profileForm.lab.en ?? ""}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      lab: { ...prev.lab, en: event.target.value },
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.summaryJa")}
+              </label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                rows={3}
+                value={profileForm.summary.ja ?? ""}
+                onChange={(event) =>
+                  setProfileForm((prev) => ({
+                    ...prev,
+                    summary: { ...prev.summary, ja: event.target.value },
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.summaryEn")}
+              </label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                rows={3}
+                value={profileForm.summary.en ?? ""}
+                onChange={(event) =>
+                  setProfileForm((prev) => ({
+                    ...prev,
+                    summary: { ...prev.summary, en: event.target.value },
+                  }))
+                }
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-700">
+                  {t("profile.skills.title")}
+                </h3>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-800"
+                  onClick={() =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      skills: [...prev.skills, { ja: "", en: "" }],
+                    }))
+                  }
+                >
+                  {t("profile.skills.add")}
+                </button>
+              </div>
+              <div className="mt-2 space-y-2">
+                {profileForm.skills.map((skill, index) => (
+                  <div
+                    className="flex flex-col gap-2 rounded-md border border-slate-200 p-3 md:flex-row"
+                    key={`skill-${index}`}
+                  >
+                    <input
+                      className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                      placeholder={t("fields.skillJa")}
+                      value={skill.ja ?? ""}
+                      onChange={(event) =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          skills: prev.skills.map((item, idx) =>
+                            idx === index
+                              ? { ...item, ja: event.target.value }
+                              : item,
+                          ),
+                        }))
+                      }
+                    />
+                    <input
+                      className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                      placeholder={t("fields.skillEn")}
+                      value={skill.en ?? ""}
+                      onChange={(event) =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          skills: prev.skills.map((item, idx) =>
+                            idx === index
+                              ? { ...item, en: event.target.value }
+                              : item,
+                          ),
+                        }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          skills: prev.skills.filter((_, idx) => idx !== index),
+                        }))
+                      }
+                      disabled={profileForm.skills.length === 1}
+                    >
+                      {t("actions.remove")}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-700">
+                  {t("profile.focusAreas.title")}
+                </h3>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-800"
+                  onClick={() =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      focusAreas: [...prev.focusAreas, { ja: "", en: "" }],
+                    }))
+                  }
+                >
+                  {t("profile.focusAreas.add")}
+                </button>
+              </div>
+              <div className="mt-2 space-y-2">
+                {profileForm.focusAreas.map((area, index) => (
+                  <div
+                    className="flex flex-col gap-2 rounded-md border border-slate-200 p-3 md:flex-row"
+                    key={`focus-${index}`}
+                  >
+                    <input
+                      className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                      placeholder={t("fields.focusJa")}
+                      value={area.ja ?? ""}
+                      onChange={(event) =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          focusAreas: prev.focusAreas.map((item, idx) =>
+                            idx === index
+                              ? { ...item, ja: event.target.value }
+                              : item,
+                          ),
+                        }))
+                      }
+                    />
+                    <input
+                      className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                      placeholder={t("fields.focusEn")}
+                      value={area.en ?? ""}
+                      onChange={(event) =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          focusAreas: prev.focusAreas.map((item, idx) =>
+                            idx === index
+                              ? { ...item, en: event.target.value }
+                              : item,
+                          ),
+                        }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          focusAreas: prev.focusAreas.filter(
+                            (_, idx) => idx !== index,
+                          ),
+                        }))
+                      }
+                      disabled={profileForm.focusAreas.length === 1}
+                    >
+                      {t("actions.remove")}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                disabled={loading}
+              >
+                {t("actions.save")}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">
+                {t("projects.title")}
+              </h2>
+              <p className="text-sm text-slate-600">
+                {t("projects.description")}
+              </p>
+            </div>
+            {editingProjectId != null && (
+              <button
+                type="button"
+                className="text-sm font-medium text-slate-600 hover:text-slate-800"
+                onClick={resetProjectForm}
+              >
+                {t("actions.cancel")}
+              </button>
+            )}
+          </div>
+          <form className="mt-4 space-y-4" onSubmit={handleSubmitProject}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.titleJa")}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   value={projectForm.titleJa}
                   onChange={(event) =>
                     setProjectForm((prev) => ({
@@ -577,9 +1095,13 @@ function App() {
                     }))
                   }
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.titleEn")}
+                </label>
                 <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Title (en)"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   value={projectForm.titleEn}
                   onChange={(event) =>
                     setProjectForm((prev) => ({
@@ -588,9 +1110,14 @@ function App() {
                     }))
                   }
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.descriptionJa")}
+                </label>
                 <textarea
-                  className="rounded border border-slate-300 p-2 md:col-span-2"
-                  placeholder="Description (ja)"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={3}
                   value={projectForm.descriptionJa}
                   onChange={(event) =>
                     setProjectForm((prev) => ({
@@ -599,9 +1126,14 @@ function App() {
                     }))
                   }
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.descriptionEn")}
+                </label>
                 <textarea
-                  className="rounded border border-slate-300 p-2 md:col-span-2"
-                  placeholder="Description (en)"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={3}
                   value={projectForm.descriptionEn}
                   onChange={(event) =>
                     setProjectForm((prev) => ({
@@ -610,9 +1142,15 @@ function App() {
                     }))
                   }
                 />
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.techStack")}
+                </label>
                 <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Tech stack (comma separated)"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   value={projectForm.techStack}
                   onChange={(event) =>
                     setProjectForm((prev) => ({
@@ -620,10 +1158,15 @@ function App() {
                       techStack: event.target.value,
                     }))
                   }
+                  placeholder={t("fields.techStackPlaceholder") ?? ""}
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.linkUrl")}
+                </label>
                 <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Link URL"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   value={projectForm.linkUrl}
                   onChange={(event) =>
                     setProjectForm((prev) => ({
@@ -632,9 +1175,14 @@ function App() {
                     }))
                   }
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.year")}
+                </label>
                 <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Year"
+                  type="number"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   value={projectForm.year}
                   onChange={(event) =>
                     setProjectForm((prev) => ({
@@ -643,9 +1191,34 @@ function App() {
                     }))
                   }
                 />
+              </div>
+              <div className="flex items-center gap-2">
                 <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Sort order"
+                  id="project-published"
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  checked={projectForm.published}
+                  onChange={(event) =>
+                    setProjectForm((prev) => ({
+                      ...prev,
+                      published: event.target.checked,
+                    }))
+                  }
+                />
+                <label
+                  htmlFor="project-published"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  {t("fields.published")}
+                </label>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.sortOrder")}
+                </label>
+                <input
+                  type="number"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   value={projectForm.sortOrder}
                   onChange={(event) =>
                     setProjectForm((prev) => ({
@@ -654,81 +1227,117 @@ function App() {
                     }))
                   }
                 />
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    checked={projectForm.published}
-                    onChange={(event) =>
-                      setProjectForm((prev) => ({
-                        ...prev,
-                        published: event.target.checked,
-                      }))
-                    }
-                    type="checkbox"
-                  />
-                  Published
-                </label>
-                <button
-                  className="rounded bg-slate-900 px-4 py-2 text-white"
-                  type="submit"
-                >
-                  {t("actions.create")}
-                </button>
-              </form>
-
-              <div className="mt-6 space-y-4">
-                {projects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="rounded border border-slate-200 p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-slate-800">
-                          {project.title.ja || project.title.en}
-                        </h3>
-                        <p className="text-sm text-slate-500">{project.year}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          className="rounded border border-slate-300 px-3 py-1 text-sm"
-                          type="button"
-                          onClick={() => toggleProjectPublished(project)}
-                        >
-                          {project.published ? "Unpublish" : "Publish"}
-                        </button>
-                        <button
-                          className="rounded border border-rose-200 bg-rose-50 px-3 py-1 text-sm text-rose-600"
-                          type="button"
-                          onClick={() => deleteProject(project.id)}
-                        >
-                          {t("actions.delete")}
-                        </button>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-600">
-                      {project.description.ja || project.description.en}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Stack: {project.techStack.join(", ")}
-                    </p>
-                  </div>
-                ))}
               </div>
-            </section>
-
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-              <header className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">
-                  {t("research.title")}
-                </h2>
-              </header>
-              <form
-                className="grid gap-3 md:grid-cols-2"
-                onSubmit={handleCreateResearch}
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                disabled={loading}
               >
+                {t(editingProjectId != null ? "actions.update" : "actions.create")}
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-6 space-y-4">
+            {projects.map((project) => (
+              <div
+                key={project.id}
+                className="rounded-md border border-slate-200 p-4"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900">
+                      {project.title.ja || project.title.en || t("projects.untitled")}
+                    </h3>
+                    <p className="text-sm text-slate-600">
+                      {project.description.ja || project.description.en || t("projects.noDescription")}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                      <span>
+                        {t("fields.year")}: {project.year}
+                      </span>
+                      {project.techStack.length > 0 && (
+                        <span>
+                          {t("fields.techStack")}: {project.techStack.join(", ")}
+                        </span>
+                      )}
+                      <span>
+                        {t("fields.published")}: {project.published ? t("status.published") : t("status.draft")}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+                      onClick={() => toggleProjectPublished(project)}
+                    >
+                      {project.published ? t("actions.unpublish") : t("actions.publish")}
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+                      onClick={() => handleEditProject(project)}
+                    >
+                      {t("actions.edit")}
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                      onClick={() => deleteProject(project.id)}
+                    >
+                      {t("actions.delete")}
+                    </button>
+                  </div>
+                </div>
+                {project.linkUrl && (
+                  <a
+                    className="mt-3 inline-block text-sm font-medium text-slate-700 underline hover:text-slate-900"
+                    href={project.linkUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {project.linkUrl}
+                  </a>
+                )}
+              </div>
+            ))}
+            {projects.length === 0 && (
+              <p className="text-sm text-slate-500">{t("projects.empty")}</p>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">
+                {t("research.title")}
+              </h2>
+              <p className="text-sm text-slate-600">
+                {t("research.description")}
+              </p>
+            </div>
+            {editingResearchId != null && (
+              <button
+                type="button"
+                className="text-sm font-medium text-slate-600 hover:text-slate-800"
+                onClick={resetResearchForm}
+              >
+                {t("actions.cancel")}
+              </button>
+            )}
+          </div>
+          <form className="mt-4 space-y-4" onSubmit={handleSubmitResearch}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.titleJa")}
+                </label>
                 <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Title (ja)"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   value={researchForm.titleJa}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
@@ -737,9 +1346,13 @@ function App() {
                     }))
                   }
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.titleEn")}
+                </label>
                 <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Title (en)"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   value={researchForm.titleEn}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
@@ -748,9 +1361,16 @@ function App() {
                     }))
                   }
                 />
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.summaryJa")}
+                </label>
                 <textarea
-                  className="rounded border border-slate-300 p-2 md:col-span-2"
-                  placeholder="Summary (ja)"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={3}
                   value={researchForm.summaryJa}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
@@ -759,9 +1379,14 @@ function App() {
                     }))
                   }
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.summaryEn")}
+                </label>
                 <textarea
-                  className="rounded border border-slate-300 p-2 md:col-span-2"
-                  placeholder="Summary (en)"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={3}
                   value={researchForm.summaryEn}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
@@ -770,9 +1395,16 @@ function App() {
                     }))
                   }
                 />
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.contentJa")}
+                </label>
                 <textarea
-                  className="rounded border border-slate-300 p-2 md:col-span-2"
-                  placeholder="Content (ja)"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={4}
                   value={researchForm.contentJa}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
@@ -781,9 +1413,14 @@ function App() {
                     }))
                   }
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.contentEn")}
+                </label>
                 <textarea
-                  className="rounded border border-slate-300 p-2 md:col-span-2"
-                  placeholder="Content (en)"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={4}
                   value={researchForm.contentEn}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
@@ -792,9 +1429,16 @@ function App() {
                     }))
                   }
                 />
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.year")}
+                </label>
                 <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Year"
+                  type="number"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   value={researchForm.year}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
@@ -803,392 +1447,271 @@ function App() {
                     }))
                   }
                 />
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    checked={researchForm.published}
-                    onChange={(event) =>
-                      setResearchForm((prev) => ({
-                        ...prev,
-                        published: event.target.checked,
-                      }))
-                    }
-                    type="checkbox"
-                  />
-                  Published
-                </label>
-                <button
-                  className="rounded bg-slate-900 px-4 py-2 text-white"
-                  type="submit"
-                >
-                  {t("actions.create")}
-                </button>
-              </form>
-              <div className="mt-6 space-y-4">
-                {research.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded border border-slate-200 p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-slate-800">
-                          {item.title.ja || item.title.en}
-                        </h3>
-                        <p className="text-sm text-slate-500">{item.year}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          className="rounded border border-slate-300 px-3 py-1 text-sm"
-                          type="button"
-                          onClick={() => toggleResearchPublished(item)}
-                        >
-                          {item.published ? "Unpublish" : "Publish"}
-                        </button>
-                        <button
-                          className="rounded border border-rose-200 bg-rose-50 px-3 py-1 text-sm text-rose-600"
-                          type="button"
-                          onClick={() => deleteResearch(item.id)}
-                        >
-                          {t("actions.delete")}
-                        </button>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-600">
-                      {item.summary.ja || item.summary.en}
-                    </p>
-                  </div>
-                ))}
               </div>
-            </section>
-
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-              <header className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">
-                  {t("blogs.title")}
-                </h2>
-              </header>
-              <form
-                className="grid gap-3 md:grid-cols-2"
-                onSubmit={handleCreateBlog}
-              >
+              <div className="flex items-center gap-2">
                 <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Title (ja)"
-                  value={blogForm.titleJa}
+                  id="research-published"
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  checked={researchForm.published}
                   onChange={(event) =>
-                    setBlogForm((prev) => ({
+                    setResearchForm((prev) => ({
                       ...prev,
-                      titleJa: event.target.value,
+                      published: event.target.checked,
                     }))
                   }
                 />
-                <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Title (en)"
-                  value={blogForm.titleEn}
-                  onChange={(event) =>
-                    setBlogForm((prev) => ({
-                      ...prev,
-                      titleEn: event.target.value,
-                    }))
-                  }
-                />
-                <textarea
-                  className="rounded border border-slate-300 p-2 md:col-span-2"
-                  placeholder="Summary (ja)"
-                  value={blogForm.summaryJa}
-                  onChange={(event) =>
-                    setBlogForm((prev) => ({
-                      ...prev,
-                      summaryJa: event.target.value,
-                    }))
-                  }
-                />
-                <textarea
-                  className="rounded border border-slate-300 p-2 md:col-span-2"
-                  placeholder="Summary (en)"
-                  value={blogForm.summaryEn}
-                  onChange={(event) =>
-                    setBlogForm((prev) => ({
-                      ...prev,
-                      summaryEn: event.target.value,
-                    }))
-                  }
-                />
-                <textarea
-                  className="rounded border border-slate-300 p-2 md:col-span-2"
-                  placeholder="Content (ja)"
-                  value={blogForm.contentJa}
-                  onChange={(event) =>
-                    setBlogForm((prev) => ({
-                      ...prev,
-                      contentJa: event.target.value,
-                    }))
-                  }
-                />
-                <textarea
-                  className="rounded border border-slate-300 p-2 md:col-span-2"
-                  placeholder="Content (en)"
-                  value={blogForm.contentEn}
-                  onChange={(event) =>
-                    setBlogForm((prev) => ({
-                      ...prev,
-                      contentEn: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Tags (comma separated)"
-                  value={blogForm.tags}
-                  onChange={(event) =>
-                    setBlogForm((prev) => ({
-                      ...prev,
-                      tags: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  className="rounded border border-slate-300 p-2"
-                  type="datetime-local"
-                  value={blogForm.publishedAt}
-                  onChange={(event) =>
-                    setBlogForm((prev) => ({
-                      ...prev,
-                      publishedAt: event.target.value,
-                    }))
-                  }
-                />
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    checked={blogForm.published}
-                    onChange={(event) =>
-                      setBlogForm((prev) => ({
-                        ...prev,
-                        published: event.target.checked,
-                      }))
-                    }
-                    type="checkbox"
-                  />
-                  Published
+                <label
+                  htmlFor="research-published"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  {t("fields.published")}
                 </label>
-                <button
-                  className="rounded bg-slate-900 px-4 py-2 text-white"
-                  type="submit"
-                >
-                  {t("actions.create")}
-                </button>
-              </form>
-
-              <div className="mt-6 space-y-4">
-                {blogs.map((post) => (
-                  <div
-                    key={post.id}
-                    className="rounded border border-slate-200 p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-slate-800">
-                          {post.title.ja || post.title.en}
-                        </h3>
-                        {post.publishedAt && (
-                          <p className="text-xs text-slate-500">
-                            Published at{" "}
-                            {new Date(post.publishedAt).toLocaleString()}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          className="rounded border border-slate-300 px-3 py-1 text-sm"
-                          type="button"
-                          onClick={() => toggleBlogPublished(post)}
-                        >
-                          {post.published ? "Unpublish" : "Publish"}
-                        </button>
-                        <button
-                          className="rounded border border-rose-200 bg-rose-50 px-3 py-1 text-sm text-rose-600"
-                          type="button"
-                          onClick={() => deleteBlog(post.id)}
-                        >
-                          {t("actions.delete")}
-                        </button>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-600">
-                      {post.summary.ja || post.summary.en}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Tags: {post.tags.join(", ")}
-                    </p>
-                  </div>
-                ))}
               </div>
-            </section>
-
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-              <header className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">
-                  {t("meetings.title")}
-                </h2>
-              </header>
-              <form
-                className="grid gap-3 md:grid-cols-2"
-                onSubmit={handleCreateMeeting}
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                disabled={loading}
               >
-                <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Name"
-                  value={meetingForm.name}
-                  onChange={(event) =>
-                    setMeetingForm((prev) => ({
-                      ...prev,
-                      name: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Email"
-                  value={meetingForm.email}
-                  onChange={(event) =>
-                    setMeetingForm((prev) => ({
-                      ...prev,
-                      email: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  className="rounded border border-slate-300 p-2"
-                  type="datetime-local"
-                  value={meetingForm.datetime}
-                  onChange={(event) =>
-                    setMeetingForm((prev) => ({
-                      ...prev,
-                      datetime: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Duration (minutes)"
-                  value={meetingForm.durationMinutes}
-                  onChange={(event) =>
-                    setMeetingForm((prev) => ({
-                      ...prev,
-                      durationMinutes: event.target.value,
-                    }))
-                  }
-                />
-                <input
-                  className="rounded border border-slate-300 p-2"
-                  placeholder="Meet URL"
-                  value={meetingForm.meetUrl}
-                  onChange={(event) =>
-                    setMeetingForm((prev) => ({
-                      ...prev,
-                      meetUrl: event.target.value,
-                    }))
-                  }
-                />
-                <select
-                  className="rounded border border-slate-300 p-2"
-                  value={meetingForm.status}
-                  onChange={(event) =>
-                    setMeetingForm((prev) => ({
-                      ...prev,
-                      status: event.target.value as MeetingStatus,
-                    }))
-                  }
-                >
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-                <textarea
-                  className="rounded border border-slate-300 p-2 md:col-span-2"
-                  placeholder="Notes"
-                  value={meetingForm.notes}
-                  onChange={(event) =>
-                    setMeetingForm((prev) => ({
-                      ...prev,
-                      notes: event.target.value,
-                    }))
-                  }
-                />
-                <button
-                  className="rounded bg-slate-900 px-4 py-2 text-white"
-                  type="submit"
-                >
-                  {t("actions.create")}
-                </button>
-              </form>
+                {t(editingResearchId != null ? "actions.update" : "actions.create")}
+              </button>
+            </div>
+          </form>
 
-              <div className="mt-6 space-y-4">
-                {meetings.map((meeting) => (
-                  <div
-                    key={meeting.id}
-                    className="rounded border border-slate-200 p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-slate-800">
-                          {meeting.name}
-                        </h3>
-                        <p className="text-sm text-slate-500">
-                          {meeting.email}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {new Date(meeting.datetime).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <select
-                          className="rounded border border-slate-300 p-1 text-sm"
-                          value={meeting.status}
-                          onChange={(event) =>
-                            updateMeetingStatus(
-                              meeting,
-                              event.target.value as MeetingStatus,
-                            )
-                          }
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="confirmed">Confirmed</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                        <button
-                          className="rounded border border-rose-200 bg-rose-50 px-3 py-1 text-sm text-rose-600"
-                          type="button"
-                          onClick={() => deleteMeeting(meeting.id)}
-                        >
-                          {t("actions.delete")}
-                        </button>
-                      </div>
+          <div className="mt-6 space-y-4">
+            {research.map((item) => (
+              <div key={item.id} className="rounded-md border border-slate-200 p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-900">
+                      {item.title.ja || item.title.en || t("research.untitled")}
+                    </h3>
+                    <p className="text-sm text-slate-600">
+                      {item.summary.ja || item.summary.en || t("research.noSummary")}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                      <span>
+                        {t("fields.year")}: {item.year}
+                      </span>
+                      <span>
+                        {t("fields.published")}: {item.published ? t("status.published") : t("status.draft")}
+                      </span>
                     </div>
-                    {meeting.notes && (
-                      <p className="mt-2 text-sm text-slate-600">
-                        {meeting.notes}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+                      onClick={() => toggleResearchPublished(item)}
+                    >
+                      {item.published ? t("actions.unpublish") : t("actions.publish")}
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+                      onClick={() => handleEditResearch(item)}
+                    >
+                      {t("actions.edit")}
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                      onClick={() => deleteResearch(item.id)}
+                    >
+                      {t("actions.delete")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {research.length === 0 && (
+              <p className="text-sm text-slate-500">{t("research.empty")}</p>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-800">
+            {t("contacts.title")}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {t("contacts.description")}
+          </p>
+          <div className="mt-4 space-y-4">
+            {contacts.map((contact) => {
+              const edit = contactEdits[contact.id] ?? {
+                topic: contact.topic,
+                message: contact.message,
+                status: contact.status,
+                adminNote: contact.adminNote,
+              };
+              return (
+                <div
+                  key={contact.id}
+                  className="rounded-md border border-slate-200 p-4"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="text-sm text-slate-700">
+                      <p className="font-semibold text-slate-900">
+                        {contact.name} · {contact.email}
                       </p>
-                    )}
+                      {contact.topic && (
+                        <p className="text-slate-600">{contact.topic}</p>
+                      )}
+                      <p className="mt-2 whitespace-pre-wrap text-slate-600">
+                        {contact.message}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        {t("fields.createdAt")}:
+                        {" "}
+                        {new Date(contact.createdAt).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {t("fields.updatedAt")}:
+                        {" "}
+                        {new Date(contact.updatedAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                        onClick={() => handleDeleteContact(contact.id)}
+                      >
+                        {t("actions.delete")}
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </section>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium uppercase text-slate-500">
+                        {t("fields.topic")}
+                      </label>
+                      <input
+                        className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        value={edit.topic}
+                        onChange={(event) =>
+                          handleContactEditChange(
+                            contact.id,
+                            "topic",
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium uppercase text-slate-500">
+                        {t("fields.status")}
+                      </label>
+                      <select
+                        className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        value={edit.status}
+                        onChange={(event) =>
+                          handleContactEditChange(
+                            contact.id,
+                            "status",
+                            event.target.value,
+                          )
+                        }
+                      >
+                        {contactStatuses.map((statusValue) => (
+                          <option key={statusValue} value={statusValue}>
+                            {t(`contacts.status.${statusValue}`)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium uppercase text-slate-500">
+                        {t("fields.adminNote")}
+                      </label>
+                      <textarea
+                        className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        rows={2}
+                        value={edit.adminNote}
+                        onChange={(event) =>
+                          handleContactEditChange(
+                            contact.id,
+                            "adminNote",
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium uppercase text-slate-500">
+                        {t("fields.message")}
+                      </label>
+                      <textarea
+                        className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        rows={3}
+                        value={edit.message}
+                        onChange={(event) =>
+                          handleContactEditChange(
+                            contact.id,
+                            "message",
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+                      onClick={() => handleResetContact(contact)}
+                    >
+                      {t("actions.reset")}
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                      onClick={() => handleSaveContact(contact.id)}
+                      disabled={loading}
+                    >
+                      {t("actions.save")}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {contacts.length === 0 && (
+              <p className="text-sm text-slate-500">{t("contacts.empty")}</p>
+            )}
+          </div>
+        </section>
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-              <header className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-800">
-                  {t("blacklist.title")}
-                </h2>
-              </header>
-              <form
-                className="flex flex-col gap-3 md:flex-row"
-                onSubmit={handleCreateBlacklist}
+        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">
+                {t("blacklist.title")}
+              </h2>
+              <p className="text-sm text-slate-600">
+                {t("blacklist.description")}
+              </p>
+            </div>
+            {editingBlacklistId != null && (
+              <button
+                type="button"
+                className="text-sm font-medium text-slate-600 hover:text-slate-800"
+                onClick={resetBlacklistForm}
               >
+                {t("actions.cancel")}
+              </button>
+            )}
+          </div>
+          <form className="mt-4 space-y-4" onSubmit={handleSubmitBlacklist}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.email")}
+                </label>
                 <input
-                  className="flex-1 rounded border border-slate-300 p-2"
-                  placeholder="Email"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   value={blacklistForm.email}
                   onChange={(event) =>
                     setBlacklistForm((prev) => ({
@@ -1197,9 +1720,13 @@ function App() {
                     }))
                   }
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.reason")}
+                </label>
                 <input
-                  className="flex-1 rounded border border-slate-300 p-2"
-                  placeholder="Reason"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   value={blacklistForm.reason}
                   onChange={(event) =>
                     setBlacklistForm((prev) => ({
@@ -1208,41 +1735,56 @@ function App() {
                     }))
                   }
                 />
-                <button
-                  className="rounded bg-slate-900 px-4 py-2 text-white"
-                  type="submit"
-                >
-                  {t("actions.create")}
-                </button>
-              </form>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                disabled={loading}
+              >
+                {t(editingBlacklistId != null ? "actions.update" : "actions.create")}
+              </button>
+            </div>
+          </form>
 
-              <div className="mt-6 space-y-3">
-                {blacklist.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-center justify-between rounded border border-slate-200 p-3"
-                  >
-                    <div>
-                      <p className="font-medium text-slate-800">
-                        {entry.email}
-                      </p>
-                      {entry.reason && (
-                        <p className="text-sm text-slate-500">{entry.reason}</p>
-                      )}
-                    </div>
+          <div className="mt-6 space-y-4">
+            {blacklist.map((entry) => (
+              <div key={entry.id} className="rounded-md border border-slate-200 p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-900">{entry.email}</p>
+                    <p className="text-sm text-slate-600">{entry.reason}</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {t("fields.createdAt")}:
+                      {" "}
+                      {new Date(entry.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
                     <button
-                      className="rounded border border-rose-200 bg-rose-50 px-3 py-1 text-sm text-rose-600"
                       type="button"
+                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+                      onClick={() => handleEditBlacklist(entry)}
+                    >
+                      {t("actions.edit")}
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
                       onClick={() => deleteBlacklistEntry(entry.id)}
                     >
                       {t("actions.delete")}
                     </button>
                   </div>
-                ))}
+                </div>
               </div>
-            </section>
-          </>
-        )}
+            ))}
+            {blacklist.length === 0 && (
+              <p className="text-sm text-slate-500">{t("blacklist.empty")}</p>
+            )}
+          </div>
+        </section>
       </main>
     </div>
   );

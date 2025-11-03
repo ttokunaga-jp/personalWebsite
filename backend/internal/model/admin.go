@@ -2,6 +2,18 @@ package model
 
 import "time"
 
+// AdminProfile captures editable profile metadata for the administrator UI.
+type AdminProfile struct {
+	Name        LocalizedText   `json:"name"`
+	Title       LocalizedText   `json:"title"`
+	Affiliation LocalizedText   `json:"affiliation"`
+	Lab         LocalizedText   `json:"lab"`
+	Summary     LocalizedText   `json:"summary"`
+	Skills      []LocalizedText `json:"skills"`
+	FocusAreas  []LocalizedText `json:"focusAreas"`
+	UpdatedAt   *time.Time      `json:"updatedAt,omitempty"`
+}
+
 // AdminProject represents a project entry including administrative metadata.
 type AdminProject struct {
 	ID          int64         `json:"id"`
@@ -65,6 +77,29 @@ type Meeting struct {
 	UpdatedAt       time.Time     `json:"updatedAt"`
 }
 
+// ContactStatus expresses the review lifecycle of a contact submission.
+type ContactStatus string
+
+const (
+	ContactStatusPending  ContactStatus = "pending"
+	ContactStatusInReview ContactStatus = "in_review"
+	ContactStatusResolved ContactStatus = "resolved"
+	ContactStatusArchived ContactStatus = "archived"
+)
+
+// ContactMessage captures incoming contact submissions enriched with moderation metadata.
+type ContactMessage struct {
+	ID        string        `json:"id"`
+	Name      string        `json:"name"`
+	Email     string        `json:"email"`
+	Topic     string        `json:"topic"`
+	Message   string        `json:"message"`
+	Status    ContactStatus `json:"status"`
+	AdminNote string        `json:"adminNote"`
+	CreatedAt time.Time     `json:"createdAt"`
+	UpdatedAt time.Time     `json:"updatedAt"`
+}
+
 // BlacklistEntry captures blacklisted emails that should be rejected.
 type BlacklistEntry struct {
 	ID        int64     `json:"id"`
@@ -75,12 +110,13 @@ type BlacklistEntry struct {
 
 // AdminSummary aggregates key admin metrics for dashboard display.
 type AdminSummary struct {
-	PublishedProjects int `json:"publishedProjects"`
-	DraftProjects     int `json:"draftProjects"`
-	PublishedResearch int `json:"publishedResearch"`
-	DraftResearch     int `json:"draftResearch"`
-	PublishedBlogs    int `json:"publishedBlogs"`
-	DraftBlogs        int `json:"draftBlogs"`
-	PendingMeetings   int `json:"pendingMeetings"`
-	BlacklistEntries  int `json:"blacklistEntries"`
+	ProfileUpdatedAt  *time.Time `json:"profileUpdatedAt,omitempty"`
+	SkillCount        int        `json:"skillCount"`
+	FocusAreaCount    int        `json:"focusAreaCount"`
+	PublishedProjects int        `json:"publishedProjects"`
+	DraftProjects     int        `json:"draftProjects"`
+	PublishedResearch int        `json:"publishedResearch"`
+	DraftResearch     int        `json:"draftResearch"`
+	PendingContacts   int        `json:"pendingContacts"`
+	BlacklistEntries  int        `json:"blacklistEntries"`
 }

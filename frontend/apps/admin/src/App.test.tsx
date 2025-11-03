@@ -12,25 +12,11 @@ import {
 const apiMocks = vi.hoisted(() => ({
   health: vi.fn(),
   fetchSummary: vi.fn(),
+  getProfile: vi.fn(),
   listProjects: vi.fn(),
   listResearch: vi.fn(),
-  listBlogs: vi.fn(),
-  listMeetings: vi.fn(),
+  listContacts: vi.fn(),
   listBlacklist: vi.fn(),
-  createProject: vi.fn(),
-  createResearch: vi.fn(),
-  createBlog: vi.fn(),
-  createMeeting: vi.fn(),
-  createBlacklist: vi.fn(),
-  updateProject: vi.fn(),
-  updateResearch: vi.fn(),
-  updateBlog: vi.fn(),
-  updateMeeting: vi.fn(),
-  deleteProject: vi.fn(),
-  deleteResearch: vi.fn(),
-  deleteBlog: vi.fn(),
-  deleteMeeting: vi.fn(),
-  deleteBlacklist: vi.fn(),
   session: vi.fn(),
 }));
 
@@ -45,10 +31,10 @@ vi.mock("./modules/admin-api", async (importOriginal) => {
 const {
   health: healthMock,
   fetchSummary: summaryMock,
+  getProfile: profileMock,
   listProjects: projectsMock,
   listResearch: researchMock,
-  listBlogs: blogsMock,
-  listMeetings: meetingsMock,
+  listContacts: contactsMock,
   listBlacklist: blacklistMock,
   session: sessionMock,
 } = apiMocks;
@@ -65,10 +51,23 @@ describe("Admin App", () => {
         draftProjects: 0,
         publishedResearch: 2,
         draftResearch: 1,
-        publishedBlogs: 3,
-        draftBlogs: 0,
-        pendingMeetings: 1,
+        pendingContacts: 1,
         blacklistEntries: 1,
+        skillCount: 4,
+        focusAreaCount: 2,
+        profileUpdatedAt: new Date().toISOString(),
+      },
+    });
+    profileMock.mockResolvedValue({
+      data: {
+        name: { ja: "高見 拓実", en: "Takumi Takami" },
+        title: { ja: "エンジニア", en: "Engineer" },
+        affiliation: { ja: "", en: "" },
+        lab: { ja: "", en: "" },
+        summary: { ja: "概要", en: "Summary" },
+        skills: [],
+        focusAreas: [],
+        updatedAt: new Date().toISOString(),
       },
     });
     projectsMock.mockResolvedValue({
@@ -101,32 +100,16 @@ describe("Admin App", () => {
         },
       ],
     });
-    blogsMock.mockResolvedValue({
+    contactsMock.mockResolvedValue({
       data: [
         {
-          id: 1,
-          title: { ja: "ブログ", en: "Blog" },
-          summary: { ja: "", en: "" },
-          contentMd: { ja: "", en: "" },
-          tags: [],
-          published: true,
-          publishedAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ],
-    });
-    meetingsMock.mockResolvedValue({
-      data: [
-        {
-          id: 1,
+          id: "contact-1",
           name: "Tester",
           email: "tester@example.com",
-          datetime: new Date().toISOString(),
-          durationMinutes: 30,
-          meetUrl: "",
+          topic: "相談",
+          message: "テストメッセージ",
           status: "pending",
-          notes: "",
+          adminNote: "",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -161,14 +144,16 @@ describe("Admin App", () => {
     await waitFor(() => {
       expect(healthMock).toHaveBeenCalled();
       expect(summaryMock).toHaveBeenCalled();
-      expect(
-        screen.getByRole("heading", { name: /Admin console/i }),
-      ).toBeInTheDocument();
+      const heading = screen.getByRole("heading", {
+        name: /Admin console|管理コンソール/i,
+      });
+      expect(heading).toBeInTheDocument();
     });
   });
 
   it("blocks access when health check returns 401", async () => {
     healthMock.mockRejectedValueOnce(new DomainError(401, "unauthorized"));
+    sessionMock.mockResolvedValueOnce({ data: { active: false } });
 
     render(
       <AuthSessionProvider>

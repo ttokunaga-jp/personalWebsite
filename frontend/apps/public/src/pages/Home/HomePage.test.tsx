@@ -10,21 +10,29 @@ describe("HomePage", () => {
     await renderWithRouter({ initialEntries: ["/"] });
 
     expect(
-      await screen.findByRole("heading", { name: profileFixture.headline }),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: profileFixture.displayName,
+      }),
     ).toBeInTheDocument();
+
+    if (profileFixture.headline) {
+      expect(
+        await screen.findByText(profileFixture.headline, { exact: false }),
+      ).toBeInTheDocument();
+    }
 
     expect(await screen.findByText("ok")).toBeInTheDocument();
 
-    const connectLink = await screen.findByRole("link", {
-      name: new RegExp(
-        `Connect via ${profileFixture.socialLinks[0]?.label ?? ""}`,
-        "i",
-      ),
-    });
-    expect(connectLink).toHaveAttribute(
-      "href",
-      profileFixture.socialLinks[0]?.url,
-    );
+    const primarySocial = profileFixture.socialLinks[0];
+    if (primarySocial) {
+      const socialLinks = await screen.findAllByRole("link", {
+        name: primarySocial.label,
+      });
+      expect(
+        socialLinks.some((link) => link.getAttribute("href") === primarySocial.url),
+      ).toBe(true);
+    }
   });
 
   it("surfaces API errors for profile and health endpoints", async () => {

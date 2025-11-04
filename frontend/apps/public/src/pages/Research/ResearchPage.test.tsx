@@ -34,11 +34,15 @@ describe("ResearchPage", () => {
 
     await renderWithRouter({ initialEntries: ["/research"] });
 
-    const allButton = await screen.findByRole("button", {
-      name: /all topics/i,
+    const allEntriesButton = await screen.findByRole("button", {
+      name: /all entries/i,
     });
+    expect(allEntriesButton).toBeInTheDocument();
     const mlButton = await screen.findByRole("button", {
       name: /machine learning/i,
+    });
+    const allTagsButton = await screen.findByRole("button", {
+      name: /all tags/i,
     });
 
     expect(
@@ -61,7 +65,7 @@ describe("ResearchPage", () => {
       screen.getByRole("heading", { name: /Self-Supervised Models/i }),
     ).toBeInTheDocument();
 
-    await user.click(allButton);
+    await user.click(allTagsButton);
 
     expect(
       await screen.findByRole("heading", {

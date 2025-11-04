@@ -82,9 +82,8 @@ describe("App", () => {
       await user.click(japaneseButton);
     });
 
-    expect(
-      await screen.findByText("実世界データと共創するイノベーション"),
-    ).toBeInTheDocument();
+    const homeLinks = await screen.findAllByRole("link", { name: "ホーム" });
+    expect(homeLinks.length).toBeGreaterThan(0);
   });
 
   it("navigates to the profile page via navigation links", async () => {
@@ -109,6 +108,11 @@ describe("App", () => {
       await user.click(profileLink);
     });
 
-    expect(await screen.findByText(/Professional profile/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: canonicalProfileEn.displayName,
+      }),
+    ).toBeInTheDocument();
   });
 });

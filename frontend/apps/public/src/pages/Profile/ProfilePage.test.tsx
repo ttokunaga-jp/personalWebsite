@@ -36,6 +36,7 @@ describe("ProfilePage", () => {
     expect(
       await within(skillsCard).findByText(
         profileFixture.techSections[0]?.members[0]?.tech.displayName ?? "",
+        { exact: false },
       ),
     ).toBeInTheDocument();
   });

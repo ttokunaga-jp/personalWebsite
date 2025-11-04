@@ -71,7 +71,10 @@ export function ContactPage() {
     );
   }, [availability]);
 
-  const topics = config?.topics ?? [];
+  const topics = useMemo(
+    () => config?.topics ?? [],
+    [config?.topics],
+  );
 
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -325,25 +328,27 @@ export function ContactPage() {
               value={formState.agenda}
               onChange={handleInputChange("agenda")}
               required
-              aria-describedby={agendaErrorId}
+              aria-describedby={
+                formErrors.agenda ? `${consentId} ${agendaErrorId}` : consentId
+              }
               rows={6}
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-500 dark:focus:ring-sky-900/30"
             />
-            <span
-              id={consentId}
-              className="text-xs text-slate-500 dark:text-slate-400"
-            >
-              {config?.consentText ?? t("contact.form.consent")}
-            </span>
-            {formErrors.agenda ? (
-              <span
-                id={agendaErrorId}
-                className="text-xs text-rose-500 dark:text-rose-400"
-              >
-                {formErrors.agenda}
-              </span>
-            ) : null}
           </label>
+          <span
+            id={consentId}
+            className="text-xs text-slate-500 dark:text-slate-400"
+          >
+            {config?.consentText ?? t("contact.form.consent")}
+          </span>
+          {formErrors.agenda ? (
+            <span
+              id={agendaErrorId}
+              className="text-xs text-rose-500 dark:text-rose-400"
+            >
+              {formErrors.agenda}
+            </span>
+          ) : null}
 
           <label className="flex flex-col gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">

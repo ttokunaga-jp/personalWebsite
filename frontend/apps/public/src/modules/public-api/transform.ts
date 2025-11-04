@@ -9,6 +9,7 @@ import {
 
 import type {
   ContactConfigResponse,
+  ContactTopic,
   HomeChipSource,
   HomePageConfig,
   HomeQuickLink,
@@ -187,6 +188,13 @@ type RawResearchAsset = {
   sortOrder?: number | null;
 };
 
+type RawResearchTag =
+  | {
+      id?: number | string;
+      value?: string | null;
+    }
+  | string;
+
 export type RawResearchDocument = {
   id?: number | string;
   slug?: string | null;
@@ -201,10 +209,7 @@ export type RawResearchDocument = {
   highlightImageUrl?: string | null;
   imageAlt?: LocalizedText | null;
   isDraft?: boolean | null;
-  tags?: Array<{
-    id?: number | string;
-    value?: string | null;
-  }> | null;
+  tags?: RawResearchTag[] | null;
   links?: RawResearchLink[] | null;
   assets?: RawResearchAsset[] | null;
   tech?: RawTechMembership[] | null;
@@ -263,12 +268,17 @@ function toNumber(value: number | null | undefined, fallback = 0): number {
 }
 
 function selectLocalizedText(
-  text: LocalizedText | null | undefined,
+  text: LocalizedText | string | null | undefined,
   language: SupportedLanguage,
   fallback?: string,
 ): string | undefined {
   if (!text) {
     return fallback;
+  }
+
+  if (typeof text === "string") {
+    const normalised = normaliseString(text);
+    return normalised ?? fallback;
   }
 
   const primary =
@@ -341,23 +351,34 @@ function mapAffiliations(
     return clone(fallback);
   }
 
-  return rows
-    .map((row, index) => {
-      const name = normaliseString(row.name);
-      if (!name) {
-        return null;
-      }
-      return {
-        id: toStringId(row.id, `affiliation-${index}`),
-        name,
-        url: normaliseString(row.url),
-        description: selectLocalizedText(row.description ?? undefined, language),
-        startedAt: row.startedAt ?? "",
-        sortOrder: toNumber(row.sortOrder, index),
-      };
-    })
-    .filter((value): value is ProfileAffiliation => value !== null)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const mapped: ProfileAffiliation[] = [];
+  rows.forEach((row, index) => {
+    const name = normaliseString(row.name);
+    if (!name) {
+      return;
+    }
+
+    const affiliation: ProfileAffiliation = {
+      id: toStringId(row.id, `affiliation-${index}`),
+      name,
+      startedAt: row.startedAt ?? fallback[index]?.startedAt ?? "",
+      sortOrder: toNumber(row.sortOrder, index),
+    };
+
+    const url = normaliseString(row.url);
+    if (url) {
+      affiliation.url = url;
+    }
+
+    const description = selectLocalizedText(row.description ?? undefined, language);
+    if (description) {
+      affiliation.description = description;
+    }
+
+    mapped.push(affiliation);
+  });
+
+  return mapped.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function mapWorkHistory(
@@ -369,26 +390,37 @@ function mapWorkHistory(
     return clone(fallback);
   }
 
-  return rows
-    .map((row, index) => {
-      const organization = selectLocalizedText(row.organization ?? undefined, language);
-      const role = selectLocalizedText(row.role ?? undefined, language);
-      if (!organization || !role) {
-        return null;
-      }
-      return {
-        id: toStringId(row.id, `work-${index}`),
-        organization,
-        role,
-        summary: selectLocalizedText(row.summary ?? undefined, language),
-        startedAt: row.startedAt ?? "",
-        endedAt: row.endedAt ?? undefined,
-        externalUrl: normaliseString(row.externalUrl),
-        sortOrder: toNumber(row.sortOrder, index),
-      };
-    })
-    .filter((value): value is ProfileWorkHistoryItem => value !== null)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const mapped: ProfileWorkHistoryItem[] = [];
+  rows.forEach((row, index) => {
+    const organization = selectLocalizedText(row.organization ?? undefined, language);
+    const role = selectLocalizedText(row.role ?? undefined, language);
+    if (!organization || !role) {
+      return;
+    }
+
+    const item: ProfileWorkHistoryItem = {
+      id: toStringId(row.id, `work-${index}`),
+      organization,
+      role,
+      startedAt: row.startedAt ?? fallback[index]?.startedAt ?? "",
+      endedAt: row.endedAt ?? undefined,
+      sortOrder: toNumber(row.sortOrder, index),
+    };
+
+    const summary = selectLocalizedText(row.summary ?? undefined, language);
+    if (summary) {
+      item.summary = summary;
+    }
+
+    const externalUrl = normaliseString(row.externalUrl);
+    if (externalUrl) {
+      item.externalUrl = externalUrl;
+    }
+
+    mapped.push(item);
+  });
+
+  return mapped.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function mapTechSections(
@@ -400,30 +432,30 @@ function mapTechSections(
     return clone(fallback);
   }
 
-  return sections
-    .map((section, index) => {
-      const title = selectLocalizedText(section.title ?? undefined, language);
-      if (!title) {
-        return null;
-      }
+  const mapped: ProfileTechSection[] = [];
+  sections.forEach((section, index) => {
+    const title = selectLocalizedText(section.title ?? undefined, language);
+    if (!title) {
+      return;
+    }
 
-      const members =
-        section.members
-          ?.map((member) => mapTechMembership(member))
-          .filter((member): member is TechMembership => Boolean(member))
-          .sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
+    const members =
+      section.members
+        ?.map((member) => mapTechMembership(member))
+        .filter((member): member is TechMembership => Boolean(member))
+        .sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
 
-      return {
-        id: toStringId(section.id, `tech-section-${index}`),
-        title,
-        layout: section.layout ?? "grid",
-        breakpoint: section.breakpoint ?? "md",
-        sortOrder: toNumber(section.sortOrder, index),
-        members,
-      };
-    })
-    .filter((value): value is ProfileTechSection => value !== null)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+    mapped.push({
+      id: toStringId(section.id, `tech-section-${index}`),
+      title,
+      layout: section.layout ?? "grid",
+      breakpoint: section.breakpoint ?? "md",
+      sortOrder: toNumber(section.sortOrder, index),
+      members,
+    });
+  });
+
+  return mapped.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function mapSocialLinks(
@@ -491,29 +523,33 @@ function mapHomeQuickLinks(
     return clone(fallback);
   }
 
-  return links
-    .map((link, index) => {
-      const label = selectLocalizedText(link.label ?? undefined, language);
-      const cta = selectLocalizedText(link.cta ?? undefined, language);
-      const targetUrl = normaliseString(link.targetUrl);
-      if (!label || !cta || !targetUrl) {
-        return null;
-      }
+  const mapped: HomeQuickLink[] = [];
+  links.forEach((link, index) => {
+    const label = selectLocalizedText(link.label ?? undefined, language);
+    const cta = selectLocalizedText(link.cta ?? undefined, language);
+    const targetUrl = normaliseString(link.targetUrl);
+    if (!label || !cta || !targetUrl) {
+      return;
+    }
 
-      const section = (link.section ?? "profile") as HomeQuickLink["section"];
+    const item: HomeQuickLink = {
+      id: toStringId(link.id, `home-link-${index}`),
+      section: (link.section ?? "profile") as HomeQuickLink["section"],
+      label,
+      cta,
+      targetUrl,
+      sortOrder: toNumber(link.sortOrder, index),
+    };
 
-      return {
-        id: toStringId(link.id, `home-link-${index}`),
-        section,
-        label,
-        description: selectLocalizedText(link.description ?? undefined, language),
-        cta,
-        targetUrl,
-        sortOrder: toNumber(link.sortOrder, index),
-      };
-    })
-    .filter((value): value is HomeQuickLink => value !== null)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+    const description = selectLocalizedText(link.description ?? undefined, language);
+    if (description) {
+      item.description = description;
+    }
+
+    mapped.push(item);
+  });
+
+  return mapped.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function mapHomeChipSources(
@@ -525,25 +561,23 @@ function mapHomeChipSources(
     return clone(fallback);
   }
 
-  return sources
-    .map((source, index) => {
-      const label = selectLocalizedText(source.label ?? undefined, language);
-      if (!label) {
-        return null;
-      }
+  const mapped: HomeChipSource[] = [];
+  sources.forEach((source, index) => {
+    const label = selectLocalizedText(source.label ?? undefined, language);
+    if (!label) {
+      return;
+    }
 
-      const kind = (source.source ?? "tech") as HomeChipSource["source"];
+    mapped.push({
+      id: toStringId(source.id, `chip-source-${index}`),
+      source: (source.source ?? "tech") as HomeChipSource["source"],
+      label,
+      limit: Math.max(1, toNumber(source.limit, 6)),
+      sortOrder: toNumber(source.sortOrder, index),
+    });
+  });
 
-      return {
-        id: toStringId(source.id, `chip-source-${index}`),
-        source: kind,
-        label,
-        limit: Math.max(1, toNumber(source.limit, 6)),
-        sortOrder: toNumber(source.sortOrder, index),
-      };
-    })
-    .filter((value): value is HomeChipSource => value !== null)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  return mapped.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function transformHomeConfig(
@@ -626,26 +660,24 @@ function mapProjectLinks(
     return clone(fallback);
   }
 
-  return links
-    .map((link, index) => {
-      const label = selectLocalizedText(link.label ?? undefined, language);
-      const url = normaliseString(link.url);
-      if (!label || !url) {
-        return null;
-      }
+  const mapped: ProjectLink[] = [];
+  links.forEach((link, index) => {
+    const label = selectLocalizedText(link.label ?? undefined, language);
+    const url = normaliseString(link.url);
+    if (!label || !url) {
+      return;
+    }
 
-      const type = link.type ?? "other";
+    mapped.push({
+      id: toStringId(link.id, `project-link-${index}`),
+      type: (link.type ?? "other") as ProjectLink["type"],
+      label,
+      url,
+      sortOrder: toNumber(link.sortOrder, index),
+    });
+  });
 
-      return {
-        id: toStringId(link.id, `project-link-${index}`),
-        type: type as ProjectLink["type"],
-        label,
-        url,
-        sortOrder: toNumber(link.sortOrder, index),
-      };
-    })
-    .filter((value): value is ProjectLink => value !== null)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  return mapped.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function transformProject(
@@ -657,7 +689,9 @@ function transformProject(
 
   project.id = toStringId(raw.id ?? project.id, `project-${project.id}`);
   project.slug = normaliseString(raw.slug) ?? project.slug;
-  project.title = selectLocalizedText(raw.title ?? undefined, language, project.title ?? "");
+  const projectTitle =
+    selectLocalizedText(raw.title ?? undefined, language, project.title) ?? project.title;
+  project.title = projectTitle;
   project.summary = selectLocalizedText(raw.summary ?? undefined, language, project.summary);
   project.description = selectLocalizedText(
     raw.description ?? undefined,
@@ -681,8 +715,12 @@ function transformProject(
   );
   project.published = raw.published ?? project.published ?? true;
   project.sortOrder = toNumber(raw.sortOrder, project.sortOrder ?? 0);
-  project.createdAt = raw.createdAt ?? project.createdAt;
-  project.updatedAt = raw.updatedAt ?? project.updatedAt;
+  if (typeof raw.createdAt === "string") {
+    project.createdAt = raw.createdAt;
+  }
+  if (typeof raw.updatedAt === "string") {
+    project.updatedAt = raw.updatedAt;
+  }
 
   return project;
 }
@@ -712,23 +750,24 @@ function mapResearchLinks(
     return clone(fallback);
   }
 
-  return links
-    .map((link, index) => {
-      const label = selectLocalizedText(link.label ?? undefined, language);
-      const url = normaliseString(link.url);
-      if (!label || !url) {
-        return null;
-      }
-      return {
-        id: toStringId(link.id, `research-link-${index}`),
-        type: (link.type ?? "external") as ResearchLink["type"],
-        label,
-        url,
-        sortOrder: toNumber(link.sortOrder, index),
-      };
-    })
-    .filter((value): value is ResearchLink => value !== null)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const mapped: ResearchLink[] = [];
+  links.forEach((link, index) => {
+    const label = selectLocalizedText(link.label ?? undefined, language);
+    const url = normaliseString(link.url);
+    if (!label || !url) {
+      return;
+    }
+
+    mapped.push({
+      id: toStringId(link.id, `research-link-${index}`),
+      type: (link.type ?? "external") as ResearchLink["type"],
+      label,
+      url,
+      sortOrder: toNumber(link.sortOrder, index),
+    });
+  });
+
+  return mapped.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function mapResearchAssets(
@@ -740,21 +779,27 @@ function mapResearchAssets(
     return clone(fallback);
   }
 
-  return assets
-    .map((asset, index) => {
-      const url = normaliseString(asset.url);
-      if (!url) {
-        return null;
-      }
-      return {
-        id: toStringId(asset.id, `research-asset-${index}`),
-        url,
-        caption: selectLocalizedText(asset.caption ?? undefined, language),
-        sortOrder: toNumber(asset.sortOrder, index),
-      };
-    })
-    .filter((value): value is ResearchAsset => value !== null)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const mapped: ResearchAsset[] = [];
+  assets.forEach((asset, index) => {
+    const url = normaliseString(asset.url);
+    if (!url) {
+      return;
+    }
+
+    const caption = selectLocalizedText(asset.caption ?? undefined, language);
+    const item: ResearchAsset = {
+      id: toStringId(asset.id, `research-asset-${index}`),
+      url,
+      sortOrder: toNumber(asset.sortOrder, index),
+    };
+    if (caption) {
+      item.caption = caption;
+    }
+
+    mapped.push(item);
+  });
+
+  return mapped.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function transformResearchEntry(
@@ -767,19 +812,38 @@ function transformResearchEntry(
   entry.id = toStringId(raw.id ?? entry.id, `research-${entry.id}`);
   entry.slug = normaliseString(raw.slug) ?? entry.slug;
   entry.kind = (raw.kind ?? entry.kind ?? "research") as ResearchEntry["kind"];
-  entry.title = selectLocalizedText(raw.title ?? undefined, language, entry.title);
-  entry.overview = selectLocalizedText(raw.overview ?? undefined, language, entry.overview);
-  entry.outcome = selectLocalizedText(raw.outcome ?? undefined, language, entry.outcome);
-  entry.outlook = selectLocalizedText(raw.outlook ?? undefined, language, entry.outlook);
-  entry.externalUrl = normaliseString(raw.externalUrl) ?? entry.externalUrl;
-  entry.publishedAt = raw.publishedAt ?? entry.publishedAt;
-  entry.updatedAt = raw.updatedAt ?? entry.updatedAt;
+  const resolvedTitle =
+    selectLocalizedText(raw.title ?? undefined, language, entry.title) ?? entry.title;
+  entry.title = resolvedTitle;
+  entry.overview =
+    selectLocalizedText(raw.overview ?? undefined, language, entry.overview) ?? entry.overview;
+  entry.outcome =
+    selectLocalizedText(raw.outcome ?? undefined, language, entry.outcome) ?? entry.outcome;
+  entry.outlook =
+    selectLocalizedText(raw.outlook ?? undefined, language, entry.outlook) ?? entry.outlook;
+  const externalUrl = normaliseString(raw.externalUrl);
+  if (externalUrl) {
+    entry.externalUrl = externalUrl;
+  }
+  if (typeof raw.publishedAt === "string") {
+    entry.publishedAt = raw.publishedAt;
+  }
+  if (typeof raw.updatedAt === "string") {
+    entry.updatedAt = raw.updatedAt;
+  }
   entry.highlightImageUrl =
     normaliseString(raw.highlightImageUrl) ?? entry.highlightImageUrl;
   entry.imageAlt = selectLocalizedText(raw.imageAlt ?? undefined, language, entry.imageAlt);
   entry.isDraft = raw.isDraft ?? entry.isDraft ?? false;
   entry.tags =
-    raw.tags?.map((tag) => normaliseString(tag.value)).filter((tag): tag is string => Boolean(tag)) ??
+    raw.tags
+      ?.map((tag) => {
+        if (typeof tag === "string") {
+          return normaliseString(tag);
+        }
+        return normaliseString(tag.value);
+      })
+      .filter((tag): tag is string => Boolean(tag)) ??
     entry.tags;
   entry.links = mapResearchLinks(raw.links, language, entry.links);
   entry.assets = mapResearchAssets(raw.assets, language, entry.assets);
@@ -813,19 +877,22 @@ export function transformContactConfig(
 ): ContactConfigResponse {
   const language = resolveLanguage();
   const topics =
-    raw?.topics
-      ?.map((topic, index) => {
-        const label = selectLocalizedText(topic.label ?? undefined, language);
-        if (!label) {
-          return null;
-        }
-        return {
-          id: topic.id ?? `topic-${index}`,
-          label,
-          description: selectLocalizedText(topic.description ?? undefined, language),
-        };
-      })
-      .filter((topic): topic is ContactConfigResponse["topics"][number] => Boolean(topic)) ?? [];
+    raw?.topics?.reduce<ContactConfigResponse["topics"]>((acc, topic, index) => {
+      const label = selectLocalizedText(topic.label ?? undefined, language);
+      if (!label) {
+        return acc;
+      }
+      const description = selectLocalizedText(topic.description ?? undefined, language);
+      const item: ContactTopic = {
+        id: topic.id ?? `topic-${index}`,
+        label,
+      };
+      if (description) {
+        item.description = description;
+      }
+      acc.push(item);
+      return acc;
+    }, []) ?? [];
 
   return {
     heroTitle: selectLocalizedText(raw?.heroTitle ?? undefined, language),

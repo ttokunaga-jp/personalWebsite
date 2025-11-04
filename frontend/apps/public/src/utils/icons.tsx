@@ -50,7 +50,6 @@ const ZennIcon: IconComponent = (props) => (
 
 const iconMap: Partial<Record<SocialProvider, IconComponent>> = {
   github: GitHubIcon,
-  twitter: TwitterIcon,
   x: TwitterIcon,
   linkedin: LinkedInIcon,
   email: MailIcon,

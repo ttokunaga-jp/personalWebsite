@@ -1,4 +1,27 @@
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: personalwebsite-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: personal_website
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   backend:
     build:
       context: ./backend
@@ -8,6 +31,12 @@ services:
       - "8100:8100"
     volumes:
       - ./backend/config:/app/config:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      APP_DATABASE_HOST: mysql
+      APP_DATABASE_PORT: 3306
 
   frontend:
     build:
@@ -16,3 +45,6 @@ services:
       - "3000:8080"
     depends_on:
       - backend
+
+volumes:
+  mysql-data:

@@ -146,7 +146,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
   ```
   - API: http://localhost:8100
   - フロント (nginx): http://localhost:3000
-  - MySQL（Cloud SQL 互換）を別途起動し、`deploy/mysql/schema.sql` を適用して初期データベースを作成してください。Cloud SQL Proxy を利用する場合は `/cloudsql` ソケットをマウントし、`DB_INSTANCE_CONNECTION_NAME` を設定します。Firestore Token Store を利用する場合のみ `APP_FIRESTORE_*` を設定してください。
+  - Docker Compose に MySQL 8.0（ユーザー: `user` / パスワード: `password` / DB: `personal_website`）が含まれています。初回起動後に `docker compose exec mysql mysql -uuser -ppassword personal_website < deploy/mysql/schema.sql` でスキーマを適用してください。Cloud SQL Proxy を利用する場合は `/cloudsql` ソケットをマウントし、`DB_INSTANCE_CONNECTION_NAME` を設定します。Firestore Token Store を利用する場合のみ `APP_FIRESTORE_*` を設定してください。※この MySQL はローカル開発専用であり、Cloud Build / Terraform など GCP 側の構成には影響しません。
 - **ユーティリティ**:
 - `make build`: バックエンドバイナリ / フロント dist を生成
 - `make fmt`: Go / TypeScript のフォーマッタ実行

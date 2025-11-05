@@ -10,6 +10,7 @@ DATABASE_NAME="${DATABASE_NAME:-app}"
 # Use a dedicated app user to avoid CI environments that lock down root password authentication.
 MYSQL_SCHEMA_USER="${MYSQL_SCHEMA_USER:-schema_runner}"
 MYSQL_SCHEMA_PASSWORD="${MYSQL_SCHEMA_PASSWORD:-schema_runner_Pw123!}"
+MYSQL_HOST="${MYSQL_HOST:-127.0.0.1}"
 CONTAINER_NAME="schema-check-$(date +%s)"
 
 cleanup() {
@@ -32,6 +33,7 @@ docker run \
   --rm \
   --name "${CONTAINER_NAME}" \
   -e MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD}" \
+  -e MYSQL_ROOT_HOST="%" \
   -e MYSQL_DATABASE="${DATABASE_NAME}" \
   -e MYSQL_USER="${MYSQL_SCHEMA_USER}" \
   -e MYSQL_PASSWORD="${MYSQL_SCHEMA_PASSWORD}" \
@@ -45,7 +47,12 @@ docker run \
 
 echo "Waiting for MySQL container ${CONTAINER_NAME} to become ready..."
 for attempt in {1..30}; do
-  if docker exec "${CONTAINER_NAME}" mysqladmin ping -uroot -p"${MYSQL_ROOT_PASSWORD}" --silent; then
+  if docker exec "${CONTAINER_NAME}" mysqladmin \
+      --protocol=TCP \
+      --host "${MYSQL_HOST}" \
+      -uroot \
+      -p"${MYSQL_ROOT_PASSWORD}" \
+      --silent ping; then
     break
   fi
   sleep 2
@@ -58,16 +65,44 @@ done
 DB_USER="${MYSQL_SCHEMA_USER}"
 DB_PASSWORD="${MYSQL_SCHEMA_PASSWORD}"
 
-if ! docker exec "${CONTAINER_NAME}" mysql -u"${DB_USER}" -p"${DB_PASSWORD}" -e 'SELECT 1' "${DATABASE_NAME}" >/dev/null 2>&1; then
+schema_user_ready=false
+for attempt in {1..10}; do
+  if docker exec "${CONTAINER_NAME}" mysql \
+      --protocol=TCP \
+      --host "${MYSQL_HOST}" \
+      -u"${DB_USER}" \
+      -p"${DB_PASSWORD}" \
+      -e 'SELECT 1' "${DATABASE_NAME}" >/dev/null 2>&1; then
+    schema_user_ready=true
+    break
+  fi
+  sleep 1
+done
+
+if [[ "${schema_user_ready}" != "true" ]]; then
   echo "Warning: schema runner user authentication failed, falling back to root user for migrations." >&2
   DB_USER="root"
   DB_PASSWORD="${MYSQL_ROOT_PASSWORD}"
+  if ! docker exec "${CONTAINER_NAME}" mysql \
+      --protocol=TCP \
+      --host "${MYSQL_HOST}" \
+      -u"${DB_USER}" \
+      -p"${DB_PASSWORD}" \
+      -e 'SELECT 1' >/dev/null 2>&1; then
+    echo "ERROR: Unable to authenticate with root user. Check MYSQL_ROOT_PASSWORD." >&2
+    exit 1
+  fi
 fi
 
 apply_sql() {
   local file="$1"
   echo "Applying ${file}"
-  docker exec -i "${CONTAINER_NAME}" mysql -u"${DB_USER}" -p"${DB_PASSWORD}" "${DATABASE_NAME}" < "${file}"
+  docker exec -i "${CONTAINER_NAME}" mysql \
+    --protocol=TCP \
+    --host "${MYSQL_HOST}" \
+    -u"${DB_USER}" \
+    -p"${DB_PASSWORD}" \
+    "${DATABASE_NAME}" < "${file}"
 }
 
 apply_sql "deploy/mysql/schema.sql"

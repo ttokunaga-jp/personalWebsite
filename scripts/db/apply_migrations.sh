@@ -7,6 +7,9 @@ set -euo pipefail
 MYSQL_IMAGE="${MYSQL_IMAGE:-mysql:8.0}"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-root}"
 DATABASE_NAME="${DATABASE_NAME:-app}"
+# Use a dedicated app user to avoid CI environments that lock down root password authentication.
+MYSQL_SCHEMA_USER="${MYSQL_SCHEMA_USER:-schema_runner}"
+MYSQL_SCHEMA_PASSWORD="${MYSQL_SCHEMA_PASSWORD:-schema_runner_Pw123!}"
 CONTAINER_NAME="schema-check-$(date +%s)"
 
 cleanup() {
@@ -30,6 +33,8 @@ docker run \
   --name "${CONTAINER_NAME}" \
   -e MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD}" \
   -e MYSQL_DATABASE="${DATABASE_NAME}" \
+  -e MYSQL_USER="${MYSQL_SCHEMA_USER}" \
+  -e MYSQL_PASSWORD="${MYSQL_SCHEMA_PASSWORD}" \
   -d \
   "${MYSQL_IMAGE}" \
   --default-authentication-plugin=mysql_native_password \
@@ -50,10 +55,19 @@ for attempt in {1..30}; do
   fi
 done
 
+DB_USER="${MYSQL_SCHEMA_USER}"
+DB_PASSWORD="${MYSQL_SCHEMA_PASSWORD}"
+
+if ! docker exec "${CONTAINER_NAME}" mysql -u"${DB_USER}" -p"${DB_PASSWORD}" -e 'SELECT 1' "${DATABASE_NAME}" >/dev/null 2>&1; then
+  echo "Warning: schema runner user authentication failed, falling back to root user for migrations." >&2
+  DB_USER="root"
+  DB_PASSWORD="${MYSQL_ROOT_PASSWORD}"
+fi
+
 apply_sql() {
   local file="$1"
   echo "Applying ${file}"
-  docker exec -i "${CONTAINER_NAME}" mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" "${DATABASE_NAME}" < "${file}"
+  docker exec -i "${CONTAINER_NAME}" mysql -u"${DB_USER}" -p"${DB_PASSWORD}" "${DATABASE_NAME}" < "${file}"
 }
 
 apply_sql "deploy/mysql/schema.sql"

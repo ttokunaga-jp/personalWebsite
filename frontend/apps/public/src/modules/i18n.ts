@@ -206,6 +206,25 @@ export const resources = {
           message: "Message",
           slot: "Time slot",
           slotPlaceholder: "Select a time slot",
+          timezoneLabel: "Times display in {{timezone}}",
+          slotTime: "Local time",
+          view: {
+            single: "Single day",
+            multi: "Multi-day",
+            previous: "Previous",
+            next: "Next",
+          },
+          legendLabels: {
+            available: "Available",
+            reserved: "Reserved",
+            blackout: "Blackout",
+          },
+          status: {
+            available: "Available",
+            reserved: "Reserved",
+            blackout: "Unavailable",
+          },
+          noAvailability: "No availability in this range.",
           submit: "Request booking",
           submitting: "Submitting…",
           success:
@@ -222,6 +241,7 @@ export const resources = {
             messageLength:
               "Share at least 20 characters so we can prepare effectively.",
             slotRequired: "Select an available time slot.",
+            slotUnavailable: "The selected time slot is no longer available.",
           },
         },
         summary: {
@@ -236,7 +256,8 @@ export const resources = {
           title: "Reservation details",
           when: "Scheduled for {{datetime}}",
           calendarEvent: "Calendar event ID: {{id}}",
-          joinLink: "Join session link",
+          lookup: "Confirmation code: {{hash}}",
+          supportEmail: "Need help? Email {{email}}",
         },
         error: "Contact configuration could not be loaded. Please try again later.",
       },
@@ -462,6 +483,25 @@ export const resources = {
           message: "メッセージ",
           slot: "時間枠",
           slotPlaceholder: "時間枠を選択してください",
+          timezoneLabel: "表示時刻: {{timezone}}",
+          slotTime: "ローカル時刻",
+          view: {
+            single: "1日表示",
+            multi: "複数日表示",
+            previous: "前へ",
+            next: "次へ",
+          },
+          legendLabels: {
+            available: "予約可能",
+            reserved: "予約済み",
+            blackout: "ブロック",
+          },
+          status: {
+            available: "予約可能",
+            reserved: "予約済み",
+            blackout: "予約不可",
+          },
+          noAvailability: "この期間に空き枠はありません。",
           submit: "予約をリクエスト",
           submitting: "送信中…",
           success:
@@ -478,6 +518,7 @@ export const resources = {
             topicRequired: "トピックを選択してください。",
             messageLength: "具体的な内容を 20 文字以上で入力してください。",
             slotRequired: "予約する時間枠を選択してください。",
+            slotUnavailable: "選択した時間枠は利用できなくなりました。",
           },
         },
         summary: {
@@ -492,7 +533,8 @@ export const resources = {
           title: "予約内容の確認",
           when: "{{datetime}} に予定されています。",
           calendarEvent: "カレンダーイベント ID: {{id}}",
-          joinLink: "ミーティングリンクを開く",
+          lookup: "確認コード: {{hash}}",
+          supportEmail: "連絡先メールアドレス: {{email}}",
         },
         error:
           "お問い合わせ設定を取得できませんでした。時間をおいて再度お試しください。",

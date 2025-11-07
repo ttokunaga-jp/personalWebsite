@@ -33,6 +33,7 @@ func registerRoutes(
 		api.GET("/contact/config", contactHandler.GetConfig)
 		api.POST("/contact", contactHandler.SubmitContact)
 		api.POST("/contact/bookings", bookingHandler.CreateBooking)
+		api.GET("/contact/bookings/:lookupHash", bookingHandler.GetReservation)
 		api.GET("/auth/login", authHandler.Login)
 		api.GET("/auth/callback", authHandler.Callback)
 		if securityHandler != nil {
@@ -56,6 +57,7 @@ func registerRoutes(
 		publicV1.GET("/contact/config", contactHandler.GetConfig)
 		publicV1.POST("/contact", contactHandler.SubmitContact)
 		publicV1.POST("/contact/bookings", bookingHandler.CreateBooking)
+		publicV1.GET("/contact/bookings/:lookupHash", bookingHandler.GetReservation)
 	}
 
 	admin := api.Group("/admin")
@@ -63,6 +65,7 @@ func registerRoutes(
 	{
 		admin.GET("/health", healthHandler.Ping)
 		admin.GET("/summary", adminHandler.Summary)
+		admin.GET("/tech-catalog", adminHandler.ListTechCatalog)
 
 		admin.GET("/profile", adminHandler.GetProfile)
 		admin.PUT("/profile", adminHandler.UpdateProfile)

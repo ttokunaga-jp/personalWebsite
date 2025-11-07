@@ -8,6 +8,11 @@ import type {
   AdminSummary,
   BlacklistEntry,
   ContactMessage,
+  LocalizedText,
+  ResearchKind,
+  ResearchLinkType,
+  TechCatalogEntry,
+  TechContext,
 } from "../types";
 
 type ProfilePayload = {
@@ -23,7 +28,13 @@ type ProfilePayload = {
 type ProjectPayload = {
   title: { ja?: string; en?: string };
   description: { ja?: string; en?: string };
-  techStack: string[];
+  tech: {
+    membershipId?: number;
+    techId: number;
+    context: TechContext;
+    note: string;
+    sortOrder: number;
+  }[];
   linkUrl: string;
   year: number;
   published: boolean;
@@ -31,11 +42,38 @@ type ProjectPayload = {
 };
 
 type ResearchPayload = {
-  title: { ja?: string; en?: string };
-  summary: { ja?: string; en?: string };
-  contentMd: { ja?: string; en?: string };
-  year: number;
-  published: boolean;
+  slug: string;
+  kind: ResearchKind;
+  title: LocalizedText;
+  overview: LocalizedText;
+  outcome: LocalizedText;
+  outlook: LocalizedText;
+  externalUrl: string;
+  highlightImageUrl: string;
+  imageAlt: LocalizedText;
+  publishedAt: string;
+  isDraft: boolean;
+  tags: { id?: number; value: string; sortOrder: number }[];
+  links: {
+    id?: number;
+    type: ResearchLinkType;
+    label: LocalizedText;
+    url: string;
+    sortOrder: number;
+  }[];
+  assets: {
+    id?: number;
+    url: string;
+    caption: LocalizedText;
+    sortOrder: number;
+  }[];
+  tech: {
+    membershipId?: number;
+    techId: number;
+    context: TechContext;
+    note: string;
+    sortOrder: number;
+  }[];
 };
 
 type ContactUpdatePayload = {
@@ -78,6 +116,9 @@ async function unwrap<T>(promise: ApiClientPromise<T>): ApiResult<T> {
 type AdminApi = {
   health: () => ApiResult<{ status: string }>;
   fetchSummary: () => ApiResult<AdminSummary>;
+  listTechCatalog: (params?: {
+    includeInactive?: boolean;
+  }) => ApiResult<TechCatalogEntry[]>;
   getProfile: () => ApiResult<AdminProfile>;
   updateProfile: (payload: ProfilePayload) => ApiResult<AdminProfile>;
   listProjects: () => ApiResult<AdminProject[]>;
@@ -123,6 +164,14 @@ type AdminApi = {
 export const adminApi: AdminApi = {
   health: () => unwrap(apiClient.get<{ status: string }>("/admin/health")),
   fetchSummary: () => unwrap(apiClient.get<AdminSummary>("/admin/summary")),
+  listTechCatalog: (params) =>
+    unwrap(
+      apiClient.get<TechCatalogEntry[]>("/admin/tech-catalog", {
+        params: {
+          includeInactive: params?.includeInactive ?? false,
+        },
+      }),
+    ),
   getProfile: () => unwrap(apiClient.get<AdminProfile>("/admin/profile")),
   updateProfile: (payload: ProfilePayload) =>
     unwrap(apiClient.put<AdminProfile>("/admin/profile", payload)),

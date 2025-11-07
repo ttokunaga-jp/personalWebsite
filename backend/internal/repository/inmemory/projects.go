@@ -47,7 +47,8 @@ func (r *projectRepository) ListProjects(ctx context.Context) ([]model.Project, 
 			ID:          p.ID,
 			Title:       p.Title,
 			Description: p.Description,
-			TechStack:   append([]string(nil), p.TechStack...),
+			Tech:        cloneProjectTechMemberships(p.Tech),
+			TechStack:   techDisplayNamesFromMemberships(p.Tech),
 			LinkURL:     p.LinkURL,
 			Year:        p.Year,
 		})
@@ -137,8 +138,55 @@ func copyAdminProject(src model.AdminProject) model.AdminProject {
 		value := *src.SortOrder
 		dst.SortOrder = &value
 	}
-	dst.TechStack = append([]string(nil), src.TechStack...)
+	dst.Tech = cloneProjectTechMemberships(src.Tech)
 	return dst
+}
+
+func cloneProjectTechMemberships(src []model.TechMembership) []model.TechMembership {
+	if len(src) == 0 {
+		return nil
+	}
+	result := make([]model.TechMembership, len(src))
+	for i, membership := range src {
+		result[i] = model.TechMembership{
+			MembershipID: membership.MembershipID,
+			EntityType:   membership.EntityType,
+			EntityID:     membership.EntityID,
+			Tech: model.TechCatalogEntry{
+				ID:          membership.Tech.ID,
+				Slug:        membership.Tech.Slug,
+				DisplayName: membership.Tech.DisplayName,
+				Category:    membership.Tech.Category,
+				Level:       membership.Tech.Level,
+				Icon:        membership.Tech.Icon,
+				SortOrder:   membership.Tech.SortOrder,
+				Active:      membership.Tech.Active,
+				CreatedAt:   membership.Tech.CreatedAt,
+				UpdatedAt:   membership.Tech.UpdatedAt,
+			},
+			Context:   membership.Context,
+			Note:      membership.Note,
+			SortOrder: membership.SortOrder,
+		}
+	}
+	return result
+}
+
+func techDisplayNamesFromMemberships(tech []model.TechMembership) []string {
+	if len(tech) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(tech))
+	for _, membership := range tech {
+		if membership.Tech.DisplayName == "" {
+			continue
+		}
+		names = append(names, membership.Tech.DisplayName)
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return names
 }
 
 var _ repository.ProjectRepository = (*projectRepository)(nil)

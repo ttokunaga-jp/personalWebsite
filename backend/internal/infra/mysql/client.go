@@ -68,11 +68,27 @@ func NewClient(lc fx.Lifecycle, cfg *config.AppConfig) (*sqlx.DB, error) {
 	db.SetMaxIdleConns(valueOrDefault(dbCfg.MaxIdleConns, 5))
 	db.SetConnMaxLifetime(valueOrDefaultDuration(dbCfg.ConnMaxLifetime, 30*time.Minute))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("mysql client: ping: %w", err)
+	const (
+		maxAttempts       = 6
+		backoffPerAttempt = 2 * time.Second
+	)
+
+	var pingErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		pingErr = db.PingContext(ctx)
+		cancel()
+		if pingErr == nil {
+			break
+		}
+
+		if attempt == maxAttempts {
+			_ = db.Close()
+			return nil, fmt.Errorf("mysql client: ping: %w", pingErr)
+		}
+
+		log.Printf("mysql client: ping attempt %d/%d failed (%v), retrying in %s", attempt, maxAttempts, pingErr, backoffPerAttempt)
+		time.Sleep(backoffPerAttempt)
 	}
 
 	lc.Append(fx.Hook{

@@ -13,8 +13,10 @@ type BookingRequest struct {
 	RecaptchaToken  string    `json:"recaptchaToken"`
 }
 
-// BookingResult summarises a booked meeting and associated Calendar event metadata.
+// BookingResult summarises a booked meeting reservation and associated metadata.
 type BookingResult struct {
-	Meeting         Meeting `json:"meeting"`
-	CalendarEventID string  `json:"calendarEventId"`
+	Reservation      MeetingReservation `json:"reservation"`
+	CalendarEventID  string             `json:"calendarEventId"`
+	SupportEmail     string             `json:"supportEmail"`
+	CalendarTimezone string             `json:"calendarTimezone"`
 }

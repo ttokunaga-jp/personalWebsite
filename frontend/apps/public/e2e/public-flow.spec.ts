@@ -51,8 +51,8 @@ test.beforeEach(async ({ page }) => {
         json: {
           data: {
             ...defaultBookingResponse,
-            meeting: {
-              ...defaultBookingResponse.meeting,
+            reservation: {
+              ...defaultBookingResponse.reservation,
               id: meetingId
             }
           }

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -30,6 +31,20 @@ func (h *AdminHandler) Summary(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, summary)
+}
+
+// Profile management --------------------------------------------------------
+
+// Tech catalog --------------------------------------------------------------
+
+func (h *AdminHandler) ListTechCatalog(c *gin.Context) {
+	includeInactive := c.Query("includeInactive") == "true"
+	entries, err := h.svc.ListTechCatalog(c.Request.Context(), includeInactive)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, entries)
 }
 
 // Profile management --------------------------------------------------------
@@ -146,7 +161,12 @@ func (h *AdminHandler) CreateResearch(c *gin.Context) {
 		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid research payload", err))
 		return
 	}
-	item, err := h.svc.CreateResearch(c.Request.Context(), req.toInput())
+	input, err := req.toInput()
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	item, err := h.svc.CreateResearch(c.Request.Context(), input)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -177,7 +197,12 @@ func (h *AdminHandler) UpdateResearch(c *gin.Context) {
 		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid research payload", err))
 		return
 	}
-	item, err := h.svc.UpdateResearch(c.Request.Context(), id, req.toInput())
+	input, err := req.toInput()
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	item, err := h.svc.UpdateResearch(c.Request.Context(), id, input)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -349,43 +374,169 @@ func (r profileRequest) toInput() adminsvc.ProfileInput {
 }
 
 type projectRequest struct {
-	Title       model.LocalizedText `json:"title"`
-	Description model.LocalizedText `json:"description"`
-	TechStack   []string            `json:"techStack"`
-	LinkURL     string              `json:"linkUrl"`
-	Year        int                 `json:"year"`
-	Published   bool                `json:"published"`
-	SortOrder   *int                `json:"sortOrder"`
+	Title       model.LocalizedText  `json:"title"`
+	Description model.LocalizedText  `json:"description"`
+	Tech        []projectTechRequest `json:"tech"`
+	LinkURL     string               `json:"linkUrl"`
+	Year        int                  `json:"year"`
+	Published   bool                 `json:"published"`
+	SortOrder   *int                 `json:"sortOrder"`
 }
 
 func (r projectRequest) toInput() adminsvc.ProjectInput {
-	return adminsvc.ProjectInput{
+	input := adminsvc.ProjectInput{
 		Title:       r.Title,
 		Description: r.Description,
-		TechStack:   r.TechStack,
 		LinkURL:     r.LinkURL,
 		Year:        r.Year,
 		Published:   r.Published,
 		SortOrder:   r.SortOrder,
 	}
+	if len(r.Tech) > 0 {
+		tech := make([]adminsvc.ProjectTechInput, 0, len(r.Tech))
+		for _, membership := range r.Tech {
+			tech = append(tech, adminsvc.ProjectTechInput{
+				MembershipID: membership.MembershipID,
+				TechID:       membership.TechID,
+				Context:      model.TechContext(strings.TrimSpace(membership.Context)),
+				Note:         strings.TrimSpace(membership.Note),
+				SortOrder:    membership.SortOrder,
+			})
+		}
+		input.Tech = tech
+	}
+	return input
+}
+
+type projectTechRequest struct {
+	MembershipID uint64 `json:"membershipId"`
+	TechID       uint64 `json:"techId"`
+	Context      string `json:"context"`
+	Note         string `json:"note"`
+	SortOrder    int    `json:"sortOrder"`
 }
 
 type researchRequest struct {
-	Title     model.LocalizedText `json:"title"`
-	Summary   model.LocalizedText `json:"summary"`
-	ContentMD model.LocalizedText `json:"contentMd"`
-	Year      int                 `json:"year"`
-	Published bool                `json:"published"`
+	Slug              string                 `json:"slug"`
+	Kind              string                 `json:"kind"`
+	Title             model.LocalizedText    `json:"title"`
+	Overview          model.LocalizedText    `json:"overview"`
+	Outcome           model.LocalizedText    `json:"outcome"`
+	Outlook           model.LocalizedText    `json:"outlook"`
+	ExternalURL       string                 `json:"externalUrl"`
+	HighlightImageURL string                 `json:"highlightImageUrl"`
+	ImageAlt          model.LocalizedText    `json:"imageAlt"`
+	PublishedAt       string                 `json:"publishedAt"`
+	IsDraft           bool                   `json:"isDraft"`
+	Tags              []researchTagRequest   `json:"tags"`
+	Links             []researchLinkRequest  `json:"links"`
+	Assets            []researchAssetRequest `json:"assets"`
+	Tech              []researchTechRequest  `json:"tech"`
 }
 
-func (r researchRequest) toInput() adminsvc.ResearchInput {
-	return adminsvc.ResearchInput{
-		Title:     r.Title,
-		Summary:   r.Summary,
-		ContentMD: r.ContentMD,
-		Year:      r.Year,
-		Published: r.Published,
+type researchTagRequest struct {
+	ID        uint64 `json:"id"`
+	Value     string `json:"value"`
+	SortOrder int    `json:"sortOrder"`
+}
+
+type researchLinkRequest struct {
+	ID        uint64              `json:"id"`
+	Type      string              `json:"type"`
+	Label     model.LocalizedText `json:"label"`
+	URL       string              `json:"url"`
+	SortOrder int                 `json:"sortOrder"`
+}
+
+type researchAssetRequest struct {
+	ID        uint64              `json:"id"`
+	URL       string              `json:"url"`
+	Caption   model.LocalizedText `json:"caption"`
+	SortOrder int                 `json:"sortOrder"`
+}
+
+type researchTechRequest struct {
+	MembershipID uint64 `json:"membershipId"`
+	TechID       uint64 `json:"techId"`
+	Context      string `json:"context"`
+	Note         string `json:"note"`
+	SortOrder    int    `json:"sortOrder"`
+}
+
+func (r researchRequest) toInput() (adminsvc.ResearchInput, error) {
+	publishedAt, err := parseRFC3339Timestamp(r.PublishedAt)
+	if err != nil {
+		return adminsvc.ResearchInput{}, err
 	}
+
+	input := adminsvc.ResearchInput{
+		Slug:              strings.TrimSpace(r.Slug),
+		Kind:              model.ResearchKind(strings.TrimSpace(r.Kind)),
+		Title:             r.Title,
+		Overview:          r.Overview,
+		Outcome:           r.Outcome,
+		Outlook:           r.Outlook,
+		ExternalURL:       strings.TrimSpace(r.ExternalURL),
+		HighlightImageURL: strings.TrimSpace(r.HighlightImageURL),
+		ImageAlt:          r.ImageAlt,
+		PublishedAt:       publishedAt,
+		IsDraft:           r.IsDraft,
+	}
+
+	if len(r.Tags) > 0 {
+		tags := make([]adminsvc.ResearchTagInput, 0, len(r.Tags))
+		for _, tag := range r.Tags {
+			tags = append(tags, adminsvc.ResearchTagInput{
+				ID:        tag.ID,
+				Value:     strings.TrimSpace(tag.Value),
+				SortOrder: tag.SortOrder,
+			})
+		}
+		input.Tags = tags
+	}
+
+	if len(r.Links) > 0 {
+		links := make([]adminsvc.ResearchLinkInput, 0, len(r.Links))
+		for _, link := range r.Links {
+			links = append(links, adminsvc.ResearchLinkInput{
+				ID:        link.ID,
+				Type:      model.ResearchLinkType(strings.TrimSpace(link.Type)),
+				Label:     link.Label,
+				URL:       strings.TrimSpace(link.URL),
+				SortOrder: link.SortOrder,
+			})
+		}
+		input.Links = links
+	}
+
+	if len(r.Assets) > 0 {
+		assets := make([]adminsvc.ResearchAssetInput, 0, len(r.Assets))
+		for _, asset := range r.Assets {
+			assets = append(assets, adminsvc.ResearchAssetInput{
+				ID:        asset.ID,
+				URL:       strings.TrimSpace(asset.URL),
+				Caption:   asset.Caption,
+				SortOrder: asset.SortOrder,
+			})
+		}
+		input.Assets = assets
+	}
+
+	if len(r.Tech) > 0 {
+		tech := make([]adminsvc.ResearchTechInput, 0, len(r.Tech))
+		for _, item := range r.Tech {
+			tech = append(tech, adminsvc.ResearchTechInput{
+				MembershipID: item.MembershipID,
+				TechID:       item.TechID,
+				Context:      model.TechContext(strings.TrimSpace(item.Context)),
+				Note:         strings.TrimSpace(item.Note),
+				SortOrder:    item.SortOrder,
+			})
+		}
+		input.Tech = tech
+	}
+
+	return input, nil
 }
 
 type contactUpdateRequest struct {
@@ -414,4 +565,21 @@ func (r blacklistRequest) toInput() adminsvc.BlacklistInput {
 		Email:  r.Email,
 		Reason: r.Reason,
 	}
+}
+
+func parseRFC3339Timestamp(value string) (time.Time, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return time.Time{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "publishedAt is required", nil)
+	}
+	layouts := []string{time.RFC3339Nano, time.RFC3339}
+	var parseErr error
+	for _, layout := range layouts {
+		if ts, err := time.Parse(layout, trimmed); err == nil {
+			return ts, nil
+		} else {
+			parseErr = err
+		}
+	}
+	return time.Time{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid publishedAt", parseErr)
 }

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/takumi/personal-website/internal/model"
 )
@@ -24,10 +25,10 @@ type AdminProfileRepository interface {
 // AdminResearchRepository manages research CRUD operations for the admin surface.
 type AdminResearchRepository interface {
 	ListAdminResearch(ctx context.Context) ([]model.AdminResearch, error)
-	GetAdminResearch(ctx context.Context, id int64) (*model.AdminResearch, error)
+	GetAdminResearch(ctx context.Context, id uint64) (*model.AdminResearch, error)
 	CreateAdminResearch(ctx context.Context, item *model.AdminResearch) (*model.AdminResearch, error)
 	UpdateAdminResearch(ctx context.Context, item *model.AdminResearch) (*model.AdminResearch, error)
-	DeleteAdminResearch(ctx context.Context, id int64) error
+	DeleteAdminResearch(ctx context.Context, id uint64) error
 }
 
 // BlogRepository manages administrator blog CRUD.
@@ -39,13 +40,19 @@ type BlogRepository interface {
 	DeleteBlogPost(ctx context.Context, id int64) error
 }
 
-// MeetingRepository manages reservations.
-type MeetingRepository interface {
-	ListMeetings(ctx context.Context) ([]model.Meeting, error)
-	GetMeeting(ctx context.Context, id int64) (*model.Meeting, error)
-	CreateMeeting(ctx context.Context, meeting *model.Meeting) (*model.Meeting, error)
-	UpdateMeeting(ctx context.Context, meeting *model.Meeting) (*model.Meeting, error)
-	DeleteMeeting(ctx context.Context, id int64) error
+// MeetingReservationRepository manages reservations backed by meeting_reservations.
+type MeetingReservationRepository interface {
+	CreateReservation(ctx context.Context, reservation *model.MeetingReservation) (*model.MeetingReservation, error)
+	FindReservationByLookupHash(ctx context.Context, lookupHash string) (*model.MeetingReservation, error)
+	ListConflictingReservations(ctx context.Context, start, end time.Time) ([]model.MeetingReservation, error)
+	MarkConfirmationSent(ctx context.Context, id uint64, sentAt time.Time) (*model.MeetingReservation, error)
+	CancelReservation(ctx context.Context, id uint64, reason string) (*model.MeetingReservation, error)
+}
+
+// MeetingNotificationRepository records outgoing notifications linked to reservations.
+type MeetingNotificationRepository interface {
+	RecordNotification(ctx context.Context, notification *model.MeetingNotification) (*model.MeetingNotification, error)
+	ListNotifications(ctx context.Context, reservationID uint64) ([]model.MeetingNotification, error)
 }
 
 // AdminContactRepository exposes management capabilities for contact submissions.

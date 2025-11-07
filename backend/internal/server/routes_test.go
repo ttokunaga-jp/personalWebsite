@@ -135,7 +135,15 @@ func TestRegisterRoutes(t *testing.T) {
 
 		rec := performRequest(engine, http.MethodPost, "/api/contact/bookings", body)
 		require.Equal(t, http.StatusCreated, rec.Code)
-		require.Contains(t, rec.Body.String(), `"calendarEventId"`)
+		require.Contains(t, rec.Body.String(), `"reservation"`)
+		require.Contains(t, rec.Body.String(), `"supportEmail"`)
+	})
+
+	t.Run("booking lookup route returns reservation", func(t *testing.T) {
+		t.Helper()
+		rec := performRequest(engine, http.MethodGet, "/api/contact/bookings/lookup-123", nil)
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Contains(t, rec.Body.String(), `"lookup-123"`)
 	})
 
 	t.Run("profile route returns data", func(t *testing.T) {
@@ -539,20 +547,33 @@ type stubBookingService struct{}
 func (s *stubBookingService) Book(context.Context, model.BookingRequest) (*model.BookingResult, error) {
 	now := time.Now().UTC()
 	return &model.BookingResult{
-		Meeting: model.Meeting{
-			ID:              1,
-			Name:            "Alan Turing",
-			Email:           "alan@example.com",
-			Datetime:        now,
-			DurationMinutes: 45,
-			MeetURL:         "https://meet.example.com/test",
-			CalendarEventID: "evt-123",
-			Status:          model.MeetingStatusPending,
-			CreatedAt:       now,
-			UpdatedAt:       now,
+		Reservation: model.MeetingReservation{
+			ID:                     1,
+			LookupHash:             "lookup-123",
+			Name:                   "Alan Turing",
+			Email:                  "alan@example.com",
+			StartAt:                now,
+			EndAt:                  now.Add(45 * time.Minute),
+			DurationMinutes:        45,
+			GoogleEventID:          "evt-123",
+			GoogleCalendarStatus:   "confirmed",
+			Status:                 model.MeetingReservationStatusPending,
+			CreatedAt:              now,
+			UpdatedAt:              now,
+			LastNotificationSentAt: &now,
 		},
-		CalendarEventID: "evt-123",
+		CalendarEventID:  "evt-123",
+		SupportEmail:     "support@example.com",
+		CalendarTimezone: "UTC",
 	}, nil
+}
+
+func (s *stubBookingService) LookupReservation(context.Context, string) (*model.BookingResult, error) {
+	return s.Book(context.Background(), model.BookingRequest{})
+}
+
+func (s *stubBookingService) CancelReservation(context.Context, string, string) (*model.BookingResult, error) {
+	return s.Book(context.Background(), model.BookingRequest{})
 }
 
 type stubAdminService struct{}
@@ -594,10 +615,26 @@ func (s *stubAdminService) ListProjects(context.Context) ([]model.AdminProject, 
 			ID:          1,
 			Title:       model.NewLocalizedText("プロジェクト", "Project"),
 			Description: model.NewLocalizedText("説明", "Description"),
-			TechStack:   []string{"Go"},
-			LinkURL:     "https://example.com",
-			Year:        2024,
-			Published:   true,
+			Tech: []model.TechMembership{
+				{
+					MembershipID: 1,
+					EntityType:   "project",
+					EntityID:     1,
+					Tech: model.TechCatalogEntry{
+						ID:          1,
+						Slug:        "go",
+						DisplayName: "Go",
+						Level:       model.TechLevelAdvanced,
+						SortOrder:   1,
+						Active:      true,
+					},
+					Context:   model.TechContextPrimary,
+					SortOrder: 1,
+				},
+			},
+			LinkURL:   "https://example.com",
+			Year:      2024,
+			Published: true,
 		},
 	}, nil
 }
@@ -616,6 +653,19 @@ func (s *stubAdminService) UpdateProject(context.Context, int64, adminsvc.Projec
 
 func (s *stubAdminService) DeleteProject(context.Context, int64) error {
 	return nil
+}
+
+func (s *stubAdminService) ListTechCatalog(context.Context, bool) ([]model.TechCatalogEntry, error) {
+	return []model.TechCatalogEntry{
+		{
+			ID:          1,
+			Slug:        "go",
+			DisplayName: "Go",
+			Level:       model.TechLevelAdvanced,
+			SortOrder:   1,
+			Active:      true,
+		},
+	}, nil
 }
 
 func (s *stubAdminService) ListResearch(context.Context) ([]model.AdminResearch, error) {

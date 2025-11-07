@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -11,6 +13,137 @@ import (
 	"github.com/takumi/personal-website/internal/model"
 	"github.com/takumi/personal-website/internal/repository"
 )
+
+const researchEntityType = "research_blog"
+
+const listPublicResearchQuery = `
+SELECT
+	r.id,
+	r.slug,
+	r.kind,
+	r.title_ja,
+	r.title_en,
+	r.overview_ja,
+	r.overview_en,
+	r.outcome_ja,
+	r.outcome_en,
+	r.published_at,
+	r.is_draft
+FROM research_blog_entries r
+WHERE r.is_draft = 0
+ORDER BY r.published_at DESC, r.id DESC`
+
+const baseAdminResearchQuery = `
+SELECT
+	r.id,
+	r.slug,
+	r.kind,
+	r.title_ja,
+	r.title_en,
+	r.overview_ja,
+	r.overview_en,
+	r.outcome_ja,
+	r.outcome_en,
+	r.outlook_ja,
+	r.outlook_en,
+	r.external_url,
+	r.highlight_image_url,
+	r.image_alt_ja,
+	r.image_alt_en,
+	r.published_at,
+	r.is_draft,
+	r.created_at,
+	r.updated_at
+FROM research_blog_entries r
+%s
+ORDER BY r.published_at DESC, r.id DESC`
+
+const insertResearchEntryQuery = `
+INSERT INTO research_blog_entries (
+	slug,
+	kind,
+	title_ja,
+	title_en,
+	overview_ja,
+	overview_en,
+	outcome_ja,
+	outcome_en,
+	outlook_ja,
+	outlook_en,
+	external_url,
+	highlight_image_url,
+	image_alt_ja,
+	image_alt_en,
+	published_at,
+	is_draft,
+	created_at,
+	updated_at
+) VALUES (
+	?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3)
+)`
+
+const updateResearchEntryQuery = `
+UPDATE research_blog_entries
+SET
+	slug = ?,
+	kind = ?,
+	title_ja = ?,
+	title_en = ?,
+	overview_ja = ?,
+	overview_en = ?,
+	outcome_ja = ?,
+	outcome_en = ?,
+	outlook_ja = ?,
+	outlook_en = ?,
+	external_url = ?,
+	highlight_image_url = ?,
+	image_alt_ja = ?,
+	image_alt_en = ?,
+	published_at = ?,
+	is_draft = ?,
+	updated_at = NOW(3)
+WHERE id = ?`
+
+const deleteResearchEntryQuery = `DELETE FROM research_blog_entries WHERE id = ?`
+
+const deleteResearchTagsQuery = `DELETE FROM research_blog_tags WHERE entry_id = ?`
+const deleteResearchLinksQuery = `DELETE FROM research_blog_links WHERE entry_id = ?`
+const deleteResearchAssetsQuery = `DELETE FROM research_blog_assets WHERE entry_id = ?`
+const deleteResearchTechQuery = `DELETE FROM tech_relationships WHERE entity_type = ? AND entity_id = ?`
+
+const insertResearchTagQuery = `
+INSERT INTO research_blog_tags (entry_id, tag, sort_order)
+VALUES (?, ?, ?)`
+
+const insertResearchLinkQuery = `
+INSERT INTO research_blog_links (
+	entry_id,
+	link_type,
+	label_ja,
+	label_en,
+	url,
+	sort_order
+) VALUES (?, ?, ?, ?, ?, ?)`
+
+const insertResearchAssetQuery = `
+INSERT INTO research_blog_assets (
+	entry_id,
+	asset_url,
+	caption_ja,
+	caption_en,
+	sort_order
+) VALUES (?, ?, ?, ?, ?)`
+
+const insertResearchTechQuery = `
+INSERT INTO tech_relationships (
+	entity_type,
+	entity_id,
+	tech_id,
+	context,
+	note,
+	sort_order,
+	created_at
+) VALUES (?, ?, ?, ?, ?, ?, NOW(3))`
 
 type researchRepository struct {
 	db *sqlx.DB
@@ -21,146 +154,84 @@ func NewResearchRepository(db *sqlx.DB) repository.ResearchRepository {
 	return &researchRepository{db: db}
 }
 
-const listResearchQuery = `
-SELECT
-	r.id,
-	r.year,
-	r.title_ja,
-	r.title_en,
-	r.summary_ja,
-	r.summary_en,
-	r.content_md_ja,
-	r.content_md_en
-FROM research r
-WHERE r.published = TRUE
-ORDER BY COALESCE(r.sort_order, r.year * 1000), r.year DESC, r.id`
-
-const listAdminResearchQuery = `
-SELECT
-	r.id,
-	r.year,
-	r.title_ja,
-	r.title_en,
-	r.summary_ja,
-	r.summary_en,
-	r.content_md_ja,
-	r.content_md_en,
-	r.published,
-	r.sort_order,
-	r.created_at,
-	r.updated_at
-FROM research r
-ORDER BY COALESCE(r.sort_order, r.year * 1000), r.year DESC, r.id`
-
-const getAdminResearchQuery = `
-SELECT
-	r.id,
-	r.year,
-	r.title_ja,
-	r.title_en,
-	r.summary_ja,
-	r.summary_en,
-	r.content_md_ja,
-	r.content_md_en,
-	r.published,
-	r.sort_order,
-	r.created_at,
-	r.updated_at
-FROM research r
-WHERE r.id = ?`
-
-const insertResearchQuery = `
-INSERT INTO research (
-	title_ja,
-	title_en,
-	summary_ja,
-	summary_en,
-	content_md_ja,
-	content_md_en,
-	year,
-	published,
-	sort_order,
-	created_at,
-	updated_at
-)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`
-
-const updateResearchQuery = `
-UPDATE research
-SET
-	title_ja = ?,
-	title_en = ?,
-	summary_ja = ?,
-	summary_en = ?,
-	content_md_ja = ?,
-	content_md_en = ?,
-	year = ?,
-	published = ?,
-	sort_order = ?,
-	updated_at = NOW()
-WHERE id = ?`
-
-const deleteResearchQuery = `DELETE FROM research WHERE id = ?`
-
-type researchRow struct {
-	ID        int64          `db:"id"`
-	Year      int            `db:"year"`
-	TitleJA   sql.NullString `db:"title_ja"`
-	TitleEN   sql.NullString `db:"title_en"`
-	SummaryJA sql.NullString `db:"summary_ja"`
-	SummaryEN sql.NullString `db:"summary_en"`
-	ContentJA sql.NullString `db:"content_md_ja"`
-	ContentEN sql.NullString `db:"content_md_en"`
-	Published sql.NullBool   `db:"published"`
-	SortOrder sql.NullInt64  `db:"sort_order"`
-	CreatedAt sql.NullTime   `db:"created_at"`
-	UpdatedAt sql.NullTime   `db:"updated_at"`
+type researchEntryRow struct {
+	ID                uint64         `db:"id"`
+	Slug              string         `db:"slug"`
+	Kind              string         `db:"kind"`
+	TitleJA           string         `db:"title_ja"`
+	TitleEN           string         `db:"title_en"`
+	OverviewJA        sql.NullString `db:"overview_ja"`
+	OverviewEN        sql.NullString `db:"overview_en"`
+	OutcomeJA         sql.NullString `db:"outcome_ja"`
+	OutcomeEN         sql.NullString `db:"outcome_en"`
+	OutlookJA         sql.NullString `db:"outlook_ja"`
+	OutlookEN         sql.NullString `db:"outlook_en"`
+	ExternalURL       string         `db:"external_url"`
+	HighlightImageURL sql.NullString `db:"highlight_image_url"`
+	ImageAltJA        sql.NullString `db:"image_alt_ja"`
+	ImageAltEN        sql.NullString `db:"image_alt_en"`
+	PublishedAt       time.Time      `db:"published_at"`
+	IsDraft           bool           `db:"is_draft"`
+	CreatedAt         time.Time      `db:"created_at"`
+	UpdatedAt         time.Time      `db:"updated_at"`
 }
 
 func (r *researchRepository) ListResearch(ctx context.Context) ([]model.Research, error) {
-	var rows []researchRow
-	if err := r.db.SelectContext(ctx, &rows, listResearchQuery); err != nil {
-		return nil, fmt.Errorf("select research: %w", err)
+	var rows []struct {
+		ID          uint64         `db:"id"`
+		TitleJA     string         `db:"title_ja"`
+		TitleEN     string         `db:"title_en"`
+		OverviewJA  sql.NullString `db:"overview_ja"`
+		OverviewEN  sql.NullString `db:"overview_en"`
+		OutcomeJA   sql.NullString `db:"outcome_ja"`
+		OutcomeEN   sql.NullString `db:"outcome_en"`
+		PublishedAt time.Time      `db:"published_at"`
+	}
+
+	if err := r.db.SelectContext(ctx, &rows, listPublicResearchQuery); err != nil {
+		return nil, fmt.Errorf("select research_blog_entries: %w", err)
+	}
+
+	if len(rows) == 0 {
+		return []model.Research{}, nil
 	}
 
 	research := make([]model.Research, 0, len(rows))
 	for _, row := range rows {
+		year := row.PublishedAt.Year()
+		if year <= 0 {
+			year = time.Now().Year()
+		}
+
+		id, err := safeUintToInt64(row.ID)
+		if err != nil {
+			return nil, err
+		}
+
 		research = append(research, model.Research{
-			ID:        row.ID,
-			Year:      row.Year,
-			Title:     toLocalizedText(row.TitleJA, row.TitleEN),
-			Summary:   toLocalizedText(row.SummaryJA, row.SummaryEN),
-			ContentMD: toLocalizedText(row.ContentJA, row.ContentEN),
+			ID:        id,
+			Year:      year,
+			Title:     model.NewLocalizedText(row.TitleJA, row.TitleEN),
+			Summary:   toLocalizedText(row.OverviewJA, row.OverviewEN),
+			ContentMD: toLocalizedText(row.OutcomeJA, row.OutcomeEN),
 		})
 	}
-
 	return research, nil
 }
 
 func (r *researchRepository) ListAdminResearch(ctx context.Context) ([]model.AdminResearch, error) {
-	var rows []researchRow
-	if err := r.db.SelectContext(ctx, &rows, listAdminResearchQuery); err != nil {
-		return nil, fmt.Errorf("select admin research: %w", err)
-	}
-
-	items := make([]model.AdminResearch, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, mapResearchRow(row))
-	}
-	return items, nil
+	return r.loadAdminResearch(ctx, nil)
 }
 
-func (r *researchRepository) GetAdminResearch(ctx context.Context, id int64) (*model.AdminResearch, error) {
-	var row researchRow
-	if err := r.db.GetContext(ctx, &row, getAdminResearchQuery, id); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, repository.ErrNotFound
-		}
-		return nil, fmt.Errorf("get research %d: %w", id, err)
+func (r *researchRepository) GetAdminResearch(ctx context.Context, id uint64) (*model.AdminResearch, error) {
+	results, err := r.loadAdminResearch(ctx, []uint64{id})
+	if err != nil {
+		return nil, err
 	}
-
-	mapped := mapResearchRow(row)
-	return &mapped, nil
+	if len(results) == 0 {
+		return nil, repository.ErrNotFound
+	}
+	return &results[0], nil
 }
 
 func (r *researchRepository) CreateAdminResearch(ctx context.Context, item *model.AdminResearch) (*model.AdminResearch, error) {
@@ -168,113 +239,366 @@ func (r *researchRepository) CreateAdminResearch(ctx context.Context, item *mode
 		return nil, repository.ErrInvalidInput
 	}
 
-	res, err := r.db.ExecContext(ctx, insertResearchQuery,
-		item.Title.Ja,
-		item.Title.En,
-		item.Summary.Ja,
-		item.Summary.En,
-		item.ContentMD.Ja,
-		item.ContentMD.En,
-		item.Year,
-		item.Published,
-		nullInt(itemSortOrderPtr(item)),
-	)
+	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("insert research: %w", err)
+		return nil, fmt.Errorf("research create: begin tx: %w", err)
 	}
 
-	id, err := res.LastInsertId()
-	if err != nil {
-		return nil, fmt.Errorf("research last insert id: %w", err)
-	}
+	var entryID uint64
+	if err := func() error {
+		defer rollbackOnError(tx, &err)
 
-	created, err := r.GetAdminResearch(ctx, id)
-	if err != nil {
+		id, err := r.insertResearchEntry(ctx, tx, item)
+		if err != nil {
+			return err
+		}
+		entryID = id
+
+		if err := r.replaceResearchRelations(ctx, tx, entryID, item); err != nil {
+			return err
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("research create: commit: %w", err)
+		}
+		return nil
+	}(); err != nil {
 		return nil, err
 	}
-	return created, nil
+
+	return r.GetAdminResearch(ctx, entryID)
 }
 
 func (r *researchRepository) UpdateAdminResearch(ctx context.Context, item *model.AdminResearch) (*model.AdminResearch, error) {
 	if item == nil {
 		return nil, repository.ErrInvalidInput
 	}
-
-	res, err := r.db.ExecContext(ctx, updateResearchQuery,
-		item.Title.Ja,
-		item.Title.En,
-		item.Summary.Ja,
-		item.Summary.En,
-		item.ContentMD.Ja,
-		item.ContentMD.En,
-		item.Year,
-		item.Published,
-		nullInt(itemSortOrderPtr(item)),
-		item.ID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("update research %d: %w", item.ID, err)
+	if item.ID == 0 {
+		return nil, repository.ErrInvalidInput
 	}
 
-	affected, err := res.RowsAffected()
+	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("rows affected research %d: %w", item.ID, err)
-	}
-	if affected == 0 {
-		return nil, repository.ErrNotFound
+		return nil, fmt.Errorf("research update: begin tx: %w", err)
 	}
 
-	updated, err := r.GetAdminResearch(ctx, item.ID)
-	if err != nil {
+	if err := func() error {
+		defer rollbackOnError(tx, &err)
+
+		res, err := tx.ExecContext(ctx, updateResearchEntryQuery,
+			strings.TrimSpace(item.Slug),
+			item.Kind,
+			strings.TrimSpace(item.Title.Ja),
+			strings.TrimSpace(item.Title.En),
+			nullString(item.Overview.Ja),
+			nullString(item.Overview.En),
+			nullString(item.Outcome.Ja),
+			nullString(item.Outcome.En),
+			nullString(item.Outlook.Ja),
+			nullString(item.Outlook.En),
+			strings.TrimSpace(item.ExternalURL),
+			nullString(item.HighlightImageURL),
+			nullString(item.ImageAlt.Ja),
+			nullString(item.ImageAlt.En),
+			item.PublishedAt.UTC(),
+			item.IsDraft,
+			item.ID,
+		)
+		if err != nil {
+			return fmt.Errorf("research update: update entry %d: %w", item.ID, err)
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("research update: rows affected %d: %w", item.ID, err)
+		}
+		if affected == 0 {
+			return repository.ErrNotFound
+		}
+
+		if err := r.replaceResearchRelations(ctx, tx, item.ID, item); err != nil {
+			return err
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("research update: commit %d: %w", item.ID, err)
+		}
+		return nil
+	}(); err != nil {
 		return nil, err
 	}
-	return updated, nil
+
+	return r.GetAdminResearch(ctx, item.ID)
 }
 
-func (r *researchRepository) DeleteAdminResearch(ctx context.Context, id int64) error {
-	res, err := r.db.ExecContext(ctx, deleteResearchQuery, id)
+func (r *researchRepository) DeleteAdminResearch(ctx context.Context, id uint64) error {
+	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("delete research %d: %w", id, err)
+		return fmt.Errorf("research delete: begin tx: %w", err)
 	}
 
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("rows affected delete research %d: %w", id, err)
-	}
-	if affected == 0 {
-		return repository.ErrNotFound
-	}
-	return nil
-}
+	return func() error {
+		defer rollbackOnError(tx, &err)
 
-func mapResearchRow(row researchRow) model.AdminResearch {
-	createdAt := row.CreatedAt.Time
-	if !row.CreatedAt.Valid {
-		createdAt = time.Time{}
-	}
-	updatedAt := row.UpdatedAt.Time
-	if !row.UpdatedAt.Valid {
-		updatedAt = time.Time{}
-	}
+		if _, err := tx.ExecContext(ctx, deleteResearchTechQuery, researchEntityType, id); err != nil {
+			return fmt.Errorf("research delete: delete tech %d: %w", id, err)
+		}
 
-	return model.AdminResearch{
-		ID:        row.ID,
-		Title:     toLocalizedText(row.TitleJA, row.TitleEN),
-		Summary:   toLocalizedText(row.SummaryJA, row.SummaryEN),
-		ContentMD: toLocalizedText(row.ContentJA, row.ContentEN),
-		Year:      row.Year,
-		Published: row.Published.Bool,
-		CreatedAt: createdAt,
-		UpdatedAt: updatedAt,
-	}
-}
+		res, err := tx.ExecContext(ctx, deleteResearchEntryQuery, id)
+		if err != nil {
+			return fmt.Errorf("research delete: delete entry %d: %w", id, err)
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("research delete: rows affected %d: %w", id, err)
+		}
+		if affected == 0 {
+			return repository.ErrNotFound
+		}
 
-func itemSortOrderPtr(item *model.AdminResearch) *int {
-	if item == nil {
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("research delete: commit %d: %w", id, err)
+		}
 		return nil
+	}()
+}
+
+func (r *researchRepository) loadAdminResearch(ctx context.Context, ids []uint64) ([]model.AdminResearch, error) {
+	clause := ""
+	query := fmt.Sprintf(baseAdminResearchQuery, clause)
+	var args []interface{}
+
+	if len(ids) > 0 {
+		clause = "WHERE r.id IN (?)"
+		var err error
+		query, args, err = sqlx.In(fmt.Sprintf(baseAdminResearchQuery, clause), ids)
+		if err != nil {
+			return nil, fmt.Errorf("research load IN: %w", err)
+		}
+		query = r.db.Rebind(query)
 	}
-	// Future enhancement: support explicit sort order on research items.
+
+	return r.queryAdminResearch(ctx, query, args...)
+}
+
+func (r *researchRepository) queryAdminResearch(ctx context.Context, query string, args ...interface{}) ([]model.AdminResearch, error) {
+	var rows []researchEntryRow
+	if err := r.db.SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, fmt.Errorf("select admin research_blog_entries: %w", err)
+	}
+	if len(rows) == 0 {
+		return []model.AdminResearch{}, nil
+	}
+
+	result := make([]model.AdminResearch, len(rows))
+	documents := make(map[uint64]*model.ResearchDocument, len(rows))
+
+	for i, row := range rows {
+		admin := &result[i]
+		*admin = model.AdminResearch{
+			ID:                row.ID,
+			Slug:              strings.TrimSpace(row.Slug),
+			Kind:              model.ResearchKind(strings.TrimSpace(row.Kind)),
+			Title:             model.NewLocalizedText(row.TitleJA, row.TitleEN),
+			Overview:          toLocalizedText(row.OverviewJA, row.OverviewEN),
+			Outcome:           toLocalizedText(row.OutcomeJA, row.OutcomeEN),
+			Outlook:           toLocalizedText(row.OutlookJA, row.OutlookEN),
+			ExternalURL:       strings.TrimSpace(row.ExternalURL),
+			HighlightImageURL: nullableString(row.HighlightImageURL),
+			ImageAlt:          toLocalizedText(row.ImageAltJA, row.ImageAltEN),
+			PublishedAt:       row.PublishedAt.UTC(),
+			IsDraft:           row.IsDraft,
+			CreatedAt:         row.CreatedAt.UTC(),
+			UpdatedAt:         row.UpdatedAt.UTC(),
+		}
+
+		document := &model.ResearchDocument{
+			ID:                row.ID,
+			Slug:              admin.Slug,
+			Kind:              admin.Kind,
+			Title:             admin.Title,
+			Overview:          admin.Overview,
+			Outcome:           admin.Outcome,
+			Outlook:           admin.Outlook,
+			ExternalURL:       admin.ExternalURL,
+			PublishedAt:       admin.PublishedAt,
+			UpdatedAt:         admin.UpdatedAt,
+			HighlightImageURL: admin.HighlightImageURL,
+			ImageAlt:          admin.ImageAlt,
+			IsDraft:           admin.IsDraft,
+			Tags:              []model.ResearchTag{},
+			Links:             []model.ResearchLink{},
+			Assets:            []model.ResearchAsset{},
+			Tech:              []model.TechMembership{},
+		}
+
+		documents[row.ID] = document
+	}
+
+	ids := make([]uint64, 0, len(documents))
+	for id := range documents {
+		ids = append(ids, id)
+	}
+
+	docRepo := &researchDocumentRepository{db: r.db}
+	if err := docRepo.attachResearchTags(ctx, ids, documents); err != nil {
+		return nil, err
+	}
+	if err := docRepo.attachResearchLinks(ctx, ids, documents); err != nil {
+		return nil, err
+	}
+	if err := docRepo.attachResearchAssets(ctx, ids, documents); err != nil {
+		return nil, err
+	}
+	if err := docRepo.attachResearchTech(ctx, ids, documents); err != nil {
+		return nil, err
+	}
+
+	for i := range result {
+		doc := documents[result[i].ID]
+		if doc == nil {
+			continue
+		}
+		result[i].Tags = append([]model.ResearchTag(nil), doc.Tags...)
+		result[i].Links = append([]model.ResearchLink(nil), doc.Links...)
+		result[i].Assets = append([]model.ResearchAsset(nil), doc.Assets...)
+		result[i].Tech = append([]model.TechMembership(nil), doc.Tech...)
+	}
+
+	return result, nil
+}
+
+func (r *researchRepository) insertResearchEntry(ctx context.Context, tx *sqlx.Tx, item *model.AdminResearch) (uint64, error) {
+	res, err := tx.ExecContext(ctx, insertResearchEntryQuery,
+		strings.TrimSpace(item.Slug),
+		item.Kind,
+		strings.TrimSpace(item.Title.Ja),
+		strings.TrimSpace(item.Title.En),
+		nullString(item.Overview.Ja),
+		nullString(item.Overview.En),
+		nullString(item.Outcome.Ja),
+		nullString(item.Outcome.En),
+		nullString(item.Outlook.Ja),
+		nullString(item.Outlook.En),
+		strings.TrimSpace(item.ExternalURL),
+		nullString(item.HighlightImageURL),
+		nullString(item.ImageAlt.Ja),
+		nullString(item.ImageAlt.En),
+		item.PublishedAt.UTC(),
+		item.IsDraft,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("insert research_blog_entries: %w", err)
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("research entry last insert id: %w", err)
+	}
+	return uint64(id), nil
+}
+
+func (r *researchRepository) replaceResearchRelations(ctx context.Context, tx *sqlx.Tx, entryID uint64, item *model.AdminResearch) error {
+	if _, err := tx.ExecContext(ctx, deleteResearchTagsQuery, entryID); err != nil {
+		return fmt.Errorf("research relations: delete tags %d: %w", entryID, err)
+	}
+	if _, err := tx.ExecContext(ctx, deleteResearchLinksQuery, entryID); err != nil {
+		return fmt.Errorf("research relations: delete links %d: %w", entryID, err)
+	}
+	if _, err := tx.ExecContext(ctx, deleteResearchAssetsQuery, entryID); err != nil {
+		return fmt.Errorf("research relations: delete assets %d: %w", entryID, err)
+	}
+	if _, err := tx.ExecContext(ctx, deleteResearchTechQuery, researchEntityType, entryID); err != nil {
+		return fmt.Errorf("research relations: delete tech %d: %w", entryID, err)
+	}
+
+	if err := r.insertResearchTags(ctx, tx, entryID, item.Tags); err != nil {
+		return err
+	}
+	if err := r.insertResearchLinks(ctx, tx, entryID, item.Links); err != nil {
+		return err
+	}
+	if err := r.insertResearchAssets(ctx, tx, entryID, item.Assets); err != nil {
+		return err
+	}
+	if err := r.insertResearchTech(ctx, tx, entryID, item.Tech); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (r *researchRepository) insertResearchTags(ctx context.Context, tx *sqlx.Tx, entryID uint64, tags []model.ResearchTag) error {
+	for _, tag := range tags {
+		if strings.TrimSpace(tag.Value) == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, insertResearchTagQuery, entryID, strings.TrimSpace(tag.Value), tag.SortOrder); err != nil {
+			return fmt.Errorf("insert research tag %d: %w", entryID, err)
+		}
+	}
+	return nil
+}
+
+func (r *researchRepository) insertResearchLinks(ctx context.Context, tx *sqlx.Tx, entryID uint64, links []model.ResearchLink) error {
+	for _, link := range links {
+		if strings.TrimSpace(link.URL) == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, insertResearchLinkQuery,
+			entryID,
+			link.Type,
+			nullString(link.Label.Ja),
+			nullString(link.Label.En),
+			strings.TrimSpace(link.URL),
+			link.SortOrder,
+		); err != nil {
+			return fmt.Errorf("insert research link %d: %w", entryID, err)
+		}
+	}
+	return nil
+}
+
+func (r *researchRepository) insertResearchAssets(ctx context.Context, tx *sqlx.Tx, entryID uint64, assets []model.ResearchAsset) error {
+	for _, asset := range assets {
+		if strings.TrimSpace(asset.URL) == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, insertResearchAssetQuery,
+			entryID,
+			strings.TrimSpace(asset.URL),
+			nullString(asset.Caption.Ja),
+			nullString(asset.Caption.En),
+			asset.SortOrder,
+		); err != nil {
+			return fmt.Errorf("insert research asset %d: %w", entryID, err)
+		}
+	}
+	return nil
+}
+
+func (r *researchRepository) insertResearchTech(ctx context.Context, tx *sqlx.Tx, entryID uint64, tech []model.TechMembership) error {
+	for _, membership := range tech {
+		if membership.Tech.ID == 0 {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, insertResearchTechQuery,
+			researchEntityType,
+			entryID,
+			membership.Tech.ID,
+			membership.Context,
+			nullString(membership.Note),
+			membership.SortOrder,
+		); err != nil {
+			return fmt.Errorf("insert research tech %d: %w", entryID, err)
+		}
+	}
+	return nil
+}
+
+func safeUintToInt64(value uint64) (int64, error) {
+	if value > math.MaxInt64 {
+		return 0, fmt.Errorf("value %d exceeds int64 range", value)
+	}
+	return int64(value), nil
 }
 
 var _ repository.ResearchRepository = (*researchRepository)(nil)

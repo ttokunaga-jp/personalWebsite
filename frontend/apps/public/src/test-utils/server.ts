@@ -46,14 +46,15 @@ export const defaultHandlers = [
     const payload = (await request.json()) as CreateBookingPayload;
     const result: BookingResult = {
       ...defaultBookingResponse,
-      meeting: {
-        ...defaultBookingResponse.meeting,
+      reservation: {
+        ...defaultBookingResponse.reservation,
         id: String(Date.now()),
         name: payload.name,
         email: payload.email,
-        datetime: payload.startTime,
+        startAt: payload.startTime,
+        endAt: payload.startTime,
         durationMinutes: payload.durationMinutes,
-        notes: payload.agenda,
+        message: payload.agenda,
       },
       calendarEventId: defaultBookingResponse.calendarEventId,
     };

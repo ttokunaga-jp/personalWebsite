@@ -18,6 +18,7 @@ auth:
   disabled: false
 contact:
   timezone: "Asia/Tokyo"
+  calendar_timezone: "Asia/Tokyo"
   slot_duration_minutes: 30
   workday_start_hour: 9
   workday_end_hour: 18
@@ -29,6 +30,7 @@ contact:
   recaptcha_site_key: ""
   minimum_lead_hours: 48
   consent_text: "We only use your information for scheduling purposes."
+  support_email: "contact@example.com"
 booking:
   calendar_id: "primary"
   meet_template: "Portfolio Intro Session"

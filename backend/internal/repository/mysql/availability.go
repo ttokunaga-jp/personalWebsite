@@ -21,20 +21,22 @@ func NewAvailabilityRepository(db *sqlx.DB) repository.AvailabilityRepository {
 }
 
 const (
-	meetingsBusyQuery = `
+	reservationsBusyQuery = `
 SELECT
-	meeting_at AS start_time,
-	DATE_ADD(meeting_at, INTERVAL COALESCE(duration_minutes, 0) MINUTE) AS end_time
-FROM meetings
+	start_at AS start_time,
+	end_at AS end_time,
+	'reservation' AS source
+FROM meeting_reservations
 WHERE status IN ('pending', 'confirmed')
-  AND DATE_ADD(meeting_at, INTERVAL COALESCE(duration_minutes, 0) MINUTE) > ?
-  AND meeting_at < ?
-ORDER BY meeting_at`
+  AND end_at > ?
+  AND start_at < ?
+ORDER BY start_at`
 
 	blackoutBusyQuery = `
 SELECT
 	start_time,
-	end_time
+	end_time,
+	'blackout' AS source
 FROM schedule_blackouts
 WHERE end_time > ?
   AND start_time < ?
@@ -42,20 +44,25 @@ ORDER BY start_time`
 )
 
 type busyRow struct {
-	Start time.Time `db:"start_time"`
-	End   time.Time `db:"end_time"`
+	Start  time.Time `db:"start_time"`
+	End    time.Time `db:"end_time"`
+	Source string    `db:"source"`
 }
 
 func (r *availabilityRepository) ListBusyWindows(ctx context.Context, from, to time.Time) ([]model.TimeWindow, error) {
 	windows := make([]model.TimeWindow, 0, 16)
 
 	var meetingRows []busyRow
-	if err := r.db.SelectContext(ctx, &meetingRows, meetingsBusyQuery, from, to); err != nil {
-		return nil, fmt.Errorf("select meeting busy windows: %w", err)
+	if err := r.db.SelectContext(ctx, &meetingRows, reservationsBusyQuery, from, to); err != nil {
+		return nil, fmt.Errorf("select reservation busy windows: %w", err)
 	}
 
 	for _, row := range meetingRows {
-		windows = append(windows, model.TimeWindow{Start: row.Start, End: row.End})
+		windows = append(windows, model.TimeWindow{
+			Start:  row.Start.UTC(),
+			End:    row.End.UTC(),
+			Source: model.BusyWindowSource(row.Source),
+		})
 	}
 
 	var blackoutRows []busyRow
@@ -64,7 +71,11 @@ func (r *availabilityRepository) ListBusyWindows(ctx context.Context, from, to t
 	}
 
 	for _, row := range blackoutRows {
-		windows = append(windows, model.TimeWindow{Start: row.Start, End: row.End})
+		windows = append(windows, model.TimeWindow{
+			Start:  row.Start.UTC(),
+			End:    row.End.UTC(),
+			Source: model.BusyWindowSource(row.Source),
+		})
 	}
 
 	return windows, nil

@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -23,6 +25,8 @@ import (
 // BookingService coordinates scheduling between Google Calendar, persistence, and notifications.
 type BookingService interface {
 	Book(ctx context.Context, req model.BookingRequest) (*model.BookingResult, error)
+	LookupReservation(ctx context.Context, lookupHash string) (*model.BookingResult, error)
+	CancelReservation(ctx context.Context, lookupHash, reason string) (*model.BookingResult, error)
 }
 
 type Clock interface {
@@ -34,27 +38,31 @@ type realClock struct{}
 func (realClock) Now() time.Time { return time.Now() }
 
 type bookingService struct {
-	meetings     repository.MeetingRepository
-	availability repository.AvailabilityRepository
-	blacklist    repository.BlacklistRepository
-	calendar     calendar.Client
-	mailer       mail.Client
-	cfg          config.BookingConfig
-	contactCfg   config.ContactConfig
-	calendarCB   *circuitBreaker
-	mailCB       *circuitBreaker
-	clock        Clock
+	reservations   repository.MeetingReservationRepository
+	notifications  repository.MeetingNotificationRepository
+	availability   repository.AvailabilityRepository
+	blacklist      repository.BlacklistRepository
+	calendar       calendar.Client
+	mailer         mail.Client
+	cfg            config.BookingConfig
+	contactCfg     config.ContactConfig
+	calendarCB     *circuitBreaker
+	mailCB         *circuitBreaker
+	clock          Clock
+	supportEmail   string
+	calendarTZName string
 }
 
 func NewBookingService(
-	meetings repository.MeetingRepository,
+	reservations repository.MeetingReservationRepository,
+	notifications repository.MeetingNotificationRepository,
 	availability repository.AvailabilityRepository,
 	blacklist repository.BlacklistRepository,
 	calendar calendar.Client,
 	mailer mail.Client,
 	cfg *config.AppConfig,
 ) (BookingService, error) {
-	if meetings == nil || availability == nil || blacklist == nil || calendar == nil || mailer == nil || cfg == nil {
+	if reservations == nil || notifications == nil || availability == nil || blacklist == nil || calendar == nil || mailer == nil || cfg == nil {
 		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "booking service: missing dependencies", nil)
 	}
 
@@ -81,16 +89,19 @@ func NewBookingService(
 	openDuration := time.Duration(bookingCfg.CircuitOpenSeconds) * time.Second
 
 	return &bookingService{
-		meetings:     meetings,
-		availability: availability,
-		blacklist:    blacklist,
-		calendar:     calendar,
-		mailer:       mailer,
-		cfg:          bookingCfg,
-		contactCfg:   cfg.Contact,
-		calendarCB:   newCircuitBreaker(bookingCfg.CircuitFailureThresh, openDuration),
-		mailCB:       newCircuitBreaker(bookingCfg.CircuitFailureThresh, openDuration),
-		clock:        realClock{},
+		reservations:   reservations,
+		notifications:  notifications,
+		availability:   availability,
+		blacklist:      blacklist,
+		calendar:       calendar,
+		mailer:         mailer,
+		cfg:            bookingCfg,
+		contactCfg:     cfg.Contact,
+		calendarCB:     newCircuitBreaker(bookingCfg.CircuitFailureThresh, openDuration),
+		mailCB:         newCircuitBreaker(bookingCfg.CircuitFailureThresh, openDuration),
+		clock:          realClock{},
+		supportEmail:   deriveSupportEmail(cfg),
+		calendarTZName: deriveCalendarTimezone(cfg),
 	}, nil
 }
 
@@ -119,6 +130,7 @@ func (s *bookingService) Book(ctx context.Context, req model.BookingRequest) (*m
 	if duration <= 0 {
 		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "duration must be greater than zero", nil)
 	}
+	endLocal := startLocal.Add(duration)
 
 	if strings.TrimSpace(req.RecaptchaToken) == "" {
 		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "recaptcha token is required", nil)
@@ -131,7 +143,7 @@ func (s *bookingService) Book(ctx context.Context, req model.BookingRequest) (*m
 	buffer := time.Duration(bufferMinutes) * time.Minute
 
 	windowStart := startLocal.Add(-buffer)
-	windowEnd := startLocal.Add(duration + buffer)
+	windowEnd := endLocal.Add(buffer)
 
 	if _, err := s.blacklist.FindBlacklistEntryByEmail(ctx, email); err == nil {
 		return nil, errs.New(errs.CodeUnauthorized, http.StatusForbidden, "email address is blocked from scheduling", nil)
@@ -157,8 +169,16 @@ func (s *bookingService) Book(ctx context.Context, req model.BookingRequest) (*m
 		return nil, err
 	}
 
-	conflicts := detectConflicts(startLocal, startLocal.Add(duration), append(busyWindows, externalBusy...), buffer, loc)
+	conflicts := detectConflicts(startLocal, endLocal, append(busyWindows, externalBusy...), buffer, loc)
 	if conflicts {
+		return nil, errs.New(errs.CodeConflict, http.StatusConflict, "requested slot conflicts with existing reservations", nil)
+	}
+
+	conflictingReservations, err := s.reservations.ListConflictingReservations(ctx, startLocal.UTC(), endLocal.UTC())
+	if err != nil {
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to validate reservation conflicts", err)
+	}
+	if len(conflictingReservations) > 0 {
 		return nil, errs.New(errs.CodeConflict, http.StatusConflict, "requested slot conflicts with existing reservations", nil)
 	}
 
@@ -168,7 +188,7 @@ func (s *bookingService) Book(ctx context.Context, req model.BookingRequest) (*m
 			Summary:     s.reservationSummary(name),
 			Description: buildEventDescription(name, email, agenda),
 			Start:       startLocal,
-			End:         startLocal.Add(duration),
+			End:         endLocal,
 			Attendees:   []string{email},
 		}
 
@@ -188,41 +208,57 @@ func (s *bookingService) Book(ctx context.Context, req model.BookingRequest) (*m
 		meetURL = calendarEvent.HTMLLink
 	}
 
-	notes := agenda
-	if topic != "" {
-		if notes != "" {
-			notes = fmt.Sprintf("[%s] %s", topic, notes)
-		} else {
-			notes = fmt.Sprintf("[%s]", topic)
-		}
+	lookupHash, err := generateLookupHash()
+	if err != nil {
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to allocate reservation identifier", err)
 	}
 
-	newMeeting := model.Meeting{
-		Name:            name,
-		Email:           email,
-		Datetime:        startLocal.UTC(),
-		DurationMinutes: req.DurationMinutes,
-		MeetURL:         strings.TrimSpace(meetURL),
-		CalendarEventID: calendarEvent.ID,
-		Status:          model.MeetingStatusPending,
-		Notes:           notes,
+	newReservation := model.MeetingReservation{
+		LookupHash:           lookupHash,
+		Name:                 name,
+		Email:                email,
+		Topic:                topic,
+		Message:              agenda,
+		StartAt:              startLocal.UTC(),
+		EndAt:                endLocal.UTC(),
+		DurationMinutes:      req.DurationMinutes,
+		GoogleEventID:        calendarEvent.ID,
+		GoogleCalendarStatus: "confirmed",
+		Status:               model.MeetingReservationStatusPending,
 	}
 
-	stored, err := s.meetings.CreateMeeting(ctx, &newMeeting)
+	stored, err := s.reservations.CreateReservation(ctx, &newReservation)
 	if err != nil {
 		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to persist reservation", err)
 	}
 
+	sentAt := s.clock.Now().In(loc)
+	notificationStatus := "sent"
+	var notificationError string
 	mailErr := s.withRetry(ctx, s.mailCB, "notification email", func(callCtx context.Context) error {
 		message := mail.Message{
 			From:    s.cfg.NotificationSender,
 			To:      []string{email},
 			CC:      buildNotificationCC(s.cfg.NotificationReceiver),
-			Subject: fmt.Sprintf("Meeting request confirmed: %s", stored.Datetime.In(loc).Format(time.RFC1123)),
-			Body:    buildConfirmationBody(name, stored.Datetime.In(loc), duration, agenda, meetURL),
+			Subject: fmt.Sprintf("Meeting request confirmed: %s", startLocal.Format(time.RFC1123)),
+			Body:    buildConfirmationBody(name, startLocal, duration, agenda, meetURL),
 		}
 		return s.mailer.Send(callCtx, message)
 	})
+	if mailErr != nil {
+		notificationStatus = "failed"
+		notificationError = mailErr.Error()
+	}
+
+	if _, err := s.notifications.RecordNotification(ctx, &model.MeetingNotification{
+		ReservationID: stored.ID,
+		Type:          "confirmation_email",
+		Status:        notificationStatus,
+		ErrorMessage:  notificationError,
+	}); err != nil {
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to record notification history", err)
+	}
+
 	if mailErr != nil {
 		if errors.Is(mailErr, google.ErrTokenNotFound) {
 			return nil, errs.New(errs.CodeInternal, http.StatusServiceUnavailable, "email integration requires administrator authorization", mailErr)
@@ -230,10 +266,57 @@ func (s *bookingService) Book(ctx context.Context, req model.BookingRequest) (*m
 		return nil, mailErr
 	}
 
+	updatedReservation, err := s.reservations.MarkConfirmationSent(ctx, stored.ID, sentAt)
+	if err != nil {
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to update confirmation status", err)
+	}
+
+	return s.buildResult(updatedReservation, calendarEvent.ID), nil
+}
+
+func generateLookupHash() (string, error) {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
+}
+
+func deriveSupportEmail(cfg *config.AppConfig) string {
+	if cfg == nil {
+		return ""
+	}
+	if email := strings.TrimSpace(cfg.Contact.SupportEmail); email != "" {
+		return email
+	}
+	if email := strings.TrimSpace(cfg.Booking.NotificationReceiver); email != "" {
+		return email
+	}
+	return strings.TrimSpace(cfg.Booking.NotificationSender)
+}
+
+func deriveCalendarTimezone(cfg *config.AppConfig) string {
+	if cfg == nil {
+		return ""
+	}
+	if tz := strings.TrimSpace(cfg.Contact.CalendarTimezone); tz != "" {
+		return tz
+	}
+	return strings.TrimSpace(cfg.Contact.Timezone)
+}
+
+func (s *bookingService) buildResult(reservation *model.MeetingReservation, calendarEventID string) *model.BookingResult {
+	if reservation == nil {
+		return nil
+	}
+
+	copyReservation := *reservation
 	return &model.BookingResult{
-		Meeting:         *stored,
-		CalendarEventID: calendarEvent.ID,
-	}, nil
+		Reservation:      copyReservation,
+		CalendarEventID:  calendarEventID,
+		SupportEmail:     s.supportEmail,
+		CalendarTimezone: s.calendarTZName,
+	}
 }
 
 func (s *bookingService) reservationSummary(name string) string {
@@ -241,6 +324,52 @@ func (s *bookingService) reservationSummary(name string) string {
 		return fmt.Sprintf("%s - %s", template, name)
 	}
 	return fmt.Sprintf("Consultation with %s", name)
+}
+
+func (s *bookingService) LookupReservation(ctx context.Context, lookupHash string) (*model.BookingResult, error) {
+	hash := strings.TrimSpace(lookupHash)
+	if hash == "" {
+		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "lookup hash is required", nil)
+	}
+
+	reservation, err := s.reservations.FindReservationByLookupHash(ctx, hash)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, errs.New(errs.CodeNotFound, http.StatusNotFound, "reservation not found", err)
+		}
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to retrieve reservation", err)
+	}
+	return s.buildResult(reservation, reservation.GoogleEventID), nil
+}
+
+func (s *bookingService) CancelReservation(ctx context.Context, lookupHash, reason string) (*model.BookingResult, error) {
+	hash := strings.TrimSpace(lookupHash)
+	if hash == "" {
+		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "lookup hash is required", nil)
+	}
+
+	reservation, err := s.reservations.FindReservationByLookupHash(ctx, hash)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, errs.New(errs.CodeNotFound, http.StatusNotFound, "reservation not found", err)
+		}
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to retrieve reservation", err)
+	}
+
+	updated, err := s.reservations.CancelReservation(ctx, reservation.ID, reason)
+	if err != nil {
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to cancel reservation", err)
+	}
+
+	if _, recordErr := s.notifications.RecordNotification(ctx, &model.MeetingNotification{
+		ReservationID: updated.ID,
+		Type:          "cancellation_email",
+		Status:        "pending",
+	}); recordErr != nil {
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to record cancellation notification", recordErr)
+	}
+
+	return s.buildResult(updated, updated.GoogleEventID), nil
 }
 
 func (s *bookingService) withRetry(ctx context.Context, breaker *circuitBreaker, operation string, call func(ctx context.Context) error) error {

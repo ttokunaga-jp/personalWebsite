@@ -1,4 +1,11 @@
-import { FormEvent, useCallback, useId, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -6,7 +13,13 @@ import {
   useContactAvailability,
   useContactConfig,
 } from "../../modules/public-api";
+import type {
+  ContactAvailabilityDay,
+  ContactAvailabilitySlot,
+} from "../../modules/public-api";
 import { formatDateTime, formatTime } from "../../utils/date";
+
+const EMPTY_AVAILABILITY_DAYS: ContactAvailabilityDay[] = [];
 
 type FormState = {
   name: string;
@@ -55,21 +68,77 @@ export function ContactPage() {
     error: configError,
   } = useContactConfig();
 
-  const availableSlots = useMemo(() => {
-    if (!availability?.days) {
+  type SlotWithContext = ContactAvailabilitySlot & { day: string };
+
+  const days = availability?.days ?? EMPTY_AVAILABILITY_DAYS;
+
+  const { dayOrder, timeKeys, slotByDay, slotById } = useMemo(() => {
+    const dayOrder = days.map((day) => day.date);
+    const timeSet = new Set<number>();
+    const slotByDay = new Map<string, Map<number, SlotWithContext>>();
+    const slotById = new Map<string, SlotWithContext>();
+
+    days.forEach((day) => {
+      const slotsForDay = new Map<number, SlotWithContext>();
+      day.slots.forEach((slot) => {
+        const slotId = slot.id || slot.start;
+        const startKey = new Date(slot.start).getTime();
+        const enriched: SlotWithContext = {
+          ...slot,
+          id: slotId,
+          day: day.date,
+        };
+        slotsForDay.set(startKey, enriched);
+        slotById.set(slotId, enriched);
+        timeSet.add(startKey);
+      });
+      slotByDay.set(day.date, slotsForDay);
+    });
+
+    const timeKeys = Array.from(timeSet).sort((a, b) => a - b);
+
+    return { dayOrder, timeKeys, slotByDay, slotById };
+  }, [days]);
+
+  const [viewMode, setViewMode] = useState<"single" | "multi">("single");
+  const [activeDayIndex, setActiveDayIndex] = useState(0);
+  const maxMultiColumns = 3;
+
+  useEffect(() => {
+    setActiveDayIndex(0);
+  }, [dayOrder.length]);
+
+  const displayedDayIndices = useMemo(() => {
+    if (dayOrder.length === 0) {
       return [];
     }
-    return availability.days.flatMap((day) =>
-      day.slots
-        .filter((slot) => slot.isBookable)
-        .map((slot) => ({
-          id: slot.id || slot.start,
-          day: day.date,
-          start: slot.start,
-          end: slot.end,
-        })),
+    if (viewMode === "single") {
+      return [Math.min(activeDayIndex, dayOrder.length - 1)];
+    }
+    const start = Math.min(activeDayIndex, Math.max(0, dayOrder.length - 1));
+    const end = Math.min(start + maxMultiColumns, dayOrder.length);
+    return Array.from({ length: end - start }, (_value, index) => start + index);
+  }, [activeDayIndex, dayOrder.length, viewMode, maxMultiColumns]);
+
+  const displayedDays = displayedDayIndices
+    .map((index) => dayOrder[index])
+    .filter((value): value is string => Boolean(value));
+
+  const canGoPrev = activeDayIndex > 0;
+  const canGoNext =
+    viewMode === "single"
+      ? activeDayIndex < dayOrder.length - 1
+      : activeDayIndex + maxMultiColumns < dayOrder.length;
+
+  const goPrev = useCallback(() => {
+    setActiveDayIndex((index) => Math.max(0, index - 1));
+  }, []);
+
+  const goNext = useCallback(() => {
+    setActiveDayIndex((index) =>
+      Math.min(dayOrder.length > 0 ? dayOrder.length - 1 : 0, index + 1),
     );
-  }, [availability]);
+  }, [dayOrder.length]);
 
   const topics = useMemo(
     () => config?.topics ?? [],
@@ -118,11 +187,16 @@ export function ContactPage() {
 
       if (!state.slotId) {
         errors.slotId = t("contact.form.errors.slotRequired");
+      } else {
+        const slot = slotById.get(state.slotId);
+        if (!slot || slot.status !== "available" || !slot.isBookable) {
+          errors.slotId = t("contact.form.errors.slotUnavailable");
+        }
       }
 
       return errors;
     },
-    [t],
+    [slotById, t],
   );
 
   const handleInputChange =
@@ -188,11 +262,13 @@ export function ContactPage() {
     try {
       setIsSubmitting(true);
       const recaptchaToken = await loadRecaptchaToken();
-      const selectedSlot = availableSlots.find(
-        (slot) => slot.id === formState.slotId,
-      );
+      const selectedSlot = slotById.get(formState.slotId);
       if (!selectedSlot) {
         setFormErrors({ slotId: t("contact.form.errors.slotRequired") });
+        return;
+      }
+      if (selectedSlot.status !== "available" || !selectedSlot.isBookable) {
+        setFormErrors({ slotId: t("contact.form.errors.slotUnavailable") });
         return;
       }
 
@@ -217,8 +293,8 @@ export function ContactPage() {
       setBookingResult(response);
       setStatusMessage(
         t("contact.form.success", {
-          id: response.meeting.id,
-          email: response.supportEmail ?? response.meeting.email,
+          id: response.reservation.id,
+          email: response.supportEmail ?? response.reservation.email,
         }),
       );
       setFormState(initialFormState);
@@ -228,6 +304,28 @@ export function ContactPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleSlotPick = useCallback(
+    (slotId: string) => {
+      const slot = slotById.get(slotId);
+      if (!slot || slot.status !== "available" || !slot.isBookable) {
+        return;
+      }
+      setFormState((previous) => ({
+        ...previous,
+        slotId,
+      }));
+      setFormErrors((previous) => {
+        if (!previous.slotId) {
+          return previous;
+        }
+        const next = { ...previous };
+        delete next.slotId;
+        return next;
+      });
+    },
+    [slotById],
+  );
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-12 sm:px-8">
@@ -350,32 +448,189 @@ export function ContactPage() {
             </span>
           ) : null}
 
-          <label className="flex flex-col gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {t("contact.form.slot")}
-            </span>
-            <select
-              name="slotId"
-              value={formState.slotId}
-              onChange={handleInputChange("slotId")}
-              required
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-500 dark:focus:ring-sky-900/30"
-            >
-              <option value="">{t("contact.form.slotPlaceholder")}</option>
-              {availableSlots.map((slot) => (
-                <option key={slot.id} value={slot.id}>
-                  {formatDateTime(slot.start, timezoneLabel)} (
-                  {formatTime(slot.start, timezoneLabel)} -{" "}
-                  {formatTime(slot.end, timezoneLabel)})
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {t("contact.form.slot")}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  {t("contact.form.timezoneLabel", {
+                    timezone: timezoneLabel,
+                  })}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("single")}
+                    className={`px-3 py-1 text-xs font-semibold ${
+                      viewMode === "single"
+                        ? "bg-sky-600 text-white dark:bg-sky-500"
+                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/80"
+                    }`}
+                  >
+                    {t("contact.form.view.single")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("multi")}
+                    className={`px-3 py-1 text-xs font-semibold ${
+                      viewMode === "multi"
+                        ? "bg-sky-600 text-white dark:bg-sky-500"
+                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/80"
+                    }`}
+                  >
+                    {t("contact.form.view.multi")}
+                  </button>
+                </div>
+                <div className="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+                  <button
+                    type="button"
+                    onClick={goPrev}
+                    disabled={!canGoPrev}
+                    className="px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800/80"
+                  >
+                    {t("contact.form.view.previous")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    disabled={!canGoNext}
+                    className="px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800/80"
+                  >
+                    {t("contact.form.view.next")}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              {displayedDays.length > 0 && timeKeys.length > 0 ? (
+                <div
+                  className="grid gap-px rounded-2xl border border-slate-200 bg-slate-200 dark:border-slate-700 dark:bg-slate-800"
+                  style={{
+                    gridTemplateColumns: `120px repeat(${displayedDays.length}, minmax(140px, 1fr))`,
+                  }}
+                >
+                  <div className="sticky left-0 top-0 flex h-14 items-center justify-center bg-slate-100 text-xs font-semibold uppercase text-slate-500 dark:bg-slate-900/80 dark:text-slate-300">
+                    {t("contact.form.slotTime")}
+                  </div>
+                  {displayedDays.map((date) => (
+                    <div
+                      key={`header-${date}`}
+                      className="flex h-14 flex-col items-center justify-center bg-white px-3 text-center text-xs font-semibold text-slate-600 dark:bg-slate-900/80 dark:text-slate-200"
+                    >
+                      <span>
+                        {new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                      <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">
+                        {new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+                          weekday: "short",
+                        })}
+                      </span>
+                    </div>
+                  ))}
+
+                  {timeKeys.map((timeKey) => {
+                    const timeLabel = formatTime(
+                      new Date(timeKey).toISOString(),
+                      timezoneLabel,
+                    );
+                    return (
+                      <div key={`row-${timeKey}`} className="contents">
+                        <div className="flex h-14 items-center justify-center bg-white px-3 text-xs font-semibold text-slate-500 dark:bg-slate-900/70 dark:text-slate-300">
+                          {timeLabel}
+                        </div>
+                        {displayedDays.map((date) => {
+                          const slot = slotByDay.get(date)?.get(timeKey);
+                          if (!slot) {
+                            return (
+                              <div
+                                key={`${date}-${timeKey}`}
+                                className="h-14 bg-white dark:bg-slate-900/40"
+                              />
+                            );
+                          }
+                          const isSelected = slot.id === formState.slotId;
+                          const isDisabled =
+                            slot.status !== "available" || !slot.isBookable;
+                          let statusClass = "";
+                          if (slot.status === "available") {
+                            statusClass = isSelected
+                              ? "bg-sky-600 text-white shadow-sm dark:bg-sky-500"
+                              : "bg-sky-100 text-sky-700 hover:bg-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:hover:bg-sky-900/60";
+                          } else if (slot.status === "reserved") {
+                            statusClass =
+                              "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200";
+                          } else {
+                            statusClass =
+                              "bg-slate-100 text-slate-500 dark:bg-slate-800/50 dark:text-slate-400";
+                          }
+
+                          return (
+                            <button
+                              key={`${date}-${timeKey}`}
+                              type="button"
+                              onClick={() => handleSlotPick(slot.id)}
+                              disabled={isDisabled}
+                              aria-label={`${formatTime(slot.start, timezoneLabel)} ${t(
+                                `contact.form.status.${slot.status}`,
+                              )}`}
+                              data-testid={
+                                slot.status === "available"
+                                  ? "availability-slot-available"
+                                  : undefined
+                              }
+                              className={`flex h-14 w-full flex-col items-center justify-center px-2 text-[11px] font-semibold transition ${
+                                isDisabled && slot.status !== "available"
+                                  ? "cursor-not-allowed opacity-80"
+                                  : "cursor-pointer"
+                              } ${statusClass}`}
+                            >
+                              <span>{formatTime(slot.start, timezoneLabel)}</span>
+                              <span className="text-[10px] font-normal">
+                                {t(`contact.form.status.${slot.status}`)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+                  {t("contact.form.noAvailability")}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
+              <span className="inline-flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-sky-500 dark:bg-sky-400" />
+                {t("contact.form.legendLabels.available")}
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-500 dark:bg-amber-400" />
+                {t("contact.form.legendLabels.reserved")}
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-400 dark:bg-slate-500" />
+                {t("contact.form.legendLabels.blackout")}
+              </span>
+            </div>
+
             {formErrors.slotId ? (
               <span className="text-xs text-rose-500 dark:text-rose-400">
                 {formErrors.slotId}
               </span>
             ) : null}
-          </label>
+          </div>
 
           <button
             type="submit"
@@ -481,11 +736,18 @@ export function ContactPage() {
                 <li>
                   {t("contact.bookingSummary.when", {
                     datetime: formatDateTime(
-                      bookingResult.meeting.datetime,
+                      bookingResult.reservation.startAt,
                       timezoneLabel,
                     ),
                   })}
                 </li>
+                {bookingResult.reservation.lookupHash ? (
+                  <li>
+                    {t("contact.bookingSummary.lookup", {
+                      hash: bookingResult.reservation.lookupHash,
+                    })}
+                  </li>
+                ) : null}
                 {bookingResult.calendarEventId ? (
                   <li>
                     {t("contact.bookingSummary.calendarEvent", {
@@ -493,16 +755,11 @@ export function ContactPage() {
                     })}
                   </li>
                 ) : null}
-                {bookingResult.meeting.meetUrl ? (
+                {bookingResult.supportEmail ? (
                   <li>
-                    <a
-                      href={bookingResult.meeting.meetUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium text-sky-600 underline decoration-sky-200 underline-offset-4 dark:text-sky-400"
-                    >
-                      {t("contact.bookingSummary.joinLink")}
-                    </a>
+                    {t("contact.bookingSummary.supportEmail", {
+                      email: bookingResult.supportEmail,
+                    })}
                   </li>
                 ) : null}
               </ul>

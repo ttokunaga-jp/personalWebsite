@@ -177,13 +177,20 @@ export function HomePage() {
   }, []);
 
   const quickLinks = useMemo<HomeQuickLink[]>(() => {
-    if (!homeConfig?.quickLinks?.length) {
+    const fallbackQuickLinks = canonicalProfile.home?.quickLinks ?? [];
+    const activeQuickLinks =
+      homeConfig?.quickLinks?.length && homeConfig.quickLinks[0] != null
+        ? homeConfig.quickLinks
+        : fallbackQuickLinks;
+
+    if (!activeQuickLinks.length) {
       return [];
     }
-    return [...homeConfig.quickLinks]
+
+    return [...activeQuickLinks]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .slice(0, QUICK_LINK_HERO_LIMIT);
-  }, [homeConfig]);
+  }, [canonicalProfile, homeConfig]);
 
   const chipGroups = useMemo<ChipGroup[]>(() => {
     return buildChipGroups(effectiveProfile, t("common.presentLabel"));

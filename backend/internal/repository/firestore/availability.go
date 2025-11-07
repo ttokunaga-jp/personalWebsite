@@ -45,29 +45,8 @@ func (r *availabilityRepository) ListBusyWindows(ctx context.Context, from, to t
 }
 
 func (r *availabilityRepository) fetchMeetingWindows(ctx context.Context, from, to time.Time) ([]model.TimeWindow, error) {
-	query := r.base.collection(meetingsCollection).
-		Where("status", "in", []any{"pending", "confirmed"}).
-		Where("meetingAt", "<", to)
-
-	snapshots, err := query.Documents(ctx).GetAll()
-	if err != nil {
-		return nil, fmt.Errorf("firestore availability: list meetings: %w", err)
-	}
-
-	windows := make([]model.TimeWindow, 0, len(snapshots))
-	for _, snap := range snapshots {
-		var entry meetingDocument
-		if err := snap.DataTo(&entry); err != nil {
-			return nil, fmt.Errorf("firestore availability: decode meeting %s: %w", snap.Ref.ID, err)
-		}
-
-		start := entry.MeetingAt
-		end := entry.MeetingAt.Add(time.Duration(entry.DurationMinutes) * time.Minute)
-		if end.After(from) {
-			windows = append(windows, model.TimeWindow{Start: start, End: end})
-		}
-	}
-	return windows, nil
+	// Firestore-backed meeting reservations are not implemented; return no busy windows.
+	return []model.TimeWindow{}, nil
 }
 
 func (r *availabilityRepository) fetchBlackoutWindows(ctx context.Context, from, to time.Time) ([]model.TimeWindow, error) {
@@ -86,7 +65,11 @@ func (r *availabilityRepository) fetchBlackoutWindows(ctx context.Context, from,
 		if err := snap.DataTo(&entry); err != nil {
 			return nil, fmt.Errorf("firestore availability: decode blackout %s: %w", snap.Ref.ID, err)
 		}
-		windows = append(windows, model.TimeWindow{Start: entry.StartTime, End: entry.EndTime})
+		windows = append(windows, model.TimeWindow{
+			Start:  entry.StartTime,
+			End:    entry.EndTime,
+			Source: model.BusyWindowSourceBlackout,
+		})
 	}
 	return windows, nil
 }

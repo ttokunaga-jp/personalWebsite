@@ -118,29 +118,34 @@ func (s *availabilityService) GetAvailability(ctx context.Context, opts Availabi
 }
 
 func buildSlots(dayStart, dayEnd time.Time, slotDuration time.Duration, busy []model.TimeWindow) []model.AvailabilitySlot {
-	slots := make([]model.AvailabilitySlot, 0, 12)
+	slots := make([]model.AvailabilitySlot, 0, 16)
 	for cursor := dayStart; !cursor.Add(slotDuration).After(dayEnd); cursor = cursor.Add(slotDuration) {
 		slotEnd := cursor.Add(slotDuration)
-		if overlapsBusy(cursor, slotEnd, busy) {
-			continue
+		status := model.AvailabilitySlotStatusAvailable
+		isBookable := true
+		for _, window := range busy {
+			if window.Start.Before(slotEnd) && window.End.After(cursor) {
+				switch window.Source {
+				case model.BusyWindowSourceBlackout:
+					status = model.AvailabilitySlotStatusBlackout
+				default:
+					status = model.AvailabilitySlotStatusReserved
+				}
+				isBookable = false
+				if status == model.AvailabilitySlotStatusBlackout {
+					break
+				}
+			}
 		}
 		slots = append(slots, model.AvailabilitySlot{
 			ID:         cursor.UTC().Format(time.RFC3339),
 			Start:      cursor,
 			End:        slotEnd,
-			IsBookable: true,
+			Status:     status,
+			IsBookable: isBookable,
 		})
 	}
 	return slots
-}
-
-func overlapsBusy(start, end time.Time, busy []model.TimeWindow) bool {
-	for _, window := range busy {
-		if window.Start.Before(end) && window.End.After(start) {
-			return true
-		}
-	}
-	return false
 }
 
 func expandAndMergeWindows(windows []model.TimeWindow, buffer time.Duration, loc *time.Location) []model.TimeWindow {
@@ -156,8 +161,9 @@ func expandAndMergeWindows(windows []model.TimeWindow, buffer time.Duration, loc
 			end = start
 		}
 		expanded = append(expanded, model.TimeWindow{
-			Start: start,
-			End:   end,
+			Start:  start,
+			End:    end,
+			Source: window.Source,
 		})
 	}
 
@@ -173,6 +179,7 @@ func expandAndMergeWindows(windows []model.TimeWindow, buffer time.Duration, loc
 			if current.End.After(last.End) {
 				last.End = current.End
 			}
+			last.Source = dominantSource(last.Source, current.Source)
 			merged[len(merged)-1] = last
 			continue
 		}
@@ -180,4 +187,17 @@ func expandAndMergeWindows(windows []model.TimeWindow, buffer time.Duration, loc
 	}
 
 	return merged
+}
+
+func dominantSource(a, b model.BusyWindowSource) model.BusyWindowSource {
+	if a == model.BusyWindowSourceBlackout || b == model.BusyWindowSourceBlackout {
+		return model.BusyWindowSourceBlackout
+	}
+	if a == model.BusyWindowSourceReservation || b == model.BusyWindowSourceReservation {
+		return model.BusyWindowSourceReservation
+	}
+	if a == model.BusyWindowSourceExternal || b == model.BusyWindowSourceExternal {
+		return model.BusyWindowSourceExternal
+	}
+	return a
 }

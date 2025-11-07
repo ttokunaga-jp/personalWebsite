@@ -38,3 +38,17 @@ func (h *BookingHandler) CreateBooking(c *gin.Context) {
 		"data": result,
 	})
 }
+
+// GetReservation resolves a reservation by lookup hash for confirmation flows.
+func (h *BookingHandler) GetReservation(c *gin.Context) {
+	lookupHash := c.Param("lookupHash")
+	result, err := h.booking.LookupReservation(c.Request.Context(), lookupHash)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": result,
+	})
+}

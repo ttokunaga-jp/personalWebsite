@@ -55,7 +55,12 @@ func TestAvailabilityService_RespectsBuffer(t *testing.T) {
 	for _, slot := range slots {
 		key := slot.Start.In(loc).Format("15:04")
 		_, blocked := forbidden[key]
-		require.Falsef(t, blocked, "slot %s should be blocked due to buffer", key)
+		if blocked {
+			require.Falsef(t, slot.IsBookable, "slot %s should be marked unavailable due to buffer", key)
+			continue
+		}
+		require.Truef(t, slot.IsBookable, "slot %s should remain bookable", key)
+		require.Equal(t, model.AvailabilitySlotStatusAvailable, slot.Status)
 	}
 }
 

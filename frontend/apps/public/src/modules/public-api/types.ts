@@ -219,11 +219,17 @@ export type ResearchEntry = {
   tech: TechMembership[];
 };
 
+export type ContactAvailabilitySlotStatus =
+  | "available"
+  | "reserved"
+  | "blackout";
+
 export type ContactAvailabilitySlot = {
   id: string;
   start: string;
   end: string;
   isBookable: boolean;
+  status: ContactAvailabilitySlotStatus;
 };
 
 export type ContactAvailabilityDay = {
@@ -266,27 +272,30 @@ export type CreateBookingPayload = {
   recaptchaToken: string;
 };
 
-export type MeetingStatus = "pending" | "confirmed" | "cancelled";
+export type MeetingReservationStatus = "pending" | "confirmed" | "cancelled";
 
-export type Meeting = {
+export type MeetingReservation = {
   id: string;
+  lookupHash?: string;
   name: string;
   email: string;
-  datetime: string;
+  topic?: string;
+  message?: string;
+  startAt: string;
+  endAt: string;
   durationMinutes: number;
-  meetUrl?: string;
-  calendarEventId?: string;
-  status: MeetingStatus | string;
-  notes?: string;
+  googleEventId?: string;
+  googleCalendarStatus?: string;
+  status: MeetingReservationStatus | string;
   confirmationSentAt?: string | null;
   lastNotificationSentAt?: string | null;
-  lookupHash?: string;
-  googleCalendarStatus?: string;
   cancellationReason?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type BookingResult = {
-  meeting: Meeting;
+  reservation: MeetingReservation;
   calendarEventId?: string;
   supportEmail?: string;
   calendarTimezone?: string;

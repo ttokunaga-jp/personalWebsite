@@ -105,7 +105,11 @@ func (c *CalendarAPIClient) ListBusyWindows(ctx context.Context, calendarID stri
 		if err != nil {
 			continue
 		}
-		windows = append(windows, model.TimeWindow{Start: start.UTC(), End: end.UTC()})
+		windows = append(windows, model.TimeWindow{
+			Start:  start.UTC(),
+			End:    end.UTC(),
+			Source: model.BusyWindowSourceExternal,
+		})
 	}
 
 	return windows, nil

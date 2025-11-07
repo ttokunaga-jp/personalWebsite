@@ -57,7 +57,8 @@ var Module = fx.Module("di",
 		provider.NewAdminContactRepository,
 		provideAvailabilityRepository,
 		provideBlogRepository,
-		provideMeetingRepository,
+		provideMeetingReservationRepository,
+		provideMeetingNotificationRepository,
 		provideBlacklistRepository,
 		provideHTTPClient,
 		provideGoogleTokenProvider,
@@ -320,16 +321,29 @@ func provideBlogRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Cli
 	}
 }
 
-func provideMeetingRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.MeetingRepository {
+func provideMeetingReservationRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.MeetingReservationRepository {
 	driver := normalizedDriver(cfg)
 	switch driver {
 	case "firestore":
-		return provider.NewMeetingRepository(nil, fs, cfg)
+		return provider.NewMeetingReservationRepository(nil, fs, cfg)
 	case "mysql":
-		return provider.NewMeetingRepository(db, nil, cfg)
+		return provider.NewMeetingReservationRepository(db, nil, cfg)
 	default:
 		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
-		return provider.NewMeetingRepository(db, fs, cfg)
+		return provider.NewMeetingReservationRepository(db, fs, cfg)
+	}
+}
+
+func provideMeetingNotificationRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.MeetingNotificationRepository {
+	driver := normalizedDriver(cfg)
+	switch driver {
+	case "firestore":
+		return provider.NewMeetingNotificationRepository(nil, fs, cfg)
+	case "mysql":
+		return provider.NewMeetingNotificationRepository(db, nil, cfg)
+	default:
+		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
+		return provider.NewMeetingNotificationRepository(db, fs, cfg)
 	}
 }
 

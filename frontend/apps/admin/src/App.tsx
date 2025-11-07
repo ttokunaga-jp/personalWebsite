@@ -16,6 +16,10 @@ import type {
   ContactMessage,
   ContactStatus,
   LocalizedText,
+  ResearchKind,
+  ResearchLinkType,
+  TechCatalogEntry,
+  TechContext,
 } from "./types";
 
 const currentYear = new Date().getFullYear();
@@ -25,6 +29,16 @@ const contactStatuses: ContactStatus[] = [
   "resolved",
   "archived",
 ];
+
+const researchKinds: ResearchKind[] = ["research", "blog"];
+const researchLinkTypes: ResearchLinkType[] = [
+  "paper",
+  "slides",
+  "video",
+  "code",
+  "external",
+];
+const techContexts: TechContext[] = ["primary", "supporting"];
 
 type ProfileFormState = {
   name: LocalizedText;
@@ -41,22 +55,73 @@ type ProjectFormState = {
   titleEn: string;
   descriptionJa: string;
   descriptionEn: string;
-  techStack: string;
+  tech: ProjectTechForm[];
   linkUrl: string;
   year: string;
   published: boolean;
   sortOrder: string;
 };
 
+type ProjectTechForm = {
+  membershipId?: number;
+  techId: string;
+  context: TechContext;
+  note: string;
+  sortOrder: string;
+};
+
+type ResearchTagForm = {
+  id?: number;
+  value: string;
+  sortOrder: string;
+};
+
+type ResearchLinkForm = {
+  id?: number;
+  type: ResearchLinkType;
+  labelJa: string;
+  labelEn: string;
+  url: string;
+  sortOrder: string;
+};
+
+type ResearchAssetForm = {
+  id?: number;
+  url: string;
+  captionJa: string;
+  captionEn: string;
+  sortOrder: string;
+};
+
+type ResearchTechForm = {
+  membershipId?: number;
+  techId: string;
+  context: TechContext;
+  note: string;
+  sortOrder: string;
+};
+
 type ResearchFormState = {
+  slug: string;
+  kind: ResearchKind;
   titleJa: string;
   titleEn: string;
-  summaryJa: string;
-  summaryEn: string;
-  contentJa: string;
-  contentEn: string;
-  year: string;
-  published: boolean;
+  overviewJa: string;
+  overviewEn: string;
+  outcomeJa: string;
+  outcomeEn: string;
+  outlookJa: string;
+  outlookEn: string;
+  externalUrl: string;
+  highlightImageUrl: string;
+  imageAltJa: string;
+  imageAltEn: string;
+  publishedAt: string;
+  isDraft: boolean;
+  tags: ResearchTagForm[];
+  links: ResearchLinkForm[];
+  assets: ResearchAssetForm[];
+  tech: ResearchTechForm[];
 };
 
 type BlacklistFormState = {
@@ -91,23 +156,35 @@ const emptyProjectForm: ProjectFormState = {
   titleEn: "",
   descriptionJa: "",
   descriptionEn: "",
-  techStack: "",
+  tech: [],
   linkUrl: "",
   year: String(currentYear),
   published: false,
   sortOrder: "",
 };
 
-const emptyResearchForm: ResearchFormState = {
+const createEmptyResearchForm = (): ResearchFormState => ({
+  slug: "",
+  kind: "research",
   titleJa: "",
   titleEn: "",
-  summaryJa: "",
-  summaryEn: "",
-  contentJa: "",
-  contentEn: "",
-  year: String(currentYear),
-  published: false,
-};
+  overviewJa: "",
+  overviewEn: "",
+  outcomeJa: "",
+  outcomeEn: "",
+  outlookJa: "",
+  outlookEn: "",
+  externalUrl: "",
+  highlightImageUrl: "",
+  imageAltJa: "",
+  imageAltEn: "",
+  publishedAt: "",
+  isDraft: true,
+  tags: [],
+  links: [],
+  assets: [],
+  tech: [],
+});
 
 const emptyBlacklistForm: BlacklistFormState = {
   email: "",
@@ -148,6 +225,203 @@ function buildContactEditMap(
   }, {});
 }
 
+const toDateTimeLocal = (iso: string): string => {
+  if (!iso) {
+    return "";
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60 * 1000);
+  return local.toISOString().slice(0, 16);
+};
+
+const toISOStringWithFallback = (value: string): string => {
+  if (!value) {
+    return new Date().toISOString();
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toISOString();
+  }
+  return date.toISOString();
+};
+
+const normalizeSortOrder = (value: string): number =>
+  Number.parseInt(value, 10) || 0;
+
+const projectToForm = (project: AdminProject): ProjectFormState => ({
+  titleJa: project.title.ja ?? "",
+  titleEn: project.title.en ?? "",
+  descriptionJa: project.description.ja ?? "",
+  descriptionEn: project.description.en ?? "",
+  tech: project.tech.map((membership) => ({
+    membershipId: membership.membershipId,
+    techId: membership.tech?.id ? String(membership.tech.id) : "",
+    context: membership.context,
+    note: membership.note,
+    sortOrder: String(membership.sortOrder ?? 0),
+  })),
+  linkUrl: project.linkUrl,
+  year: String(project.year),
+  published: project.published,
+  sortOrder: project.sortOrder != null ? String(project.sortOrder) : "",
+});
+
+const projectFormToPayload = (form: ProjectFormState) => {
+  const techMembers: {
+    membershipId?: number;
+    techId: number;
+    context: TechContext;
+    note: string;
+    sortOrder: number;
+  }[] = [];
+
+  form.tech.forEach((membership) => {
+    const parsed = Number.parseInt(membership.techId, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return;
+    }
+    techMembers.push({
+      membershipId: membership.membershipId,
+      techId: parsed,
+      context: membership.context,
+      note: membership.note.trim(),
+      sortOrder: normalizeSortOrder(membership.sortOrder),
+    });
+  });
+
+  return {
+    title: { ja: form.titleJa.trim(), en: form.titleEn.trim() },
+    description: {
+      ja: form.descriptionJa.trim(),
+      en: form.descriptionEn.trim(),
+    },
+    tech: techMembers,
+    linkUrl: form.linkUrl.trim(),
+    year: Number.parseInt(form.year, 10) || currentYear,
+    published: form.published,
+    sortOrder: form.sortOrder === "" ? null : normalizeSortOrder(form.sortOrder),
+  };
+};
+
+const projectToPayload = (project: AdminProject) =>
+  projectFormToPayload(projectToForm(project));
+
+const researchToForm = (item: AdminResearch): ResearchFormState => ({
+  slug: item.slug,
+  kind: item.kind,
+  titleJa: item.title.ja ?? "",
+  titleEn: item.title.en ?? "",
+  overviewJa: item.overview.ja ?? "",
+  overviewEn: item.overview.en ?? "",
+  outcomeJa: item.outcome.ja ?? "",
+  outcomeEn: item.outcome.en ?? "",
+  outlookJa: item.outlook.ja ?? "",
+  outlookEn: item.outlook.en ?? "",
+  externalUrl: item.externalUrl,
+  highlightImageUrl: item.highlightImageUrl,
+  imageAltJa: item.imageAlt.ja ?? "",
+  imageAltEn: item.imageAlt.en ?? "",
+  publishedAt: toDateTimeLocal(item.publishedAt),
+  isDraft: item.isDraft,
+  tags: item.tags.map((tag) => ({
+    id: tag.id,
+    value: tag.value,
+    sortOrder: String(tag.sortOrder),
+  })),
+  links: item.links.map((link) => ({
+    id: link.id,
+    type: link.type,
+    labelJa: link.label.ja ?? "",
+    labelEn: link.label.en ?? "",
+    url: link.url,
+    sortOrder: String(link.sortOrder),
+  })),
+  assets: item.assets.map((asset) => ({
+    id: asset.id,
+    url: asset.url,
+    captionJa: asset.caption.ja ?? "",
+    captionEn: asset.caption.en ?? "",
+    sortOrder: String(asset.sortOrder),
+  })),
+  tech: item.tech.map((membership) => ({
+    membershipId: membership.membershipId,
+    techId: membership.tech?.id ? String(membership.tech.id) : "",
+    context: membership.context,
+    note: membership.note,
+    sortOrder: String(membership.sortOrder),
+  })),
+});
+
+const researchFormToPayload = (form: ResearchFormState) => {
+  const techMembers: {
+    membershipId?: number;
+    techId: number;
+    context: TechContext;
+    note: string;
+    sortOrder: number;
+  }[] = [];
+
+  form.tech.forEach((membership) => {
+    const parsed = Number.parseInt(membership.techId, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return;
+    }
+    techMembers.push({
+      membershipId: membership.membershipId,
+      techId: parsed,
+      context: membership.context,
+      note: membership.note.trim(),
+      sortOrder: normalizeSortOrder(membership.sortOrder),
+    });
+  });
+
+  return {
+    slug: form.slug.trim(),
+    kind: form.kind,
+    title: { ja: form.titleJa.trim(), en: form.titleEn.trim() },
+    overview: { ja: form.overviewJa.trim(), en: form.overviewEn.trim() },
+    outcome: { ja: form.outcomeJa.trim(), en: form.outcomeEn.trim() },
+    outlook: { ja: form.outlookJa.trim(), en: form.outlookEn.trim() },
+    externalUrl: form.externalUrl.trim(),
+    highlightImageUrl: form.highlightImageUrl.trim(),
+    imageAlt: { ja: form.imageAltJa.trim(), en: form.imageAltEn.trim() },
+    publishedAt: toISOStringWithFallback(form.publishedAt),
+    isDraft: form.isDraft,
+    tags: form.tags
+      .filter((tag) => tag.value.trim())
+      .map((tag) => ({
+        id: tag.id,
+        value: tag.value.trim(),
+        sortOrder: normalizeSortOrder(tag.sortOrder),
+      })),
+    links: form.links
+      .filter((link) => link.url.trim())
+      .map((link) => ({
+        id: link.id,
+        type: link.type,
+        label: { ja: link.labelJa.trim(), en: link.labelEn.trim() },
+        url: link.url.trim(),
+        sortOrder: normalizeSortOrder(link.sortOrder),
+      })),
+    assets: form.assets
+      .filter((asset) => asset.url.trim())
+      .map((asset) => ({
+        id: asset.id,
+        url: asset.url.trim(),
+        caption: { ja: asset.captionJa.trim(), en: asset.captionEn.trim() },
+        sortOrder: normalizeSortOrder(asset.sortOrder),
+      })),
+    tech: techMembers,
+  };
+};
+
+const researchToPayload = (item: AdminResearch) =>
+  researchFormToPayload(researchToForm(item));
+
 function App() {
   const { t } = useTranslation();
   const { token, setToken: storeToken, clearToken } = useAuthSession();
@@ -156,6 +430,7 @@ function App() {
   const [status, setStatus] = useState("unknown");
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [projects, setProjects] = useState<AdminProject[]>([]);
+  const [techCatalog, setTechCatalog] = useState<TechCatalogEntry[]>([]);
   const [research, setResearch] = useState<AdminResearch[]>([]);
   const [contacts, setContacts] = useState<ContactMessage[]>([]);
   const [blacklist, setBlacklist] = useState<BlacklistEntry[]>([]);
@@ -168,11 +443,11 @@ function App() {
   const [projectForm, setProjectForm] = useState<ProjectFormState>({
     ...emptyProjectForm,
   });
-  const [projectTechQuery, setProjectTechQuery] = useState("");
+  const [projectTechSearch, setProjectTechSearch] = useState("");
   const [showProjectPreview, setShowProjectPreview] = useState(false);
-  const [researchForm, setResearchForm] = useState<ResearchFormState>({
-    ...emptyResearchForm,
-  });
+  const [researchForm, setResearchForm] = useState<ResearchFormState>(
+    createEmptyResearchForm(),
+  );
   const [blacklistForm, setBlacklistForm] = useState<BlacklistFormState>({
     ...emptyBlacklistForm,
   });
@@ -187,28 +462,33 @@ function App() {
   const [editingBlacklistId, setEditingBlacklistId] =
     useState<number | null>(null);
 
-  const techSuggestions = useMemo(() => {
-    const set = new Set<string>();
-    projects.forEach((project) => {
-      project.techStack.forEach((tech) => set.add(tech));
+  const selectedProjectTechIds = useMemo(() => {
+    const ids = new Set<number>();
+    projectForm.tech.forEach((membership) => {
+      const parsed = Number.parseInt(membership.techId, 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        ids.add(parsed);
+      }
     });
-    projectForm.techStack
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean)
-      .forEach((tech) => set.add(tech));
-    return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b));
-  }, [projects, projectForm.techStack]);
+    return ids;
+  }, [projectForm.tech]);
 
-  const filteredTechSuggestions = useMemo(() => {
-    const query = projectTechQuery.trim().toLowerCase();
-    if (!query) {
-      return techSuggestions.slice(0, 8);
-    }
-    return techSuggestions
-      .filter((tech) => tech.toLowerCase().includes(query))
-      .slice(0, 8);
-  }, [projectTechQuery, techSuggestions]);
+  const filteredProjectTech = useMemo(() => {
+    const query = projectTechSearch.trim().toLowerCase();
+    const matches = techCatalog
+      .filter((entry) => entry.active && !selectedProjectTechIds.has(entry.id))
+      .filter((entry) => {
+        if (!query) {
+          return true;
+        }
+        const haystack = `${entry.displayName} ${entry.slug} ${
+          entry.category ?? ""
+        }`.toLowerCase();
+        return haystack.includes(query);
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+    return matches.slice(0, 10);
+  }, [projectTechSearch, techCatalog, selectedProjectTechIds]);
 
   const handleUnauthorized = useCallback(() => {
     clearToken();
@@ -222,9 +502,9 @@ function App() {
     setContactEdits({});
     setProfileForm(createEmptyProfileForm());
     setProjectForm({ ...emptyProjectForm });
-    setProjectTechQuery("");
+    setProjectTechSearch("");
     setShowProjectPreview(false);
-    setResearchForm({ ...emptyResearchForm });
+    setResearchForm(createEmptyResearchForm());
     setBlacklistForm({ ...emptyBlacklistForm });
     setEditingProjectId(null);
     setEditingResearchId(null);
@@ -257,6 +537,7 @@ function App() {
         researchRes,
         contactRes,
         blacklistRes,
+        techCatalogRes,
       ] = await Promise.all([
         adminApi.fetchSummary(),
         adminApi.getProfile(),
@@ -264,6 +545,7 @@ function App() {
         adminApi.listResearch(),
         adminApi.listContacts(),
         adminApi.listBlacklist(),
+        adminApi.listTechCatalog({ includeInactive: false }),
       ]);
 
       setSummary(summaryRes.data);
@@ -273,6 +555,7 @@ function App() {
       setContacts(contactRes.data);
       setContactEdits(buildContactEditMap(contactRes.data));
       setBlacklist(blacklistRes.data);
+      setTechCatalog(techCatalogRes.data);
       setError(null);
     } catch (err) {
       if (isUnauthorizedError(err)) {
@@ -420,22 +703,7 @@ function App() {
 
   const handleSubmitProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const payload = {
-      title: { ja: projectForm.titleJa, en: projectForm.titleEn },
-      description: {
-        ja: projectForm.descriptionJa,
-        en: projectForm.descriptionEn,
-      },
-      techStack: projectForm.techStack
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-      linkUrl: projectForm.linkUrl.trim(),
-      year: Number(projectForm.year) || currentYear,
-      published: projectForm.published,
-      sortOrder:
-        projectForm.sortOrder === "" ? null : Number(projectForm.sortOrder),
-    };
+    const payload = projectFormToPayload(projectForm);
 
     await run(async () => {
       if (editingProjectId != null) {
@@ -446,19 +714,12 @@ function App() {
     });
     setProjectForm({ ...emptyProjectForm });
     setEditingProjectId(null);
-    setProjectTechQuery("");
     setShowProjectPreview(false);
   };
 
   const handleSubmitResearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const payload = {
-      title: { ja: researchForm.titleJa, en: researchForm.titleEn },
-      summary: { ja: researchForm.summaryJa, en: researchForm.summaryEn },
-      contentMd: { ja: researchForm.contentJa, en: researchForm.contentEn },
-      year: Number(researchForm.year) || currentYear,
-      published: researchForm.published,
-    };
+    const payload = researchFormToPayload(researchForm);
 
     await run(async () => {
       if (editingResearchId != null) {
@@ -467,7 +728,7 @@ function App() {
         await adminApi.createResearch(payload);
       }
     });
-    setResearchForm({ ...emptyResearchForm });
+    setResearchForm(createEmptyResearchForm());
     setEditingResearchId(null);
   };
 
@@ -491,82 +752,326 @@ function App() {
 
   const toggleProjectPublished = (project: AdminProject) =>
     run(async () => {
-      await adminApi.updateProject(project.id, {
-        title: project.title,
-        description: project.description,
-        techStack: project.techStack,
-        linkUrl: project.linkUrl,
-        year: project.year,
+      const payload = projectToPayload({
+        ...project,
         published: !project.published,
-        sortOrder: project.sortOrder ?? null,
       });
+      await adminApi.updateProject(project.id, payload);
     });
 
-  const handleAddTechToProject = useCallback(
-    (tech: string) => {
-      setProjectForm((prev) => {
-        const current = prev.techStack
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean);
-        if (current.includes(tech)) {
-          return prev;
-        }
-        return {
-          ...prev,
-          techStack: [...current, tech].join(", "),
-        };
-      });
-      setProjectTechQuery("");
-    },
+  const toggleResearchDraft = (item: AdminResearch) =>
+    run(async () => {
+      const payload = researchToPayload(item);
+      payload.isDraft = !item.isDraft;
+      await adminApi.updateResearch(item.id, payload);
+    });
+
+  const handleAddResearchTag = () =>
+    setResearchForm((prev) => ({
+      ...prev,
+      tags: [
+        ...prev.tags,
+        { value: "", sortOrder: String(prev.tags.length + 1) },
+      ],
+    }));
+
+  const handleUpdateResearchTag = (
+    index: number,
+    payload: Partial<ResearchTagForm>,
+  ) =>
+    setResearchForm((prev) => {
+      const tags = prev.tags.map((tag, idx) =>
+        idx === index ? { ...tag, ...payload } : tag,
+      );
+      return { ...prev, tags };
+    });
+
+  const handleRemoveResearchTag = (index: number) =>
+    setResearchForm((prev) => ({
+      ...prev,
+      tags: prev.tags.filter((_, idx) => idx !== index),
+    }));
+
+  const handleAddResearchLink = () =>
+    setResearchForm((prev) => ({
+      ...prev,
+      links: [
+        ...prev.links,
+        {
+          type: "paper",
+          labelJa: "",
+          labelEn: "",
+          url: "",
+          sortOrder: String(prev.links.length + 1),
+        },
+      ],
+    }));
+
+  const handleUpdateResearchLink = (
+    index: number,
+    payload: Partial<ResearchLinkForm>,
+  ) =>
+    setResearchForm((prev) => {
+      const links = prev.links.map((link, idx) =>
+        idx === index ? { ...link, ...payload } : link,
+      );
+      return { ...prev, links };
+    });
+
+  const handleRemoveResearchLink = (index: number) =>
+    setResearchForm((prev) => ({
+      ...prev,
+      links: prev.links.filter((_, idx) => idx !== index),
+    }));
+
+  const handleAddResearchAsset = () =>
+    setResearchForm((prev) => ({
+      ...prev,
+      assets: [
+        ...prev.assets,
+        {
+          url: "",
+          captionJa: "",
+          captionEn: "",
+          sortOrder: String(prev.assets.length + 1),
+        },
+      ],
+    }));
+
+  const handleUpdateResearchAsset = (
+    index: number,
+    payload: Partial<ResearchAssetForm>,
+  ) =>
+    setResearchForm((prev) => {
+      const assets = prev.assets.map((asset, idx) =>
+        idx === index ? { ...asset, ...payload } : asset,
+      );
+      return { ...prev, assets };
+    });
+
+  const handleRemoveResearchAsset = (index: number) =>
+    setResearchForm((prev) => ({
+      ...prev,
+      assets: prev.assets.filter((_, idx) => idx !== index),
+    }));
+
+  const handleAddResearchTech = () =>
+    setResearchForm((prev) => ({
+      ...prev,
+      tech: [
+        ...prev.tech,
+        {
+          techId: "",
+          context: "primary",
+          note: "",
+          sortOrder: String(prev.tech.length + 1),
+        },
+      ],
+    }));
+
+  const handleUpdateResearchTech = (
+    index: number,
+    payload: Partial<ResearchTechForm>,
+  ) =>
+    setResearchForm((prev) => {
+      const tech = prev.tech.map((membership, idx) =>
+        idx === index ? { ...membership, ...payload } : membership,
+      );
+      return { ...prev, tech };
+    });
+
+  const handleRemoveResearchTech = (index: number) =>
+    setResearchForm((prev) => ({
+      ...prev,
+      tech: prev.tech.filter((_, idx) => idx !== index),
+    }));
+
+  const handleAddProjectTech = useCallback(
+    (techId: number) =>
+      setProjectForm((prev) => ({
+        ...prev,
+        tech: [
+          ...prev.tech,
+          {
+            techId: String(techId),
+            context: "primary",
+            note: "",
+            sortOrder: String(prev.tech.length + 1),
+          },
+        ],
+      })),
     [],
   );
 
-  const toggleResearchPublished = (item: AdminResearch) =>
-    run(async () => {
-      await adminApi.updateResearch(item.id, {
-        title: item.title,
-        summary: item.summary,
-        contentMd: item.contentMd,
-        year: item.year,
-        published: !item.published,
-      });
+  const handleUpdateProjectTech = (
+    index: number,
+    payload: Partial<ProjectTechForm>,
+  ) =>
+    setProjectForm((prev) => {
+      const tech = prev.tech.map((membership, idx) =>
+        idx === index ? { ...membership, ...payload } : membership,
+      );
+      return { ...prev, tech };
     });
+
+  const handleRemoveProjectTech = (index: number) =>
+    setProjectForm((prev) => ({
+      ...prev,
+      tech: prev.tech.filter((_, idx) => idx !== index),
+    }));
+
+  const renderProjectTechSection = () => (
+    <div className="md:col-span-2">
+      <div className="space-y-3 rounded-md border border-slate-200 p-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <span className="block text-sm font-medium text-slate-700">
+              {t("fields.tech")}
+            </span>
+            <p className="text-xs text-slate-500">
+              {t("fields.techSearchDescription") ??
+                "Search the catalog to add technologies. Each entry can be marked as primary or supporting."}
+            </p>
+          </div>
+          <div className="flex w-full flex-col gap-2 md:w-96">
+            <input
+              className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+              value={projectTechSearch}
+              onChange={(event) => setProjectTechSearch(event.target.value)}
+              placeholder={t("fields.techSearchPlaceholder") ?? ""}
+            />
+            <div className="flex flex-wrap gap-2">
+              {filteredProjectTech.length > 0 ? (
+                filteredProjectTech.map((entry) => (
+                  <button
+                    type="button"
+                    key={`catalog-${entry.id}`}
+                    className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-sky-400 hover:text-sky-600"
+                    onClick={() => {
+                      handleAddProjectTech(entry.id);
+                      setProjectTechSearch("");
+                    }}
+                  >
+                    {entry.displayName}
+                  </button>
+                ))
+              ) : (
+                <span className="text-xs text-slate-500">
+                  {t("fields.techSearchEmpty")}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {projectForm.tech.length === 0 && (
+            <p className="text-sm text-slate-500">
+              {t("projects.noTech") ??
+                "No technologies added yet. Use the search above to add from the catalog."}
+            </p>
+          )}
+          {projectForm.tech.map((membership, index) => {
+            const selected = techCatalog.find(
+              (entry) => String(entry.id) === membership.techId,
+            );
+            return (
+              <div
+                key={`project-tech-${index}`}
+                className="grid gap-2 md:grid-cols-5"
+              >
+                <select
+                  className="rounded-md border border-slate-200 px-3 py-2 text-sm md:col-span-2"
+                  value={membership.techId}
+                  onChange={(event) =>
+                    handleUpdateProjectTech(index, {
+                      techId: event.target.value,
+                    })
+                  }
+                >
+                  <option value="">
+                    {t("fields.selectTech") ?? "Select technology"}
+                  </option>
+                  {techCatalog.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.displayName}
+                    </option>
+                  ))}
+                  {membership.techId && !selected && (
+                    <option value={membership.techId}>
+                      {t("fields.unknownTech", {
+                        id: membership.techId,
+                      }) ??
+                        `Unknown (#${membership.techId})`}
+                    </option>
+                  )}
+                </select>
+                <select
+                  className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={membership.context}
+                  onChange={(event) =>
+                    handleUpdateProjectTech(index, {
+                      context: event.target.value as TechContext,
+                    })
+                  }
+                >
+                  {techContexts.map((context) => (
+                    <option key={context} value={context}>
+                      {context}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={membership.sortOrder}
+                  onChange={(event) =>
+                    handleUpdateProjectTech(index, {
+                      sortOrder: event.target.value,
+                    })
+                  }
+                  placeholder={t("fields.sortOrder") ?? "Sort"}
+                />
+                <div className="flex items-center gap-2">
+                  <input
+                    className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={membership.note}
+                    onChange={(event) =>
+                      handleUpdateProjectTech(index, {
+                        note: event.target.value,
+                      })
+                    }
+                    placeholder={t("fields.note") ?? "Note"}
+                  />
+                  <button
+                    type="button"
+                    className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+                    onClick={() => handleRemoveProjectTech(index)}
+                  >
+                    {t("actions.remove")}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 
   const deleteProject = (id: number) => run(() => adminApi.deleteProject(id));
   const deleteResearch = (id: number) => run(() => adminApi.deleteResearch(id));
   const deleteBlacklistEntry = (id: number) =>
     run(() => adminApi.deleteBlacklist(id));
 
-  const handleEditProject = (project: AdminProject) => {
-    setEditingProjectId(project.id);
-    setProjectForm({
-      titleJa: project.title.ja ?? "",
-      titleEn: project.title.en ?? "",
-      descriptionJa: project.description.ja ?? "",
-      descriptionEn: project.description.en ?? "",
-      techStack: project.techStack.join(", "),
-      linkUrl: project.linkUrl,
-      year: project.year.toString(),
-      published: project.published,
-      sortOrder: project.sortOrder != null ? project.sortOrder.toString() : "",
-    });
-    setProjectTechQuery("");
-    setShowProjectPreview(false);
-  };
+const handleEditProject = (project: AdminProject) => {
+  setEditingProjectId(project.id);
+  setProjectForm(projectToForm(project));
+  setProjectTechSearch("");
+  setShowProjectPreview(false);
+};
 
   const handleEditResearch = (item: AdminResearch) => {
     setEditingResearchId(item.id);
-    setResearchForm({
-      titleJa: item.title.ja ?? "",
-      titleEn: item.title.en ?? "",
-      summaryJa: item.summary.ja ?? "",
-      summaryEn: item.summary.en ?? "",
-      contentJa: item.contentMd.ja ?? "",
-      contentEn: item.contentMd.en ?? "",
-      year: item.year.toString(),
-      published: item.published,
-    });
+    setResearchForm(researchToForm(item));
   };
 
   const handleEditBlacklist = (entry: BlacklistEntry) => {
@@ -577,13 +1082,14 @@ function App() {
     });
   };
 
-  const resetProjectForm = () => {
-    setProjectForm({ ...emptyProjectForm });
-    setEditingProjectId(null);
-  };
+const resetProjectForm = () => {
+  setProjectForm({ ...emptyProjectForm });
+  setEditingProjectId(null);
+  setProjectTechSearch("");
+};
 
   const resetResearchForm = () => {
-    setResearchForm({ ...emptyResearchForm });
+    setResearchForm(createEmptyResearchForm());
     setEditingResearchId(null);
   };
 
@@ -1204,119 +1710,73 @@ function App() {
                 />
               </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.techStack")}
-                </label>
-                <input
-                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={projectForm.techStack}
-                  onChange={(event) =>
-                    setProjectForm((prev) => ({
-                      ...prev,
-                      techStack: event.target.value,
-                    }))
-                  }
-                  placeholder={t("fields.techStackPlaceholder") ?? ""}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.techSearch")}
-                </label>
-                <input
-                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={projectTechQuery}
-                  onChange={(event) => setProjectTechQuery(event.target.value)}
-                  placeholder={t("fields.techSearchPlaceholder") ?? ""}
-                />
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {filteredTechSuggestions.length ? (
-                    filteredTechSuggestions.map((tech) => (
-                      <button
-                        type="button"
-                        key={`suggestion-${tech}`}
-                        className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-sky-400 hover:text-sky-600"
-                        onClick={() => handleAddTechToProject(tech)}
-                      >
-                        {tech}
-                      </button>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-500">
-                      {t("fields.techSearchEmpty")}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.linkUrl")}
-                </label>
-                <input
-                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={projectForm.linkUrl}
-                  onChange={(event) =>
-                    setProjectForm((prev) => ({
-                      ...prev,
-                      linkUrl: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.year")}
-                </label>
-                <input
-                  type="number"
-                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={projectForm.year}
-                  onChange={(event) =>
-                    setProjectForm((prev) => ({
-                      ...prev,
-                      year: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="project-published"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                  checked={projectForm.published}
-                  onChange={(event) =>
-                    setProjectForm((prev) => ({
-                      ...prev,
-                      published: event.target.checked,
-                    }))
-                  }
-                />
-                <label
-                  htmlFor="project-published"
-                  className="text-sm font-medium text-slate-700"
-                >
-                  {t("fields.published")}
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.sortOrder")}
-                </label>
-                <input
-                  type="number"
-                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={projectForm.sortOrder}
-                  onChange={(event) =>
-                    setProjectForm((prev) => ({
-                      ...prev,
-                      sortOrder: event.target.value,
-                    }))
-                  }
-                />
-              </div>
+            {renderProjectTechSection()}
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.linkUrl")}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={projectForm.linkUrl}
+                onChange={(event) =>
+                  setProjectForm((prev) => ({
+                    ...prev,
+                    linkUrl: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.year")}
+              </label>
+              <input
+                type="number"
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={projectForm.year}
+                onChange={(event) =>
+                  setProjectForm((prev) => ({
+                    ...prev,
+                    year: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="project-published"
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                checked={projectForm.published}
+                onChange={(event) =>
+                  setProjectForm((prev) => ({
+                    ...prev,
+                    published: event.target.checked,
+                  }))
+                }
+              />
+              <label
+                htmlFor="project-published"
+                className="text-sm font-medium text-slate-700"
+              >
+                {t("fields.published")}
+              </label>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.sortOrder")}
+              </label>
+              <input
+                type="number"
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={projectForm.sortOrder}
+                onChange={(event) =>
+                  setProjectForm((prev) => ({
+                    ...prev,
+                    sortOrder: event.target.value,
+                  }))
+                }
+              />
             </div>
             <div className="flex items-center justify-end gap-3">
               <button
@@ -1338,96 +1798,98 @@ function App() {
             </div>
             {showProjectPreview ? (
               <pre className="mt-4 overflow-x-auto rounded-md border border-slate-200 bg-slate-900/80 p-4 text-xs text-slate-100 dark:border-slate-700">
-                {JSON.stringify(
-                  {
-                    title: {
-                      ja: projectForm.titleJa,
-                      en: projectForm.titleEn,
-                    },
-                    description: {
-                      ja: projectForm.descriptionJa,
-                      en: projectForm.descriptionEn,
-                    },
-                    techStack: projectForm.techStack
-                      .split(",")
-                      .map((value) => value.trim())
-                      .filter(Boolean),
-                    linkUrl: projectForm.linkUrl,
-                    year: projectForm.year,
-                    published: projectForm.published,
-                    sortOrder: projectForm.sortOrder,
-                  },
-                  null,
-                  2,
-                )}
+                {JSON.stringify(projectFormToPayload(projectForm), null, 2)}
               </pre>
             ) : null}
           </form>
 
           <div className="mt-6 space-y-4">
-            {projects.map((project) => (
-              <div
-                key={project.id}
-                className="rounded-md border border-slate-200 p-4"
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-900">
-                      {project.title.ja || project.title.en || t("projects.untitled")}
-                    </h3>
-                    <p className="text-sm text-slate-600">
-                      {project.description.ja || project.description.en || t("projects.noDescription")}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                      <span>
-                        {t("fields.year")}: {project.year}
-                      </span>
-                      {project.techStack.length > 0 && (
+            {projects.map((project) => {
+              const techLabels = project.tech
+                .map((membership) => {
+                  if (membership.tech?.displayName) {
+                    return membership.tech.displayName;
+                  }
+                  const fallback = techCatalog.find(
+                    (entry) => entry.id === membership.tech?.id,
+                  );
+                  return fallback?.displayName ?? `#${membership.tech?.id ?? ""}`;
+                })
+                .filter((label) => label != null && label !== "");
+
+              return (
+                <div
+                  key={project.id}
+                  className="rounded-md border border-slate-200 p-4"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="text-base font-semibold text-slate-900">
+                        {project.title.ja ||
+                          project.title.en ||
+                          t("projects.untitled")}
+                      </h3>
+                      <p className="text-sm text-slate-600">
+                        {project.description.ja ||
+                          project.description.en ||
+                          t("projects.noDescription")}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
                         <span>
-                          {t("fields.techStack")}: {project.techStack.join(", ")}
+                          {t("fields.year")}: {project.year}
                         </span>
-                      )}
-                      <span>
-                        {t("fields.published")}: {project.published ? t("status.published") : t("status.draft")}
-                      </span>
+                        {techLabels.length > 0 && (
+                          <span>
+                            {t("fields.tech")}: {techLabels.join(", ")}
+                          </span>
+                        )}
+                        <span>
+                          {t("fields.published")}:{" "}
+                          {project.published
+                            ? t("status.published")
+                            : t("status.draft")}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+                        onClick={() => toggleProjectPublished(project)}
+                      >
+                        {project.published
+                          ? t("actions.unpublish")
+                          : t("actions.publish")}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+                        onClick={() => handleEditProject(project)}
+                      >
+                        {t("actions.edit")}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                        onClick={() => deleteProject(project.id)}
+                      >
+                        {t("actions.delete")}
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
-                      onClick={() => toggleProjectPublished(project)}
+                  {project.linkUrl && (
+                    <a
+                      className="mt-3 inline-block text-sm font-medium text-slate-700 underline hover:text-slate-900"
+                      href={project.linkUrl}
+                      target="_blank"
+                      rel="noreferrer"
                     >
-                      {project.published ? t("actions.unpublish") : t("actions.publish")}
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
-                      onClick={() => handleEditProject(project)}
-                    >
-                      {t("actions.edit")}
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
-                      onClick={() => deleteProject(project.id)}
-                    >
-                      {t("actions.delete")}
-                    </button>
-                  </div>
+                      {project.linkUrl}
+                    </a>
+                  )}
                 </div>
-                {project.linkUrl && (
-                  <a
-                    className="mt-3 inline-block text-sm font-medium text-slate-700 underline hover:text-slate-900"
-                    href={project.linkUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {project.linkUrl}
-                  </a>
-                )}
-              </div>
-            ))}
+              );
+            })}
             {projects.length === 0 && (
               <p className="text-sm text-slate-500">{t("projects.empty")}</p>
             )}
@@ -1454,7 +1916,85 @@ function App() {
               </button>
             )}
           </div>
-          <form className="mt-4 space-y-4" onSubmit={handleSubmitResearch}>
+          <form className="mt-4 space-y-5" onSubmit={handleSubmitResearch}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.slug") ?? "Slug"}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={researchForm.slug}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      slug: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.kind") ?? "Kind"}
+                </label>
+                <select
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={researchForm.kind}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      kind: event.target.value as ResearchKind,
+                    }))
+                  }
+                >
+                  {researchKinds.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {kind}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.publishedAt") ?? "Published at"}
+                </label>
+                <input
+                  type="datetime-local"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={researchForm.publishedAt}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      publishedAt: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="research-draft"
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  checked={researchForm.isDraft}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      isDraft: event.target.checked,
+                    }))
+                  }
+                />
+                <label
+                  htmlFor="research-draft"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  {t("fields.draft") ?? "Save as draft"}
+                </label>
+              </div>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-slate-700">
@@ -1487,112 +2027,501 @@ function App() {
                 />
               </div>
             </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.summaryJa")}
+                  {t("fields.overviewJa") ?? "Overview (JA)"}
                 </label>
                 <textarea
                   className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   rows={3}
-                  value={researchForm.summaryJa}
+                  value={researchForm.overviewJa}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
                       ...prev,
-                      summaryJa: event.target.value,
+                      overviewJa: event.target.value,
                     }))
                   }
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.summaryEn")}
+                  {t("fields.overviewEn") ?? "Overview (EN)"}
                 </label>
                 <textarea
                   className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   rows={3}
-                  value={researchForm.summaryEn}
+                  value={researchForm.overviewEn}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
                       ...prev,
-                      summaryEn: event.target.value,
+                      overviewEn: event.target.value,
                     }))
                   }
                 />
               </div>
             </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.contentJa")}
+                  {t("fields.outcomeJa") ?? "Outcome (JA)"}
                 </label>
                 <textarea
                   className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  rows={4}
-                  value={researchForm.contentJa}
+                  rows={3}
+                  value={researchForm.outcomeJa}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
                       ...prev,
-                      contentJa: event.target.value,
+                      outcomeJa: event.target.value,
                     }))
                   }
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.contentEn")}
+                  {t("fields.outcomeEn") ?? "Outcome (EN)"}
                 </label>
                 <textarea
                   className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  rows={4}
-                  value={researchForm.contentEn}
+                  rows={3}
+                  value={researchForm.outcomeEn}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
                       ...prev,
-                      contentEn: event.target.value,
+                      outcomeEn: event.target.value,
                     }))
                   }
                 />
               </div>
             </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.year")}
+                  {t("fields.outlookJa") ?? "Outlook (JA)"}
                 </label>
-                <input
-                  type="number"
+                <textarea
                   className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={researchForm.year}
+                  rows={3}
+                  value={researchForm.outlookJa}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
                       ...prev,
-                      year: event.target.value,
+                      outlookJa: event.target.value,
                     }))
                   }
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="research-published"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                  checked={researchForm.published}
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.outlookEn") ?? "Outlook (EN)"}
+                </label>
+                <textarea
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={3}
+                  value={researchForm.outlookEn}
                   onChange={(event) =>
                     setResearchForm((prev) => ({
                       ...prev,
-                      published: event.target.checked,
+                      outlookEn: event.target.value,
                     }))
                   }
                 />
-                <label
-                  htmlFor="research-published"
-                  className="text-sm font-medium text-slate-700"
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.externalUrl") ?? "External URL"}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={researchForm.externalUrl}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      externalUrl: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.highlightImageUrl") ?? "Highlight image URL"}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={researchForm.highlightImageUrl}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      highlightImageUrl: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.imageAltJa") ?? "Image alt (JA)"}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={researchForm.imageAltJa}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      imageAltJa: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.imageAltEn") ?? "Image alt (EN)"}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={researchForm.imageAltEn}
+                  onChange={(event) =>
+                    setResearchForm((prev) => ({
+                      ...prev,
+                      imageAltEn: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-700">
+                  {t("fields.tags") ?? "Tags"}
+                </label>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-800"
+                  onClick={handleAddResearchTag}
                 >
-                  {t("fields.published")}
-                </label>
+                  {t("actions.addTag") ?? "Add tag"}
+                </button>
+              </div>
+              <div className="mt-2 space-y-3">
+                {researchForm.tags.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    {t("research.noTags") ?? "No tags yet."}
+                  </p>
+                ) : (
+                  researchForm.tags.map((tag, index) => (
+                    <div
+                      key={`tag-${index}`}
+                      className="grid gap-3 md:grid-cols-[1fr,120px,auto]"
+                    >
+                      <input
+                        className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        placeholder="value"
+                        value={tag.value}
+                        onChange={(event) =>
+                          handleUpdateResearchTag(index, {
+                            value: event.target.value,
+                          })
+                        }
+                      />
+                      <input
+                        type="number"
+                        className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        value={tag.sortOrder}
+                        onChange={(event) =>
+                          handleUpdateResearchTag(index, {
+                            sortOrder: event.target.value,
+                          })
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                        onClick={() => handleRemoveResearchTag(index)}
+                      >
+                        {t("actions.remove") ?? "Remove"}
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-700">
+                  {t("fields.links") ?? "Links"}
+                </label>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-800"
+                  onClick={handleAddResearchLink}
+                >
+                  {t("actions.addLink") ?? "Add link"}
+                </button>
+              </div>
+              <div className="mt-2 space-y-3">
+                {researchForm.links.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    {t("research.noLinks") ?? "No links yet."}
+                  </p>
+                ) : (
+                  researchForm.links.map((link, index) => (
+                    <div
+                      key={`link-${index}`}
+                      className="space-y-3 rounded-md border border-slate-200 p-3"
+                    >
+                      <div className="grid gap-3 md:grid-cols-[160px,1fr,auto]">
+                        <select
+                          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                          value={link.type}
+                          onChange={(event) =>
+                            handleUpdateResearchLink(index, {
+                              type: event.target.value as ResearchLinkType,
+                            })
+                          }
+                        >
+                          {researchLinkTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                          placeholder="https://"
+                          value={link.url}
+                          onChange={(event) =>
+                            handleUpdateResearchLink(index, {
+                              url: event.target.value,
+                            })
+                          }
+                        />
+                        <div className="flex items-center justify-end gap-2">
+                          <input
+                            type="number"
+                            className="w-24 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                            value={link.sortOrder}
+                            onChange={(event) =>
+                              handleUpdateResearchLink(index, {
+                                sortOrder: event.target.value,
+                              })
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                            onClick={() => handleRemoveResearchLink(index)}
+                          >
+                            {t("actions.remove") ?? "Remove"}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input
+                          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                          placeholder="Label (JA)"
+                          value={link.labelJa}
+                          onChange={(event) =>
+                            handleUpdateResearchLink(index, {
+                              labelJa: event.target.value,
+                            })
+                          }
+                        />
+                        <input
+                          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                          placeholder="Label (EN)"
+                          value={link.labelEn}
+                          onChange={(event) =>
+                            handleUpdateResearchLink(index, {
+                              labelEn: event.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-700">
+                  {t("fields.assets") ?? "Assets"}
+                </label>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-800"
+                  onClick={handleAddResearchAsset}
+                >
+                  {t("actions.addAsset") ?? "Add asset"}
+                </button>
+              </div>
+              <div className="mt-2 space-y-3">
+                {researchForm.assets.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    {t("research.noAssets") ?? "No assets yet."}
+                  </p>
+                ) : (
+                  researchForm.assets.map((asset, index) => (
+                    <div
+                      key={`asset-${index}`}
+                      className="space-y-3 rounded-md border border-slate-200 p-3"
+                    >
+                      <div className="grid gap-3 md:grid-cols-[1fr,120px,auto]">
+                        <input
+                          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                          placeholder="https://"
+                          value={asset.url}
+                          onChange={(event) =>
+                            handleUpdateResearchAsset(index, {
+                              url: event.target.value,
+                            })
+                          }
+                        />
+                        <input
+                          type="number"
+                          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                          value={asset.sortOrder}
+                          onChange={(event) =>
+                            handleUpdateResearchAsset(index, {
+                              sortOrder: event.target.value,
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                          onClick={() => handleRemoveResearchAsset(index)}
+                        >
+                          {t("actions.remove") ?? "Remove"}
+                        </button>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input
+                          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                          placeholder="Caption (JA)"
+                          value={asset.captionJa}
+                          onChange={(event) =>
+                            handleUpdateResearchAsset(index, {
+                              captionJa: event.target.value,
+                            })
+                          }
+                        />
+                        <input
+                          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                          placeholder="Caption (EN)"
+                          value={asset.captionEn}
+                          onChange={(event) =>
+                            handleUpdateResearchAsset(index, {
+                              captionEn: event.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-700">
+                  {t("fields.tech") ?? "Tech relationships"}
+                </label>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-800"
+                  onClick={handleAddResearchTech}
+                >
+                  {t("actions.addTech") ?? "Add tech"}
+                </button>
+              </div>
+              <div className="mt-2 space-y-3">
+                {researchForm.tech.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    {t("research.noTech") ?? "No technology relationships yet."}
+                  </p>
+                ) : (
+                  researchForm.tech.map((membership, index) => (
+                    <div
+                      key={`tech-${index}`}
+                      className="space-y-3 rounded-md border border-slate-200 p-3"
+                    >
+                      <div className="grid gap-3 md:grid-cols-[160px,1fr,auto]">
+                        <input
+                          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                          placeholder="Tech ID"
+                          value={membership.techId}
+                          onChange={(event) =>
+                            handleUpdateResearchTech(index, {
+                              techId: event.target.value,
+                            })
+                          }
+                        />
+                        <select
+                          className="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                          value={membership.context}
+                          onChange={(event) =>
+                            handleUpdateResearchTech(index, {
+                              context: event.target.value as TechContext,
+                            })
+                          }
+                        >
+                          {techContexts.map((context) => (
+                            <option key={context} value={context}>
+                              {context}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="flex items-center justify-end gap-2">
+                          <input
+                            type="number"
+                            className="w-24 rounded-md border border-slate-200 px-3 py-2 text-sm"
+                            value={membership.sortOrder}
+                            onChange={(event) =>
+                              handleUpdateResearchTech(index, {
+                                sortOrder: event.target.value,
+                              })
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                            onClick={() => handleRemoveResearchTech(index)}
+                          >
+                            {t("actions.remove") ?? "Remove"}
+                          </button>
+                        </div>
+                      </div>
+                      <textarea
+                        className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        rows={2}
+                        placeholder={t("fields.note") ?? "Note"}
+                        value={membership.note}
+                        onChange={(event) =>
+                          handleUpdateResearchTech(index, {
+                            note: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             <div className="flex items-center justify-end gap-3">
               <button
                 type="submit"
@@ -1613,24 +2542,50 @@ function App() {
                       {item.title.ja || item.title.en || t("research.untitled")}
                     </h3>
                     <p className="text-sm text-slate-600">
-                      {item.summary.ja || item.summary.en || t("research.noSummary")}
+                      {item.overview.ja || item.overview.en || t("research.noSummary")}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                      <span>slug: {item.slug}</span>
+                      <span>kind: {item.kind}</span>
                       <span>
-                        {t("fields.year")}: {item.year}
+                        {t("fields.publishedAt") ?? "Published"}:{" "}
+                        {new Date(item.publishedAt).toLocaleString()}
                       </span>
                       <span>
-                        {t("fields.published")}: {item.published ? t("status.published") : t("status.draft")}
+                        {item.isDraft
+                          ? t("status.draft") ?? "Draft"
+                          : t("status.published") ?? "Published"}
                       </span>
+                      {item.tags.length > 0 && (
+                        <span>{t("fields.tags") ?? "Tags"}: {item.tags.length}</span>
+                      )}
+                      {item.links.length > 0 && (
+                        <span>{t("fields.links") ?? "Links"}: {item.links.length}</span>
+                      )}
+                      {item.tech.length > 0 && (
+                        <span>{t("fields.tech") ?? "Tech"}: {item.tech.length}</span>
+                      )}
                     </div>
+                    {item.externalUrl && (
+                      <a
+                        className="mt-2 inline-block text-sm font-medium text-slate-700 underline hover:text-slate-900"
+                        href={item.externalUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {item.externalUrl}
+                      </a>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
-                      onClick={() => toggleResearchPublished(item)}
+                      onClick={() => toggleResearchDraft(item)}
                     >
-                      {item.published ? t("actions.unpublish") : t("actions.publish")}
+                      {item.isDraft
+                        ? t("actions.publish") ?? "Publish"
+                        : t("actions.markDraft") ?? "Mark as draft"}
                     </button>
                     <button
                       type="button"

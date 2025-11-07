@@ -20,16 +20,20 @@ func TestService_CreateProjectAndList(t *testing.T) {
 	input := ProjectInput{
 		Title:       model.NewLocalizedText("新規プロジェクト", "New Project"),
 		Description: model.NewLocalizedText("説明", "Description"),
-		TechStack:   []string{"Go", "React"},
-		LinkURL:     "https://example.com",
-		Year:        2025,
-		Published:   true,
+		Tech: []ProjectTechInput{
+			{TechID: 1, Context: model.TechContextPrimary, SortOrder: 1},
+			{TechID: 2, Context: model.TechContextSupporting, SortOrder: 2},
+		},
+		LinkURL:   "https://example.com",
+		Year:      2025,
+		Published: true,
 	}
 
 	created, err := svc.CreateProject(ctx, input)
 	require.NoError(t, err)
 	require.NotZero(t, created.ID)
 	require.Equal(t, 2025, created.Year)
+	require.Len(t, created.Tech, 2)
 
 	projects, err := svc.ListProjects(ctx)
 	require.NoError(t, err)
@@ -141,8 +145,9 @@ func newTestService(t *testing.T) Service {
 	}
 
 	bl := inmemory.NewBlacklistRepository()
+	techCatalog := inmemory.NewTechCatalogRepository()
 
-	svc, err := NewService(adminProfileRepo, adminProjectRepo, adminResearchRepo, adminContactRepo, bl)
+	svc, err := NewService(adminProfileRepo, adminProjectRepo, adminResearchRepo, adminContactRepo, bl, techCatalog)
 	require.NoError(t, err)
 
 	return svc

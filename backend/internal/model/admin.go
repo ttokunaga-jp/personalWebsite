@@ -16,28 +16,38 @@ type AdminProfile struct {
 
 // AdminProject represents a project entry including administrative metadata.
 type AdminProject struct {
-	ID          int64         `json:"id"`
-	Title       LocalizedText `json:"title"`
-	Description LocalizedText `json:"description"`
-	TechStack   []string      `json:"techStack"`
-	LinkURL     string        `json:"linkUrl"`
-	Year        int           `json:"year"`
-	Published   bool          `json:"published"`
-	SortOrder   *int          `json:"sortOrder,omitempty"`
-	CreatedAt   time.Time     `json:"createdAt"`
-	UpdatedAt   time.Time     `json:"updatedAt"`
+	ID          int64            `json:"id"`
+	Title       LocalizedText    `json:"title"`
+	Description LocalizedText    `json:"description"`
+	Tech        []TechMembership `json:"tech"`
+	LinkURL     string           `json:"linkUrl"`
+	Year        int              `json:"year"`
+	Published   bool             `json:"published"`
+	SortOrder   *int             `json:"sortOrder,omitempty"`
+	CreatedAt   time.Time        `json:"createdAt"`
+	UpdatedAt   time.Time        `json:"updatedAt"`
 }
 
-// AdminResearch includes research content with draft management fields.
+// AdminResearch includes full research/blog entry content with draft management fields.
 type AdminResearch struct {
-	ID        int64         `json:"id"`
-	Title     LocalizedText `json:"title"`
-	Summary   LocalizedText `json:"summary"`
-	ContentMD LocalizedText `json:"contentMd"`
-	Year      int           `json:"year"`
-	Published bool          `json:"published"`
-	CreatedAt time.Time     `json:"createdAt"`
-	UpdatedAt time.Time     `json:"updatedAt"`
+	ID                uint64           `json:"id"`
+	Slug              string           `json:"slug"`
+	Kind              ResearchKind     `json:"kind"`
+	Title             LocalizedText    `json:"title"`
+	Overview          LocalizedText    `json:"overview"`
+	Outcome           LocalizedText    `json:"outcome"`
+	Outlook           LocalizedText    `json:"outlook"`
+	ExternalURL       string           `json:"externalUrl"`
+	HighlightImageURL string           `json:"highlightImageUrl"`
+	ImageAlt          LocalizedText    `json:"imageAlt"`
+	PublishedAt       time.Time        `json:"publishedAt"`
+	IsDraft           bool             `json:"isDraft"`
+	CreatedAt         time.Time        `json:"createdAt"`
+	UpdatedAt         time.Time        `json:"updatedAt"`
+	Tags              []ResearchTag    `json:"tags"`
+	Links             []ResearchLink   `json:"links"`
+	Assets            []ResearchAsset  `json:"assets"`
+	Tech              []TechMembership `json:"tech"`
 }
 
 // BlogPost models an article managed through the admin surface.

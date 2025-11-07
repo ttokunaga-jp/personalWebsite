@@ -191,16 +191,21 @@ func NewBlogRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppCon
 	}
 }
 
-// NewMeetingRepository selects an appropriate meeting repository implementation based on the Firestore client.
-func NewMeetingRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.MeetingRepository {
-	switch {
-	case db != nil:
-		return repoMySQL.NewMeetingRepository(db)
-	case client != nil:
-		return repoFirestore.NewMeetingRepository(client, prefix(cfg))
-	default:
-		return inmemory.NewMeetingRepository()
+// NewMeetingReservationRepository selects an appropriate reservation repository implementation.
+func NewMeetingReservationRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.MeetingReservationRepository {
+	if db != nil {
+		return repoMySQL.NewMeetingReservationRepository(db)
 	}
+	// Meeting reservations rely on SQL features; fall back to in-memory when a database is unavailable.
+	return inmemory.NewMeetingReservationRepository()
+}
+
+// NewMeetingNotificationRepository selects an appropriate notification repository implementation.
+func NewMeetingNotificationRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.MeetingNotificationRepository {
+	if db != nil {
+		return repoMySQL.NewMeetingNotificationRepository(db)
+	}
+	return inmemory.NewMeetingNotificationRepository()
 }
 
 // NewBlacklistRepository selects an appropriate blacklist repository implementation based on the Firestore client.

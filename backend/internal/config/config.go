@@ -59,6 +59,8 @@ type ContactConfig struct {
 	RecaptchaSiteKey string   `mapstructure:"recaptcha_site_key"`
 	MinimumLeadHours int      `mapstructure:"minimum_lead_hours"`
 	ConsentText      string   `mapstructure:"consent_text"`
+	SupportEmail     string   `mapstructure:"support_email"`
+	CalendarTimezone string   `mapstructure:"calendar_timezone"`
 }
 
 type BookingConfig struct {

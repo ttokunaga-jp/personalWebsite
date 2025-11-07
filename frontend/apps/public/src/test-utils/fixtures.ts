@@ -47,6 +47,7 @@ export const contactAvailabilityFixture: ContactAvailabilityResponse = {
             new Date(now.getTime() + 1000 * 60 * 60 * 24 + 30 * 60 * 1000),
           ),
           isBookable: true,
+          status: "available" as const,
         },
         {
           id: "slot-2",
@@ -55,6 +56,7 @@ export const contactAvailabilityFixture: ContactAvailabilityResponse = {
             new Date(now.getTime() + 1000 * 60 * 60 * 24 + 2 * 60 * 60 * 1000 + 30 * 60 * 1000),
           ),
           isBookable: false,
+          status: "reserved" as const,
         },
       ],
     },
@@ -79,17 +81,22 @@ export const contactConfigFixture: ContactConfigResponse = {
 };
 
 export const defaultBookingResponse: BookingResult = {
-  meeting: {
+  reservation: {
     id: "bk-1",
+    lookupHash: "lookup-bk-1",
     name: "Jane Doe",
     email: "jane.doe@example.com",
-    datetime: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24)),
+    topic: "consultation",
+    message: "Initial consultation",
+    startAt: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24)),
+    endAt: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24 + 30 * 60 * 1000)),
     durationMinutes: 30,
-    meetUrl: "https://meet.example.com/abc",
-    calendarEventId: "event-1",
+    googleEventId: "event-1",
+    googleCalendarStatus: "confirmed",
     status: "pending",
-    notes: "Initial consultation",
-    confirmationSentAt: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24 + 5 * 60 * 1000)),
+    confirmationSentAt: iso(
+      new Date(now.getTime() + 1000 * 60 * 60 * 24 + 5 * 60 * 1000),
+    ),
   },
   calendarEventId: "event-1",
   supportEmail: "contact@example.com",

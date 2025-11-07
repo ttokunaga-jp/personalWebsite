@@ -14,13 +14,14 @@
     "test": "pnpm -r test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:perf": "pnpm --filter @personal-website/public build -- --mode lhci && node ./scripts/run-lhci.mjs",
+    "test:perf": "cross-env VITE_USE_MOCK_PUBLIC_API=true VITE_DISABLE_HEALTH_CHECKS=true pnpm --filter @personal-website/public build -- --mode lhci && cross-env VITE_USE_MOCK_PUBLIC_API=true VITE_DISABLE_HEALTH_CHECKS=true node ./scripts/run-lhci.mjs",
     "format": "pnpm -r format",
     "prepare": "pnpm exec husky install"
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.1",
     "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.49.1",
+    "cross-env": "^10.1.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.1",
     "typescript": "5.3.3"

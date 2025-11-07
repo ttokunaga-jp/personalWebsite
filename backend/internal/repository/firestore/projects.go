@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -17,19 +18,31 @@ type projectRepository struct {
 	base baseRepository
 }
 
-const projectsCollection = "projects"
+const (
+	projectsCollection = "projects"
+	projectEntityType  = "project"
+)
 
 type projectDocument struct {
-	ID          int64        `firestore:"id"`
-	Title       localizedDoc `firestore:"title"`
-	Description localizedDoc `firestore:"description"`
-	TechStack   []string     `firestore:"techStack"`
-	LinkURL     string       `firestore:"linkUrl"`
-	Year        int          `firestore:"year"`
-	Published   bool         `firestore:"published"`
-	SortOrder   *int         `firestore:"sortOrder,omitempty"`
-	CreatedAt   time.Time    `firestore:"createdAt"`
-	UpdatedAt   time.Time    `firestore:"updatedAt"`
+	ID          int64            `firestore:"id"`
+	Title       localizedDoc     `firestore:"title"`
+	Description localizedDoc     `firestore:"description"`
+	TechStack   []string         `firestore:"techStack"`
+	Tech        []projectTechDoc `firestore:"tech"`
+	LinkURL     string           `firestore:"linkUrl"`
+	Year        int              `firestore:"year"`
+	Published   bool             `firestore:"published"`
+	SortOrder   *int             `firestore:"sortOrder,omitempty"`
+	CreatedAt   time.Time        `firestore:"createdAt"`
+	UpdatedAt   time.Time        `firestore:"updatedAt"`
+}
+
+type projectTechDoc struct {
+	ID        uint64 `firestore:"id"`
+	TechID    uint64 `firestore:"techId"`
+	Context   string `firestore:"context"`
+	Note      string `firestore:"note"`
+	SortOrder int    `firestore:"sortOrder"`
 }
 
 func NewProjectRepository(client *firestore.Client, prefix string) repository.ProjectRepository {
@@ -52,11 +65,13 @@ func (r *projectRepository) ListProjects(ctx context.Context) ([]model.Project, 
 		if !entry.Published {
 			continue
 		}
+		tech := mapProjectTech(entry)
 		result = append(result, model.Project{
 			ID:          entry.ID,
 			Title:       fromLocalizedDoc(entry.Title),
 			Description: fromLocalizedDoc(entry.Description),
-			TechStack:   copyStringSlice(entry.TechStack),
+			Tech:        tech,
+			TechStack:   techDisplayNames(entry, tech),
 			LinkURL:     entry.LinkURL,
 			Year:        entry.Year,
 		})
@@ -114,7 +129,8 @@ func (r *projectRepository) CreateAdminProject(ctx context.Context, project *mod
 		ID:          id,
 		Title:       toLocalizedDoc(project.Title),
 		Description: toLocalizedDoc(project.Description),
-		TechStack:   copyStringSlice(project.TechStack),
+		TechStack:   techStackFromMemberships(project.Tech),
+		Tech:        toProjectTechDocs(project.Tech),
 		LinkURL:     project.LinkURL,
 		Year:        project.Year,
 		Published:   project.Published,
@@ -142,7 +158,8 @@ func (r *projectRepository) UpdateAdminProject(ctx context.Context, project *mod
 	data := map[string]any{
 		"title":       toLocalizedDoc(project.Title),
 		"description": toLocalizedDoc(project.Description),
-		"techStack":   copyStringSlice(project.TechStack),
+		"techStack":   techStackFromMemberships(project.Tech),
+		"tech":        toProjectTechDocs(project.Tech),
 		"linkUrl":     project.LinkURL,
 		"year":        project.Year,
 		"published":   project.Published,
@@ -154,6 +171,7 @@ func (r *projectRepository) UpdateAdminProject(ctx context.Context, project *mod
 		{Path: "title", Value: data["title"]},
 		{Path: "description", Value: data["description"]},
 		{Path: "techStack", Value: data["techStack"]},
+		{Path: "tech", Value: data["tech"]},
 		{Path: "linkUrl", Value: data["linkUrl"]},
 		{Path: "year", Value: data["year"]},
 		{Path: "published", Value: data["published"]},
@@ -221,12 +239,118 @@ func sortKey(item projectDocument) int {
 	return item.Year * 1000
 }
 
+func mapProjectTech(doc projectDocument) []model.TechMembership {
+	if len(doc.Tech) == 0 {
+		return nil
+	}
+	memberships := make([]model.TechMembership, 0, len(doc.Tech))
+	for _, membership := range doc.Tech {
+		memberships = append(memberships, model.TechMembership{
+			MembershipID: membership.ID,
+			EntityType:   projectEntityType,
+			EntityID:     uint64(doc.ID),
+			Tech: model.TechCatalogEntry{
+				ID: membership.TechID,
+			},
+			Context:   model.TechContext(strings.TrimSpace(membership.Context)),
+			Note:      strings.TrimSpace(membership.Note),
+			SortOrder: membership.SortOrder,
+		})
+	}
+	return memberships
+}
+
+func techDisplayNames(doc projectDocument, tech []model.TechMembership) []string {
+	if len(doc.TechStack) > 0 {
+		return trimStringSlice(doc.TechStack)
+	}
+	if len(tech) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(tech))
+	for _, membership := range tech {
+		name := strings.TrimSpace(membership.Tech.DisplayName)
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return names
+}
+
+func trimStringSlice(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+func techStackFromMemberships(tech []model.TechMembership) []string {
+	if len(tech) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(tech))
+	for _, membership := range tech {
+		if membership.Tech.DisplayName == "" {
+			continue
+		}
+		if trimmed := strings.TrimSpace(membership.Tech.DisplayName); trimmed != "" {
+			names = append(names, trimmed)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return names
+}
+
+func toProjectTechDocs(tech []model.TechMembership) []projectTechDoc {
+	if len(tech) == 0 {
+		return nil
+	}
+	result := make([]projectTechDoc, 0, len(tech))
+	nextID := uint64(1)
+	for _, membership := range tech {
+		if membership.Tech.ID == 0 {
+			continue
+		}
+		id := membership.MembershipID
+		if id == 0 {
+			id = nextID
+			nextID++
+		}
+		result = append(result, projectTechDoc{
+			ID:        id,
+			TechID:    membership.Tech.ID,
+			Context:   string(membership.Context),
+			Note:      strings.TrimSpace(membership.Note),
+			SortOrder: membership.SortOrder,
+		})
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
 func mapProjectDocument(doc projectDocument) model.AdminProject {
+	tech := mapProjectTech(doc)
 	return model.AdminProject{
 		ID:          doc.ID,
 		Title:       fromLocalizedDoc(doc.Title),
 		Description: fromLocalizedDoc(doc.Description),
-		TechStack:   copyStringSlice(doc.TechStack),
+		Tech:        tech,
 		LinkURL:     doc.LinkURL,
 		Year:        doc.Year,
 		Published:   doc.Published,

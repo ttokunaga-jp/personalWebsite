@@ -57,11 +57,13 @@ describe("ContactPage", () => {
     const createBookingMock = vi
       .spyOn(publicApi, "createBooking")
       .mockResolvedValue({
-        meeting: {
+        reservation: {
           id: "bk-1",
+          lookupHash: "lookup-bk-1",
           name: "Jane Doe",
           email: "jane.doe@example.com",
-          datetime: firstSlot?.start ?? "",
+          startAt: firstSlot?.start ?? "",
+          endAt: firstSlot?.end ?? "",
           durationMinutes: firstSlot
             ? Math.round(
                 (new Date(firstSlot.end).getTime() -
@@ -69,10 +71,11 @@ describe("ContactPage", () => {
                   60000,
               )
             : 30,
-          meetUrl: "https://meet.example.com/mock",
-          calendarEventId: "event-1",
           status: "pending",
-          notes: "[Research collaboration] I would like to discuss possibilities for joint research in HRI.",
+          message:
+            "[Research collaboration] I would like to discuss possibilities for joint research in HRI.",
+          googleEventId: "event-1",
+          googleCalendarStatus: "confirmed",
         },
         calendarEventId: "event-1",
         supportEmail: contactConfigFixture.supportEmail,
@@ -101,8 +104,10 @@ describe("ContactPage", () => {
     );
     await user.type(agendaTextarea, "I would like to discuss possibilities for joint research in HRI.");
 
-    const slotSelect = await screen.findByLabelText("Time slot");
-    await user.selectOptions(slotSelect, firstSlot?.id ?? "");
+    const availableSlotButtons = await screen.findAllByTestId(
+      "availability-slot-available",
+    );
+    await user.click(availableSlotButtons[0]);
 
     await user.click(screen.getByRole("button", { name: /request booking/i }));
 

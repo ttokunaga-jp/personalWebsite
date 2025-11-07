@@ -22,6 +22,7 @@ import type {
   ContactConfigResponse,
   CreateBookingPayload,
   BookingResult,
+  MeetingReservationStatus,
   ProfileResponse,
   Project,
   ResearchEntry,
@@ -68,6 +69,7 @@ function createMockAvailability(): ContactAvailabilityResponse {
         start: start.toISOString(),
         end: end.toISOString(),
         isBookable: true,
+        status: "available" as const,
       };
     });
     days.push({
@@ -105,23 +107,28 @@ function createMockContactConfig(): ContactConfigResponse {
   };
 }
 
+type RawMeetingReservation = {
+  id?: number | string | null;
+  lookupHash?: string | null;
+  name?: string | null;
+  email?: string | null;
+  topic?: string | null;
+  message?: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  durationMinutes?: number | null;
+  googleEventId?: string | null;
+  googleCalendarStatus?: string | null;
+  status?: string | null;
+  confirmationSentAt?: string | null;
+  lastNotificationSentAt?: string | null;
+  cancellationReason?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
 type RawBookingResult = {
-  meeting: {
-    id?: number | string;
-    name?: string | null;
-    email?: string | null;
-    datetime?: string | null;
-    durationMinutes?: number | null;
-    meetUrl?: string | null;
-    calendarEventId?: string | null;
-    status?: string | null;
-    notes?: string | null;
-    confirmationSentAt?: string | null;
-    lastNotificationSentAt?: string | null;
-    lookupHash?: string | null;
-    googleCalendarStatus?: string | null;
-    cancellationReason?: string | null;
-  };
+  reservation?: RawMeetingReservation;
   calendarEventId?: string | null;
   supportEmail?: string | null;
   calendarTimezone?: string | null;
@@ -133,28 +140,31 @@ function normalizeString(value?: string | null): string | undefined {
 }
 
 function transformBookingResult(raw: RawBookingResult): BookingResult {
-  const meeting = raw.meeting ?? {};
+  const reservation = raw.reservation ?? {};
   const id =
-    meeting.id !== undefined && meeting.id !== null
-      ? String(meeting.id)
+    reservation.id !== undefined && reservation.id !== null
+      ? String(reservation.id)
       : "";
 
   return {
-    meeting: {
+    reservation: {
       id,
-      name: normalizeString(meeting.name) ?? "",
-      email: normalizeString(meeting.email) ?? "",
-      datetime: meeting.datetime ?? "",
-      durationMinutes: meeting.durationMinutes ?? 0,
-      meetUrl: normalizeString(meeting.meetUrl),
-      calendarEventId: normalizeString(meeting.calendarEventId),
-      status: (meeting.status ?? "pending") as BookingResult["meeting"]["status"],
-      notes: normalizeString(meeting.notes),
-      confirmationSentAt: meeting.confirmationSentAt ?? undefined,
-      lastNotificationSentAt: meeting.lastNotificationSentAt ?? undefined,
-      lookupHash: meeting.lookupHash ?? undefined,
-      googleCalendarStatus: meeting.googleCalendarStatus ?? undefined,
-      cancellationReason: meeting.cancellationReason ?? undefined,
+      lookupHash: normalizeString(reservation.lookupHash),
+      name: normalizeString(reservation.name) ?? "",
+      email: normalizeString(reservation.email) ?? "",
+      topic: normalizeString(reservation.topic),
+      message: normalizeString(reservation.message),
+      startAt: reservation.startAt ?? "",
+      endAt: reservation.endAt ?? "",
+      durationMinutes: reservation.durationMinutes ?? 0,
+      googleEventId: normalizeString(reservation.googleEventId),
+      googleCalendarStatus: normalizeString(reservation.googleCalendarStatus),
+      status: (reservation.status ?? "pending") as MeetingReservationStatus,
+      confirmationSentAt: reservation.confirmationSentAt ?? undefined,
+      lastNotificationSentAt: reservation.lastNotificationSentAt ?? undefined,
+      cancellationReason: normalizeString(reservation.cancellationReason),
+      createdAt: reservation.createdAt ?? undefined,
+      updatedAt: reservation.updatedAt ?? undefined,
     },
     calendarEventId: normalizeString(raw.calendarEventId),
     supportEmail: normalizeString(raw.supportEmail),
@@ -240,16 +250,18 @@ export const publicApi = {
   ): Promise<BookingResult> {
     if (USE_MOCK_PUBLIC_API) {
       return {
-        meeting: {
+        reservation: {
           id: String(Date.now()),
+          lookupHash: `mock-${Date.now()}`,
           name: payload.name,
           email: payload.email,
-          datetime: payload.startTime,
+          topic: payload.topic,
+          message: payload.agenda,
+          startAt: payload.startTime,
+          endAt: payload.startTime,
           durationMinutes: payload.durationMinutes,
-          meetUrl: undefined,
-          calendarEventId: undefined,
           status: "pending",
-          notes: payload.agenda,
+          googleCalendarStatus: "confirmed",
         },
         calendarEventId: undefined,
         supportEmail: "contact@example.com",

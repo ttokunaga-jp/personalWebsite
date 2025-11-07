@@ -1,4 +1,5 @@
 import { apiClient } from "@shared/lib/api-client";
+import { useTranslation } from "react-i18next";
 
 import {
   type UseApiResourceResult,
@@ -28,7 +29,7 @@ import type {
 const BASE_PATH = "/v1/public";
 const USE_MOCK_PUBLIC_API =
   import.meta.env.MODE !== "test" &&
-  (import.meta.env.VITE_USE_MOCK_PUBLIC_API ?? "true") !== "false";
+  (import.meta.env.VITE_USE_MOCK_PUBLIC_API ?? "false") === "true";
 
 function withAbortSignal(signal: AbortSignal) {
   return { signal };
@@ -260,9 +261,12 @@ export const publicApi = {
 };
 
 export function useProfileResource(): UseApiResourceResult<ProfileResponse> {
+  const { i18n } = useTranslation();
+
   return useApiResource(publicApi.getProfile, {
     initialData: () => transformProfile(undefined),
     skip: USE_MOCK_PUBLIC_API,
+    dependencies: [i18n.language],
   });
 }
 

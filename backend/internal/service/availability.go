@@ -10,6 +10,8 @@ import (
 	"github.com/takumi/personal-website/internal/errs"
 	"github.com/takumi/personal-website/internal/model"
 	"github.com/takumi/personal-website/internal/repository"
+	"github.com/takumi/personal-website/internal/repository/inmemory"
+	"github.com/takumi/personal-website/internal/service/support"
 )
 
 // AvailabilityOptions allows handlers to customise the scheduling horizon.
@@ -24,15 +26,17 @@ type AvailabilityService interface {
 }
 
 type availabilityService struct {
-	repo repository.AvailabilityRepository
-	cfg  config.ContactConfig
+	repo         repository.AvailabilityRepository
+	fallbackRepo repository.AvailabilityRepository
+	cfg          config.ContactConfig
 }
 
 // NewAvailabilityService wires availability logic to the repository and configuration.
 func NewAvailabilityService(repo repository.AvailabilityRepository, cfg *config.AppConfig) AvailabilityService {
 	return &availabilityService{
-		repo: repo,
-		cfg:  cfg.Contact,
+		repo:         repo,
+		fallbackRepo: inmemory.NewAvailabilityRepository(),
+		cfg:          cfg.Contact,
 	}
 }
 
@@ -80,7 +84,15 @@ func (s *availabilityService) GetAvailability(ctx context.Context, opts Availabi
 
 	busyWindows, err := s.repo.ListBusyWindows(ctx, startDate.UTC(), endDate.UTC())
 	if err != nil {
-		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to load busy windows", err)
+		if s.fallbackRepo != nil && support.ShouldFallback(err) {
+			if fallbackWindows, fallbackErr := s.fallbackRepo.ListBusyWindows(ctx, startDate.UTC(), endDate.UTC()); fallbackErr == nil {
+				busyWindows = fallbackWindows
+				err = nil
+			}
+		}
+		if err != nil {
+			return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to load busy windows", err)
+		}
 	}
 
 	expanded := expandAndMergeWindows(busyWindows, buffer, loc)

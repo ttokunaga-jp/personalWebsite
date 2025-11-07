@@ -34,7 +34,10 @@ func TestRegisterRoutes(t *testing.T) {
 
 	engine := gin.New()
 
-	profileSvc := service.NewProfileService(inmemory.NewContentProfileRepository())
+	profileSvc := service.NewProfileService(
+		inmemory.NewContentProfileRepository(),
+		inmemory.NewHomePageConfigRepository(),
+	)
 	projectSvc := service.NewProjectService(inmemory.NewProjectDocumentRepository())
 	researchSvc := service.NewResearchService(inmemory.NewResearchDocumentRepository())
 	contactSvc := service.NewContactService(inmemory.NewContactRepository(), inmemory.NewContactFormSettingsRepository())
@@ -139,7 +142,9 @@ func TestRegisterRoutes(t *testing.T) {
 		t.Helper()
 		rec := performRequest(engine, http.MethodGet, "/api/profile", nil)
 		require.Equal(t, http.StatusOK, rec.Code)
-		require.Contains(t, rec.Body.String(), `"data"`)
+		body := rec.Body.String()
+		require.Contains(t, body, `"data"`)
+		require.Contains(t, body, `"home"`)
 	})
 
 	t.Run("projects route returns data", func(t *testing.T) {
@@ -397,7 +402,10 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 		engine.Use(csrfMiddleware.Handler())
 	}
 
-	profileSvc := service.NewProfileService(inmemory.NewContentProfileRepository())
+	profileSvc := service.NewProfileService(
+		inmemory.NewContentProfileRepository(),
+		inmemory.NewHomePageConfigRepository(),
+	)
 	projectSvc := service.NewProjectService(inmemory.NewProjectDocumentRepository())
 	researchSvc := service.NewResearchService(inmemory.NewResearchDocumentRepository())
 	contactSvc := service.NewContactService(inmemory.NewContactRepository(), inmemory.NewContactFormSettingsRepository())

@@ -13,13 +13,18 @@ export type UseApiResourceResult<T> = UseApiResourceState<T> & {
 type UseApiResourceOptions<T> = {
   initialData?: T | (() => T);
   skip?: boolean;
+  dependencies?: readonly unknown[];
 };
 
 export function useApiResource<T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
   options?: UseApiResourceOptions<T>,
 ): UseApiResourceResult<T> {
-  const { initialData: initialDataOption, skip = false } = options ?? {};
+  const {
+    initialData: initialDataOption,
+    skip = false,
+    dependencies = [],
+  } = options ?? {};
   const initialDataRef = useRef<T | null>();
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -36,6 +41,8 @@ export function useApiResource<T>(
     }
     return initialDataRef.current;
   }, [initialDataOption]);
+
+  const dependencyKey = useMemo(() => JSON.stringify(dependencies), [dependencies]);
 
   const [state, setState] = useState<UseApiResourceState<T>>({
     data: initialData,
@@ -90,7 +97,7 @@ export function useApiResource<T>(
     return () => {
       abortControllerRef.current?.abort();
     };
-  }, [runFetch, skip]);
+  }, [dependencyKey, runFetch, skip]);
 
   const refetch = useCallback(() => {
     if (skip) {

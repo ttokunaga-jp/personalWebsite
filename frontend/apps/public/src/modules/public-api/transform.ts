@@ -114,6 +114,7 @@ export type RawProfileDocument = {
   workHistory?: RawProfileWorkHistory[] | null;
   techSections?: RawProfileTechSection[] | null;
   socialLinks?: RawProfileSocialLink[] | null;
+  home?: RawHomePageConfig | null;
   updatedAt?: string | null;
 };
 
@@ -606,10 +607,7 @@ function transformHomeConfig(
   };
 }
 
-export function transformProfile(
-  raw: RawProfileDocument | undefined,
-  homeConfig?: RawHomePageConfig | undefined,
-): ProfileResponse {
+export function transformProfile(raw: RawProfileDocument | undefined): ProfileResponse {
   const language = resolveLanguage();
 
   const canonicalProfile = getCanonicalProfile(language);
@@ -646,7 +644,7 @@ export function transformProfile(
   profile.socialLinks = mapSocialLinks(raw?.socialLinks, language, profile.socialLinks);
   profile.footerLinks = profile.socialLinks.filter((link) => link.isFooter);
   profile.updatedAt = raw?.updatedAt ?? profile.updatedAt;
-  profile.home = transformHomeConfig(homeConfig ?? null, language, canonicalHome);
+  profile.home = transformHomeConfig(raw?.home ?? null, language, canonicalHome);
 
   return profile;
 }

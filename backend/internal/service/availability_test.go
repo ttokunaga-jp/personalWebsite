@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	mysqlerr "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 
 	"github.com/takumi/personal-website/internal/config"
@@ -91,8 +92,47 @@ func TestAvailabilityService_HonoursDaysOverride(t *testing.T) {
 
 type stubAvailabilityRepo struct {
 	windows []model.TimeWindow
+	err     error
 }
 
 func (s *stubAvailabilityRepo) ListBusyWindows(context.Context, time.Time, time.Time) ([]model.TimeWindow, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
 	return append([]model.TimeWindow(nil), s.windows...), nil
+}
+
+func TestAvailabilityService_FallbackWhenRepositoryUnavailable(t *testing.T) {
+	t.Parallel()
+
+	loc, err := time.LoadLocation("Asia/Tokyo")
+	require.NoError(t, err)
+
+	repo := &stubAvailabilityRepo{
+		err: &mysqlerr.MySQLError{
+			Number:  1146,
+			Message: "Table 'personal_website.meetings' doesn't exist",
+		},
+	}
+
+	svc := NewAvailabilityService(repo, &config.AppConfig{
+		Contact: config.ContactConfig{
+			Timezone:         "Asia/Tokyo",
+			SlotDurationMin:  30,
+			WorkdayStartHour: 9,
+			WorkdayEndHour:   12,
+			HorizonDays:      1,
+			BufferMinutes:    0,
+		},
+	})
+
+	resp, reqErr := svc.GetAvailability(context.Background(), AvailabilityOptions{
+		StartDate: time.Date(2024, time.June, 1, 0, 0, 0, 0, loc),
+		Days:      1,
+	})
+
+	require.NoError(t, reqErr)
+	require.NotNil(t, resp)
+	require.Len(t, resp.Days, 1)
+	require.NotEmpty(t, resp.Days[0].Slots)
 }

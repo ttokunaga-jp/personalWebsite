@@ -149,6 +149,7 @@ type ProfileDocument struct {
 	WorkHistory  []ProfileWorkExperience `json:"workHistory"`
 	TechSections []ProfileTechSection    `json:"techSections"`
 	SocialLinks  []ProfileSocialLink     `json:"socialLinks"`
+	Home         *HomePageConfigDocument `json:"home,omitempty"`
 	UpdatedAt    time.Time               `json:"updatedAt"`
 }
 

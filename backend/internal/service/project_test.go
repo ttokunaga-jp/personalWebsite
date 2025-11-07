@@ -9,6 +9,7 @@ import (
 
 	"github.com/takumi/personal-website/internal/errs"
 	"github.com/takumi/personal-website/internal/model"
+	"github.com/takumi/personal-website/internal/repository"
 )
 
 type stubProjectDocumentRepository struct {
@@ -50,4 +51,14 @@ func TestProjectService_ListProjectsError(t *testing.T) {
 	appErr := errs.From(err)
 	require.Equal(t, errs.CodeInternal, appErr.Code)
 	require.Contains(t, appErr.Message, "failed to load project documents")
+}
+
+func TestProjectService_FallbackWhenRepositoryUnavailable(t *testing.T) {
+	t.Parallel()
+
+	service := NewProjectService(&stubProjectDocumentRepository{err: repository.ErrNotFound})
+
+	projects, err := service.ListProjectDocuments(context.Background(), false)
+	require.NoError(t, err)
+	require.NotEmpty(t, projects)
 }

@@ -45,10 +45,15 @@ func loadEnvFile(path string) {
 			}
 		}
 
-		if key != "" {
-			if err := os.Setenv(key, value); err != nil {
-				log.Printf("failed to set env var %s: %v", key, err)
-			}
+		if key == "" {
+			continue
+		}
+		if _, exists := os.LookupEnv(key); exists {
+			// Respect already-specified environment variables so CLI overrides are honoured.
+			continue
+		}
+		if err := os.Setenv(key, value); err != nil {
+			log.Printf("failed to set env var %s: %v", key, err)
 		}
 	}
 

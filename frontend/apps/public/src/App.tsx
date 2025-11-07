@@ -2,6 +2,7 @@ import type { Router as RemixRouter } from "@remix-run/router";
 import { RouterProvider } from "react-router-dom";
 
 import { appBrowserRouter } from "./app/router";
+import { ProfileResourceProvider } from "./modules/public-api";
 import { ThemeProvider } from "./providers/ThemeProvider";
 import type { ThemeProviderProps } from "./providers/ThemeProvider";
 
@@ -20,7 +21,9 @@ export function App({
 
   return (
     <ThemeProvider {...providerProps}>
-      <RouterProvider router={router} />
+      <ProfileResourceProvider>
+        <RouterProvider router={router} />
+      </ProfileResourceProvider>
     </ThemeProvider>
   );
 }

@@ -23,8 +23,22 @@ export function SiteHeader() {
 
   return (
     <header className="border-b border-slate-200 bg-white/80 backdrop-blur-md transition-colors dark:border-slate-800 dark:bg-slate-950/80">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-8">
-        <div className="flex items-center gap-3">
+      <div
+        className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-8"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "1rem",
+          maxWidth: "72rem",
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          className="flex items-center gap-3"
+          style={{ display: "flex", alignItems: "center", columnGap: "0.75rem" }}
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-600 font-bold text-white dark:bg-sky-500">
             TA
           </div>

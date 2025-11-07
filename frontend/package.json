@@ -14,7 +14,7 @@
     "test": "pnpm -r test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:perf": "pnpm --filter @personal-website/public build && node ./scripts/run-lhci.mjs",
+    "test:perf": "pnpm --filter @personal-website/public build -- --mode lhci && node ./scripts/run-lhci.mjs",
     "format": "pnpm -r format",
     "prepare": "pnpm exec husky install"
   },
@@ -29,7 +29,14 @@
     "*.{ts,tsx,js,jsx}": "pnpm lint --filter ...[origin/main]",
     "*.{ts,tsx,js,jsx,json,css,md}": "pnpm format --filter ...[origin/main]"
   },
-  "packageManager": "pnpm@8.15.4",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "esbuild",
+      "msw"
+    ]
+  },
+  "packageManager": "pnpm@10.20.0",
   "engines": {
     "node": ">=20"
   }

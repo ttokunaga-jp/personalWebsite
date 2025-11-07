@@ -1,5 +1,11 @@
 import { apiClient } from "@shared/lib/api-client";
-import { startTransition, useEffect, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  startTransition,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { getCanonicalProfile } from "../../modules/profile-content";
@@ -7,6 +13,30 @@ import { useProfileResource } from "../../modules/public-api";
 import type { HomeQuickLink, ProfileResponse, SocialLink } from "../../modules/public-api";
 import { formatDateRange } from "../../utils/date";
 import { getSocialIcon } from "../../utils/icons";
+
+const DISABLE_HEALTH_CHECKS =
+  (import.meta.env?.["VITE_DISABLE_HEALTH_CHECKS"] ?? "false") === "true";
+
+const QUICK_LINK_GRID_BASE_STYLES: CSSProperties = {
+  display: "grid",
+  gap: "1rem",
+  gridTemplateColumns: "repeat(1, minmax(0, 1fr))",
+  minHeight: "220px",
+};
+const QUICK_LINK_HERO_LIMIT = 2;
+
+const QUICK_LINK_CARD_BASE_STYLES: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.5rem",
+  width: "100%",
+  borderRadius: "1rem",
+  borderWidth: 1,
+  borderStyle: "solid",
+  padding: "1.25rem",
+  textDecoration: "none",
+  boxSizing: "border-box",
+};
 
 type HealthResponse = {
   status: string;
@@ -104,7 +134,9 @@ export function HomePage() {
     isLoading: isProfileLoading,
     error: profileError,
   } = useProfileResource();
-  const [status, setStatus] = useState<string>("loading");
+  const [status, setStatus] = useState<string>(
+    DISABLE_HEALTH_CHECKS ? "healthy" : "loading",
+  );
 
   const canonicalProfile = useMemo(
     () => getCanonicalProfile(i18n.language),
@@ -114,6 +146,10 @@ export function HomePage() {
   const homeConfig = effectiveProfile.home;
 
   useEffect(() => {
+    if (DISABLE_HEALTH_CHECKS) {
+      return () => {};
+    }
+
     let subscribed = true;
 
     const fetchHealthStatus = async () => {
@@ -144,9 +180,9 @@ export function HomePage() {
     if (!homeConfig?.quickLinks?.length) {
       return [];
     }
-    return [...homeConfig.quickLinks].sort(
-      (a, b) => a.sortOrder - b.sortOrder,
-    );
+    return [...homeConfig.quickLinks]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .slice(0, QUICK_LINK_HERO_LIMIT);
   }, [homeConfig]);
 
   const chipGroups = useMemo<ChipGroup[]>(() => {
@@ -174,12 +210,21 @@ export function HomePage() {
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-12 px-4 py-16 sm:px-8 lg:px-12">
-      <header className="grid gap-8 lg:grid-cols-[2fr,1fr]">
-        <div className="space-y-6">
+      <header
+        className="grid gap-8 lg:grid-cols-[2fr,1fr]"
+        style={{ display: "grid", gap: "2rem" }}
+      >
+        <div
+          className="flex flex-col gap-6"
+          style={{ display: "flex", flexDirection: "column", rowGap: "1.5rem" }}
+        >
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
             {homeConfig?.heroSubtitle ?? t("home.hero.tagline")}
           </p>
-          <div className="space-y-3">
+          <div
+            className="flex flex-col gap-3"
+            style={{ display: "flex", flexDirection: "column", rowGap: "0.75rem" }}
+          >
             <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-50 sm:text-5xl lg:text-6xl">
               {effectiveProfile.displayName}
             </h1>
@@ -196,34 +241,47 @@ export function HomePage() {
           ) : null}
 
           {quickLinks.length ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {quickLinks.map((link) => (
-                <a
-                  key={link.id}
-                  href={link.targetUrl}
-                  className="group flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white/80 p-5 text-left shadow-sm transition hover:border-sky-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-sky-500"
-                >
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    {link.section.replace("_", " ")}
-                  </span>
-                  <span className="text-lg font-semibold text-slate-900 transition group-hover:text-sky-600 dark:text-slate-100 dark:group-hover:text-sky-300">
-                    {link.label}
-                  </span>
-                  {link.description ? (
-                    <span className="text-sm text-slate-600 dark:text-slate-300">
-                      {link.description}
+            <div className="relative" style={{ minHeight: "220px" }}>
+              <div
+                className="grid gap-4 sm:grid-cols-2"
+                style={{
+                  ...QUICK_LINK_GRID_BASE_STYLES,
+                  position: "absolute",
+                  inset: 0,
+                }}
+              >
+                {quickLinks.map((link) => (
+                  <a
+                    key={link.id}
+                    href={link.targetUrl}
+                    className="group flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white/80 p-5 text-left shadow-sm transition hover:border-sky-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-sky-500"
+                    style={QUICK_LINK_CARD_BASE_STYLES}
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {link.section.replace("_", " ")}
                     </span>
-                  ) : null}
-                  <span className="text-sm font-medium text-sky-600 transition group-hover:underline dark:text-sky-400">
-                    {link.cta}
-                  </span>
-                </a>
-              ))}
+                    <span className="text-lg font-semibold text-slate-900 transition group-hover:text-sky-600 dark:text-slate-100 dark:group-hover:text-sky-300">
+                      {link.label}
+                    </span>
+                    {link.description ? (
+                      <span className="text-sm text-slate-600 dark:text-slate-300">
+                        {link.description}
+                      </span>
+                    ) : null}
+                    <span className="text-sm font-medium text-sky-600 transition group-hover:underline dark:text-sky-400">
+                      {link.cta}
+                    </span>
+                  </a>
+                ))}
+              </div>
             </div>
           ) : null}
         </div>
 
-        <aside className="flex flex-col gap-6">
+        <aside
+          className="flex flex-col gap-6"
+          style={{ display: "flex", flexDirection: "column", rowGap: "1.5rem" }}
+        >
           <div className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/60">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               {t("home.health.title")}
@@ -280,9 +338,18 @@ export function HomePage() {
         </aside>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[2fr,1fr]">
-        <section className="space-y-6">
-          <div className="space-y-2">
+      <div
+        className="grid gap-8 lg:grid-cols-[2fr,1fr]"
+        style={{ display: "grid", gap: "2rem" }}
+      >
+        <section
+          className="flex flex-col gap-6"
+          style={{ display: "flex", flexDirection: "column", rowGap: "1.5rem" }}
+        >
+          <div
+            className="flex flex-col gap-2"
+            style={{ display: "flex", flexDirection: "column", rowGap: "0.5rem" }}
+          >
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {t("home.tech.title")}
             </h2>
@@ -317,11 +384,17 @@ export function HomePage() {
           </div>
 
           {recentWork.length ? (
-            <div className="space-y-4">
+            <div
+              className="flex flex-col gap-4"
+              style={{ display: "flex", flexDirection: "column", rowGap: "1rem" }}
+            >
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 {t("home.work.title")}
               </h2>
-              <ul className="space-y-4">
+              <ul
+                className="flex flex-col gap-4"
+                style={{ display: "flex", flexDirection: "column", rowGap: "1rem" }}
+              >
                 {recentWork.map((work) => (
                   <li
                     key={work.id}
@@ -394,7 +467,10 @@ export function HomePage() {
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {t("home.affiliations.title")}
               </h2>
-              <ul className="mt-3 space-y-3">
+              <ul
+                className="mt-3 flex flex-col gap-3"
+                style={{ display: "flex", flexDirection: "column", rowGap: "0.75rem" }}
+              >
                 {effectiveProfile.affiliations
                   .slice(0, 4)
                   .map((affiliation) => (

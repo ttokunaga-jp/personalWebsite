@@ -71,7 +71,7 @@
 ### 前提条件
 - Go 1.22 以上
 - Node.js 20 以上（Corepack 利用可）
-- pnpm 8.x（`corepack enable` で自動インストール可能）
+- pnpm 10.x（`corepack enable` で自動インストール可能）
 - Docker / Docker Compose v2
 - Terraform 1.5 以上
 - GCP プロジェクト（Cloud Run / Artifact Registry / Secret Manager / Cloud Build を有効化済み）
@@ -127,7 +127,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
    make deps
    ```
    - `make deps-backend`: `go mod tidy`
-   - `make deps-frontend`: `pnpm install`（corepack 未導入の場合は `npx pnpm@8.15.4 install`）
+  - `make deps-frontend`: `pnpm install`（corepack 未導入の場合は `npx pnpm@10.20.0 install`）
 3. 必要に応じてフックを初期化:
    ```bash
    cd frontend && pnpm prepare
@@ -150,7 +150,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 - **ユーティリティ**:
 - `make build`: バックエンドバイナリ / フロント dist を生成
 - `make fmt`: Go / TypeScript のフォーマッタ実行
-- `make smoke-backend`: API スモークテスト（`BASE_URL` や `TOKEN` でカスタマイズ可）
+- `make smoke-backend`: API スモークテスト（既存の `BASE_URL` が無い場合はインメモリ構成のバックエンドを一時起動。`BASE_URL` / `TOKEN` で接続先や認証を上書き可能）
 
 ## 管理者ログイン手順
 1. **Google Cloud Console でリダイレクト URI を登録**  

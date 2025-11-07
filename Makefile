@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 GO ?= go
 PNPM ?= pnpm
+PNPM_VERSION ?= 10.20.0
 DOCKER_COMPOSE ?= docker compose
 GCLOUD ?= gcloud
 CLOUD_BUILD_CONFIG ?= deploy/cloudbuild/cloudbuild.yaml
@@ -14,11 +15,11 @@ deps-backend:
 
 deps-frontend:
 	cd frontend && { command -v corepack >/dev/null 2>&1 && corepack enable || true; }
-	cd frontend && { command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) install || npx pnpm@8.15.4 install; }
+	cd frontend && { command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) install || npx pnpm@$(PNPM_VERSION) install; }
 
 pnpm-install:
 	cd frontend && { command -v corepack >/dev/null 2>&1 && corepack enable || true; }
-	cd frontend && { command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) install || npx pnpm@8.15.4 install; }
+	cd frontend && { command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) install || npx pnpm@$(PNPM_VERSION) install; }
 
 lint: lint-backend lint-frontend
 
@@ -30,7 +31,7 @@ lint-frontend:
 	cd frontend && { \
 		command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) lint || \
 		(command -v corepack >/dev/null 2>&1 && corepack pnpm lint) || \
-		npx pnpm@8.15.4 lint; \
+		npx pnpm@$(PNPM_VERSION) lint; \
 	}
 
 test: test-backend test-frontend
@@ -42,18 +43,18 @@ test-frontend:
 	cd frontend && { \
 		command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) test || \
 		(command -v corepack >/dev/null 2>&1 && corepack pnpm test) || \
-		npx pnpm@8.15.4 test; \
+		npx pnpm@$(PNPM_VERSION) test; \
 	}
 
 test-perf:
 	cd frontend && { \
 		command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) test:perf || \
 		(command -v corepack >/dev/null 2>&1 && corepack pnpm test:perf) || \
-		npx pnpm@8.15.4 test:perf; \
+		npx pnpm@$(PNPM_VERSION) test:perf; \
 	}
 
 smoke-backend:
-	cd backend && ./scripts/api_smoke.sh
+	cd backend && SMOKE_BACKEND_SPAWN_LOCAL=1 ./scripts/api_smoke.sh
 
 build: build-backend build-frontend
 
@@ -64,7 +65,7 @@ build-frontend:
 	cd frontend && { \
 		command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) build || \
 		(command -v corepack >/dev/null 2>&1 && corepack pnpm build) || \
-		npx pnpm@8.15.4 build; \
+		npx pnpm@$(PNPM_VERSION) build; \
 	}
 
 fmt: fmt-backend fmt-frontend
@@ -76,7 +77,7 @@ fmt-frontend:
 	cd frontend && { \
 		command -v $(PNPM) >/dev/null 2>&1 && $(PNPM) format || \
 		(command -v corepack >/dev/null 2>&1 && corepack pnpm format) || \
-		npx pnpm@8.15.4 format; \
+		npx pnpm@$(PNPM_VERSION) format; \
 	}
 
 ci: lint test build

@@ -1,4 +1,5 @@
 import { apiClient } from "@shared/lib/api-client";
+import { createContext, useContext } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -161,6 +162,9 @@ function transformBookingResult(raw: RawBookingResult): BookingResult {
   };
 }
 
+export const ProfileResourceContext =
+  createContext<UseApiResourceResult<ProfileResponse> | null>(null);
+
 export const publicApi = {
   async getProfile(signal: AbortSignal): Promise<ProfileResponse> {
     if (USE_MOCK_PUBLIC_API) {
@@ -260,14 +264,30 @@ export const publicApi = {
   },
 };
 
-export function useProfileResource(): UseApiResourceResult<ProfileResponse> {
+type UseProfileResourceOptions = {
+  skip?: boolean;
+};
+
+export function useProfileResourceInternal(
+  options?: UseProfileResourceOptions,
+): UseApiResourceResult<ProfileResponse> {
   const { i18n } = useTranslation();
+  const skip = options?.skip ?? USE_MOCK_PUBLIC_API;
 
   return useApiResource(publicApi.getProfile, {
     initialData: () => transformProfile(undefined),
-    skip: USE_MOCK_PUBLIC_API,
+    skip,
     dependencies: [i18n.language],
   });
+}
+
+export function useProfileResource(): UseApiResourceResult<ProfileResponse> {
+  const contextValue = useContext(ProfileResourceContext);
+  const fallbackValue = useProfileResourceInternal({
+    skip: contextValue !== null,
+  });
+
+  return contextValue ?? fallbackValue;
 }
 
 export function useResearchResource(): UseApiResourceResult<ResearchEntry[]> {

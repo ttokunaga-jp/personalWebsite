@@ -6,6 +6,39 @@ import { preloadRouteModules } from "./app/routes/routeConfig";
 import "./styles.css";
 import "./modules/i18n";
 
+async function waitForStyles() {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const styleLinks = Array.from(
+    document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
+  );
+
+  if (!styleLinks.length) {
+    return;
+  }
+
+  await Promise.all(
+    styleLinks.map(
+      (link) =>
+        new Promise<void>((resolve) => {
+          if (link.sheet) {
+            resolve();
+            return;
+          }
+          const handle = () => {
+            link.removeEventListener("load", handle);
+            link.removeEventListener("error", handle);
+            resolve();
+          };
+          link.addEventListener("load", handle);
+          link.addEventListener("error", handle);
+        }),
+    ),
+  );
+}
+
 async function bootstrap() {
   const rootElement = document.getElementById("root");
   if (!rootElement) {
@@ -24,11 +57,15 @@ async function bootstrap() {
     rootElement.setAttribute("data-app-loaded", "true");
   };
 
-  if (typeof window.requestAnimationFrame === "function") {
-    window.requestAnimationFrame(markAppLoaded);
-  } else {
-    window.setTimeout(markAppLoaded, 0);
-  }
+  void waitForStyles()
+    .catch(() => {})
+    .finally(() => {
+      if (typeof window.requestAnimationFrame === "function") {
+        window.requestAnimationFrame(markAppLoaded);
+      } else {
+        window.setTimeout(markAppLoaded, 0);
+      }
+    });
 
   if (import.meta.env.MODE !== "test") {
     const schedulePreload = () => {

@@ -1,12 +1,8 @@
 import { lazy, Suspense, type ReactElement } from "react";
 
+import { HomePage } from "../../pages/Home/HomePage";
 import type { NavigationItem } from "../../types/navigation";
 
-const HomePage = lazy(() =>
-  import("../../pages/Home/HomePage").then((module) => ({
-    default: module.HomePage,
-  })),
-);
 const ProfilePage = lazy(() =>
   import("../../pages/Profile/ProfilePage").then((module) => ({
     default: module.ProfilePage,
@@ -116,7 +112,6 @@ export type RouteDefinition = {
 
 export async function preloadRouteModules(): Promise<void> {
   await Promise.all([
-    import("../../pages/Home/HomePage"),
     import("../../pages/Profile/ProfilePage"),
     import("../../pages/Research/ResearchPage"),
     import("../../pages/Projects/ProjectsPage"),

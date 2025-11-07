@@ -12,6 +12,7 @@ const previewMetadataDir = path.join(projectRoot, ".lighthouseci");
 const previewPidFile = path.join(previewMetadataDir, "preview.pid");
 
 const requireFromPublic = createRequire(path.join(publicAppRoot, "package.json"));
+const previewMode = process.env.LHCI_PREVIEW_MODE ?? "production";
 
 async function fileExists(filePath) {
   try {
@@ -99,6 +100,7 @@ async function startPreviewServer() {
   const previewServer = await preview({
     root: publicAppRoot,
     configFile: path.join(publicAppRoot, "vite.config.ts"),
+    mode: previewMode,
     preview: {
       host,
       port,

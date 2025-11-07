@@ -54,7 +54,7 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 8.15.4
+          version: 10.20.0
           run_install: false
 
       - name: Set up Terraform
@@ -65,7 +65,7 @@ jobs:
       - name: Cache pnpm store
         uses: actions/cache@v4
         with:
-          path: ~/.local/share/pnpm/store/v3
+          path: ~/.pnpm-store/v10
           key: ${{ runner.os }}-pnpm-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-

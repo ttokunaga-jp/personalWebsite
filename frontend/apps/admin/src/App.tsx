@@ -12,12 +12,18 @@ import type {
   ContactFormSettings,
   ContactMessage,
   ContactStatus,
-  LocalizedText,
   ResearchKind,
   ResearchLinkType,
+  HomePageConfig,
+  HomeQuickLinkSection,
+  HomeChipSourceType,
+  SocialProvider,
   TechCatalogEntry,
   TechContext,
 } from "./types";
+
+type ProfilePayload = Parameters<typeof adminApi.updateProfile>[0];
+type HomeSettingsPayload = Parameters<typeof adminApi.updateHomeSettings>[0];
 
 const currentYear = new Date().getFullYear();
 const contactStatuses: ContactStatus[] = [
@@ -37,14 +43,94 @@ const researchLinkTypes: ResearchLinkType[] = [
 ];
 const techContexts: TechContext[] = ["primary", "supporting"];
 
+type AffiliationForm = {
+  id?: number;
+  name: string;
+  url: string;
+  descriptionJa: string;
+  descriptionEn: string;
+  startedAt: string;
+  sortOrder: string;
+};
+
+type WorkHistoryForm = {
+  id?: number;
+  organizationJa: string;
+  organizationEn: string;
+  roleJa: string;
+  roleEn: string;
+  summaryJa: string;
+  summaryEn: string;
+  startedAt: string;
+  endedAt: string;
+  externalUrl: string;
+  sortOrder: string;
+};
+
+type SocialLinkForm = {
+  id?: number;
+  provider: SocialProvider;
+  labelJa: string;
+  labelEn: string;
+  url: string;
+  isFooter: boolean;
+  sortOrder: string;
+};
+
+type HomeQuickLinkForm = {
+  id?: number;
+  section: HomeQuickLinkSection;
+  labelJa: string;
+  labelEn: string;
+  descriptionJa: string;
+  descriptionEn: string;
+  ctaJa: string;
+  ctaEn: string;
+  targetUrl: string;
+  sortOrder: string;
+};
+
+type HomeChipSourceForm = {
+  id?: number;
+  source: HomeChipSourceType;
+  labelJa: string;
+  labelEn: string;
+  limit: string;
+  sortOrder: string;
+};
+
+type HomeSettingsFormState = {
+  id?: number | null;
+  profileId?: number | null;
+  heroSubtitleJa: string;
+  heroSubtitleEn: string;
+  quickLinks: HomeQuickLinkForm[];
+  chipSources: HomeChipSourceForm[];
+  updatedAt?: string;
+};
+
 type ProfileFormState = {
-  name: LocalizedText;
-  title: LocalizedText;
-  affiliation: LocalizedText;
-  lab: LocalizedText;
-  summary: LocalizedText;
-  skills: LocalizedText[];
-  focusAreas: LocalizedText[];
+  displayName: string;
+  headlineJa: string;
+  headlineEn: string;
+  summaryJa: string;
+  summaryEn: string;
+  avatarUrl: string;
+  locationJa: string;
+  locationEn: string;
+  themeMode: "light" | "dark" | "system";
+  themeAccentColor: string;
+  labNameJa: string;
+  labNameEn: string;
+  labAdvisorJa: string;
+  labAdvisorEn: string;
+  labRoomJa: string;
+  labRoomEn: string;
+  labUrl: string;
+  affiliations: AffiliationForm[];
+  communities: AffiliationForm[];
+  workHistory: WorkHistoryForm[];
+  socialLinks: SocialLinkForm[];
 };
 
 type ProjectFormState = {
@@ -218,15 +304,1101 @@ const isNotFoundError = (error: unknown): boolean =>
 const isConflictError = (error: unknown): boolean =>
   getHttpStatus(error) === 409;
 
-const createEmptyProfileForm = (): ProfileFormState => ({
-  name: { ja: "", en: "" },
-  title: { ja: "", en: "" },
-  affiliation: { ja: "", en: "" },
-  lab: { ja: "", en: "" },
-  summary: { ja: "", en: "" },
-  skills: [{ ja: "", en: "" }],
-  focusAreas: [{ ja: "", en: "" }],
+const createEmptyAffiliation = (): AffiliationForm => ({
+  name: "",
+  url: "",
+  descriptionJa: "",
+  descriptionEn: "",
+  startedAt: "",
+  sortOrder: "",
 });
+
+const createEmptyWorkHistory = (): WorkHistoryForm => ({
+  organizationJa: "",
+  organizationEn: "",
+  roleJa: "",
+  roleEn: "",
+  summaryJa: "",
+  summaryEn: "",
+  startedAt: "",
+  endedAt: "",
+  externalUrl: "",
+  sortOrder: "",
+});
+
+const createSocialLink = (provider: SocialProvider): SocialLinkForm => ({
+  provider,
+  labelJa: "",
+  labelEn: "",
+  url: "",
+  isFooter: true,
+  sortOrder: "",
+});
+
+const createEmptyProfileForm = (): ProfileFormState => ({
+  displayName: "",
+  headlineJa: "",
+  headlineEn: "",
+  summaryJa: "",
+  summaryEn: "",
+  avatarUrl: "",
+  locationJa: "",
+  locationEn: "",
+  themeMode: "system",
+  themeAccentColor: "",
+  labNameJa: "",
+  labNameEn: "",
+  labAdvisorJa: "",
+  labAdvisorEn: "",
+  labRoomJa: "",
+  labRoomEn: "",
+  labUrl: "",
+  affiliations: [createEmptyAffiliation()],
+  communities: [createEmptyAffiliation()],
+  workHistory: [createEmptyWorkHistory()],
+  socialLinks: [
+    createSocialLink("github"),
+    createSocialLink("zenn"),
+    createSocialLink("linkedin"),
+  ],
+});
+
+const createEmptyQuickLink = (): HomeQuickLinkForm => ({
+  section: "profile",
+  labelJa: "",
+  labelEn: "",
+  descriptionJa: "",
+  descriptionEn: "",
+  ctaJa: "",
+  ctaEn: "",
+  targetUrl: "",
+  sortOrder: "",
+});
+
+const createEmptyChipSource = (): HomeChipSourceForm => ({
+  source: "affiliation",
+  labelJa: "",
+  labelEn: "",
+  limit: "",
+  sortOrder: "",
+});
+
+const createEmptyHomeSettingsForm = (
+  profileId?: number | null,
+): HomeSettingsFormState => ({
+  id: null,
+  profileId: profileId ?? null,
+  heroSubtitleJa: "",
+  heroSubtitleEn: "",
+  quickLinks: [createEmptyQuickLink()],
+  chipSources: [createEmptyChipSource()],
+  updatedAt: undefined,
+});
+
+const themeOptions: ProfileFormState["themeMode"][] = [
+  "system",
+  "light",
+  "dark",
+];
+
+const socialProviderOptions: SocialProvider[] = [
+  "github",
+  "zenn",
+  "linkedin",
+  "x",
+  "email",
+  "other",
+];
+
+const requiredSocialProviders: SocialProvider[] = [
+  "github",
+  "zenn",
+  "linkedin",
+];
+
+const homeQuickLinkSections: HomeQuickLinkSection[] = [
+  "profile",
+  "research_blog",
+  "projects",
+  "contact",
+];
+
+const homeChipSourceOptions: HomeChipSourceType[] = [
+  "affiliation",
+  "community",
+  "skill",
+];
+
+type ListUpdater<T> = (prev: T[]) => T[];
+
+type ProfileAffiliationListProps = {
+  title: string;
+  items: AffiliationForm[];
+  onChange: (updater: ListUpdater<AffiliationForm>) => void;
+};
+
+type HomeQuickLinksEditorProps = {
+  items: HomeQuickLinkForm[];
+  onChange: (updater: ListUpdater<HomeQuickLinkForm>) => void;
+};
+
+type HomeChipSourcesEditorProps = {
+  items: HomeChipSourceForm[];
+  onChange: (updater: ListUpdater<HomeChipSourceForm>) => void;
+};
+
+const ProfileAffiliationList = ({
+  title,
+  items,
+  onChange,
+}: ProfileAffiliationListProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
+      <div className="mt-2 space-y-4">
+        {items.map((item, index) => (
+          <div
+            key={item.id ?? index}
+            className="space-y-3 rounded-lg border border-slate-200 p-4"
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.name", { defaultValue: "Name" })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={item.name}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = { ...next[index], name: event.target.value };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.url", { defaultValue: "URL" })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={item.url}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = { ...next[index], url: event.target.value };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.startedAt", { defaultValue: "Started at" })}
+                </label>
+                <input
+                  type="datetime-local"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={toDateTimeLocal(item.startedAt)}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        startedAt: toISOStringWithFallback(event.target.value),
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.sortOrder", { defaultValue: "Sort order" })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={item.sortOrder}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        sortOrder: event.target.value,
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.descriptionJa")}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={item.descriptionJa}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        descriptionJa: event.target.value,
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.descriptionEn")}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={item.descriptionEn}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        descriptionEn: event.target.value,
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600"
+                type="button"
+                onClick={() =>
+                  onChange((prev) => prev.filter((_, i) => i !== index))
+                }
+                disabled={items.length === 1}
+              >
+                {t("actions.remove")}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button
+        className="mt-3 rounded-md border border-slate-200 px-3 py-1 text-sm text-slate-700"
+        type="button"
+        onClick={() =>
+          onChange((prev) => [...prev, createEmptyAffiliation()])
+        }
+      >
+        {t("actions.addAffiliation", { defaultValue: "Add affiliation" })}
+      </button>
+    </div>
+  );
+};
+
+type ProfileWorkHistoryListProps = {
+  items: WorkHistoryForm[];
+  onChange: (updater: ListUpdater<WorkHistoryForm>) => void;
+};
+
+const ProfileWorkHistoryList = ({
+  items,
+  onChange,
+}: ProfileWorkHistoryListProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-slate-700">
+        {t("profile.sections.workHistory", { defaultValue: "Work history" })}
+      </h3>
+      <div className="mt-2 space-y-4">
+        {items.map((item, index) => (
+          <div
+            key={item.id ?? index}
+            className="space-y-3 rounded-lg border border-slate-200 p-4"
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("profile.fields.organizationJa", {
+                    defaultValue: "Organization (JA)",
+                  })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={item.organizationJa}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        organizationJa: event.target.value,
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("profile.fields.organizationEn", {
+                    defaultValue: "Organization (EN)",
+                  })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={item.organizationEn}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        organizationEn: event.target.value,
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("profile.fields.roleJa", { defaultValue: "Role (JA)" })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={item.roleJa}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        roleJa: event.target.value,
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("profile.fields.roleEn", { defaultValue: "Role (EN)" })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={item.roleEn}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        roleEn: event.target.value,
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.startedAt", { defaultValue: "Started at" })}
+                </label>
+                <input
+                  type="datetime-local"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={toDateTimeLocal(item.startedAt)}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        startedAt: toISOStringWithFallback(event.target.value),
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.endedAt", { defaultValue: "Ended at" })}
+                </label>
+                <input
+                  type="datetime-local"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={toDateTimeLocal(item.endedAt)}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        endedAt: event.target.value
+                          ? toISOStringWithFallback(event.target.value)
+                          : "",
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.sortOrder", { defaultValue: "Sort order" })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={item.sortOrder}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        sortOrder: event.target.value,
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.url", { defaultValue: "External URL" })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={item.externalUrl}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        externalUrl: event.target.value,
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.descriptionJa")}
+                </label>
+                <textarea
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={3}
+                  value={item.summaryJa}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        summaryJa: event.target.value,
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.descriptionEn")}
+                </label>
+                <textarea
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={3}
+                  value={item.summaryEn}
+                  onChange={(event) =>
+                    onChange((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        summaryEn: event.target.value,
+                      };
+                      return next;
+                    })
+                  }
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600"
+                type="button"
+                onClick={() =>
+                  onChange((prev) => prev.filter((_, i) => i !== index))
+                }
+                disabled={items.length === 1}
+              >
+                {t("actions.remove")}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button
+        className="mt-3 rounded-md border border-slate-200 px-3 py-1 text-sm text-slate-700"
+        type="button"
+        onClick={() =>
+          onChange((prev) => [...prev, createEmptyWorkHistory()])
+        }
+      >
+        {t("actions.addWorkHistory", { defaultValue: "Add work history" })}
+      </button>
+    </div>
+  );
+};
+
+type ProfileSocialLinkListProps = {
+  items: SocialLinkForm[];
+  onChange: (updater: ListUpdater<SocialLinkForm>) => void;
+};
+
+const ProfileSocialLinkList = ({
+  items,
+  onChange,
+}: ProfileSocialLinkListProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-slate-700">
+        {t("profile.sections.socialLinks", {
+          defaultValue: "Social links",
+        })}
+      </h3>
+      <div className="mt-2 space-y-4">
+        {items.map((item, index) => {
+          const disableRemove = requiredSocialProviders.includes(item.provider);
+          return (
+            <div
+              key={item.id ?? `${item.provider}-${index}`}
+              className="space-y-3 rounded-lg border border-slate-200 p-4"
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("fields.provider", { defaultValue: "Provider" })}
+                  </label>
+                  <select
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={item.provider}
+                    onChange={(event) =>
+                      onChange((prev) => {
+                        const next = [...prev];
+                        next[index] = {
+                          ...next[index],
+                          provider: event.target.value as SocialProvider,
+                        };
+                        return next;
+                      })
+                    }
+                  >
+                    {socialProviderOptions.map((provider) => (
+                      <option key={provider} value={provider}>
+                        {provider}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("fields.url", { defaultValue: "URL" })}
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={item.url}
+                    onChange={(event) =>
+                      onChange((prev) => {
+                        const next = [...prev];
+                        next[index] = { ...next[index], url: event.target.value };
+                        return next;
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("fields.labelJa")}
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={item.labelJa}
+                    onChange={(event) =>
+                      onChange((prev) => {
+                        const next = [...prev];
+                        next[index] = {
+                          ...next[index],
+                          labelJa: event.target.value,
+                        };
+                        return next;
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("fields.labelEn")}
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={item.labelEn}
+                    onChange={(event) =>
+                      onChange((prev) => {
+                        const next = [...prev];
+                        next[index] = {
+                          ...next[index],
+                          labelEn: event.target.value,
+                        };
+                        return next;
+                      })
+                    }
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900"
+                    checked={item.isFooter}
+                    onChange={(event) =>
+                      onChange((prev) => {
+                        const next = [...prev];
+                        next[index] = {
+                          ...next[index],
+                          isFooter: event.target.checked,
+                        };
+                        return next;
+                      })
+                    }
+                  />
+                  <span className="text-sm text-slate-700">
+                    {t("profile.fields.showInFooter", {
+                      defaultValue: "Show in footer",
+                    })}
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("fields.sortOrder", { defaultValue: "Sort order" })}
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={item.sortOrder}
+                    onChange={(event) =>
+                      onChange((prev) => {
+                        const next = [...prev];
+                        next[index] = {
+                          ...next[index],
+                          sortOrder: event.target.value,
+                        };
+                        return next;
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600"
+                  type="button"
+                  onClick={() =>
+                    onChange((prev) => prev.filter((_, i) => i !== index))
+                  }
+                  disabled={disableRemove}
+                >
+                  {t("actions.remove")}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <button
+        className="mt-3 rounded-md border border-slate-200 px-3 py-1 text-sm text-slate-700"
+        type="button"
+        onClick={() =>
+          onChange((prev) => [...prev, createSocialLink("other")])
+        }
+      >
+        {t("actions.addSocialLink", { defaultValue: "Add social link" })}
+      </button>
+    </div>
+  );
+};
+
+const HomeQuickLinksEditor = ({ items, onChange }: HomeQuickLinksEditorProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="space-y-4">
+      {items.map((item, index) => (
+        <div
+          key={item.id ?? index}
+          className="space-y-3 rounded-lg border border-slate-200 p-4"
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("homeSettings.fields.section", { defaultValue: "Section" })}
+              </label>
+              <select
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.section}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      section: event.target.value as HomeQuickLinkSection,
+                    };
+                    return next;
+                  })
+                }
+              >
+                {homeQuickLinkSections.map((section) => (
+                  <option key={section} value={section}>
+                    {section}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.sortOrder", { defaultValue: "Sort order" })}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.sortOrder}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      sortOrder: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.labelJa")}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.labelJa}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      labelJa: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.labelEn")}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.labelEn}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      labelEn: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.descriptionJa")}
+              </label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                rows={3}
+                value={item.descriptionJa}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      descriptionJa: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.descriptionEn")}
+              </label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                rows={3}
+                value={item.descriptionEn}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      descriptionEn: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("homeSettings.fields.ctaJa", { defaultValue: "CTA (JA)" })}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.ctaJa}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      ctaJa: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("homeSettings.fields.ctaEn", { defaultValue: "CTA (EN)" })}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.ctaEn}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      ctaEn: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.url", { defaultValue: "Target URL" })}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.targetUrl}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      targetUrl: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600"
+              type="button"
+              onClick={() =>
+                onChange((prev) => prev.filter((_, i) => i !== index))
+              }
+              disabled={items.length === 1}
+            >
+              {t("actions.remove")}
+            </button>
+          </div>
+        </div>
+      ))}
+      <button
+        className="rounded-md border border-slate-200 px-3 py-1 text-sm text-slate-700"
+        type="button"
+        onClick={() => onChange((prev) => [...prev, createEmptyQuickLink()])}
+      >
+        {t("homeSettings.actions.addQuickLink", {
+          defaultValue: "Add quick link",
+        })}
+      </button>
+    </div>
+  );
+};
+
+const HomeChipSourcesEditor = ({ items, onChange }: HomeChipSourcesEditorProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="space-y-4">
+      {items.map((item, index) => (
+        <div
+          key={item.id ?? index}
+          className="space-y-3 rounded-lg border border-slate-200 p-4"
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("homeSettings.fields.source", { defaultValue: "Source" })}
+              </label>
+              <select
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.source}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      source: event.target.value as HomeChipSourceType,
+                    };
+                    return next;
+                  })
+                }
+              >
+                {homeChipSourceOptions.map((source) => (
+                  <option key={source} value={source}>
+                    {source}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.sortOrder", { defaultValue: "Sort order" })}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.sortOrder}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      sortOrder: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.labelJa")}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.labelJa}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      labelJa: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("fields.labelEn")}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.labelEn}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      labelEn: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("homeSettings.fields.limit", { defaultValue: "Limit" })}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={item.limit}
+                onChange={(event) =>
+                  onChange((prev) => {
+                    const next = [...prev];
+                    next[index] = {
+                      ...next[index],
+                      limit: event.target.value,
+                    };
+                    return next;
+                  })
+                }
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600"
+              type="button"
+              onClick={() =>
+                onChange((prev) => prev.filter((_, i) => i !== index))
+              }
+              disabled={items.length === 1}
+            >
+              {t("actions.remove")}
+            </button>
+          </div>
+        </div>
+      ))}
+      <button
+        className="rounded-md border border-slate-200 px-3 py-1 text-sm text-slate-700"
+        type="button"
+        onClick={() => onChange((prev) => [...prev, createEmptyChipSource()])}
+      >
+        {t("homeSettings.actions.addChipSource", {
+          defaultValue: "Add chip source",
+        })}
+      </button>
+    </div>
+  );
+};
+
 
 const emptyProjectForm: ProjectFormState = {
   titleJa: "",
@@ -362,6 +1534,108 @@ const normalizeContactSettingsForm = (
   calendarTimezone: trimValue(form.calendarTimezone),
   googleCalendarId: trimValue(form.googleCalendarId),
   bookingWindowDays: parseNumber(form.bookingWindowDays, 0),
+});
+
+const normalizeProfileFormState = (
+  form: ProfileFormState,
+): ProfilePayload => ({
+  displayName: trimValue(form.displayName),
+  headline: normalizeLocalizedField({
+    ja: form.headlineJa,
+    en: form.headlineEn,
+  }),
+  summary: normalizeLocalizedField({
+    ja: form.summaryJa,
+    en: form.summaryEn,
+  }),
+  avatarUrl: trimValue(form.avatarUrl),
+  location: normalizeLocalizedField({
+    ja: form.locationJa,
+    en: form.locationEn,
+  }),
+  theme: {
+    mode: form.themeMode,
+    accentColor: trimValue(form.themeAccentColor) || undefined,
+  },
+  lab: {
+    name: normalizeLocalizedField({
+      ja: form.labNameJa,
+      en: form.labNameEn,
+    }),
+    advisor: normalizeLocalizedField({
+      ja: form.labAdvisorJa,
+      en: form.labAdvisorEn,
+    }),
+    room: normalizeLocalizedField({
+      ja: form.labRoomJa,
+      en: form.labRoomEn,
+    }),
+    url: trimValue(form.labUrl) || undefined,
+  },
+  affiliations: form.affiliations
+    .filter((item) => trimValue(item.name))
+    .map((item) => ({
+      id: item.id,
+      name: trimValue(item.name),
+      url: trimValue(item.url) || undefined,
+      description: normalizeLocalizedField({
+        ja: item.descriptionJa,
+        en: item.descriptionEn,
+      }),
+      startedAt: item.startedAt,
+      sortOrder: normalizeSortOrder(item.sortOrder),
+    })),
+  communities: form.communities
+    .filter((item) => trimValue(item.name))
+    .map((item) => ({
+      id: item.id,
+      name: trimValue(item.name),
+      url: trimValue(item.url) || undefined,
+      description: normalizeLocalizedField({
+        ja: item.descriptionJa,
+        en: item.descriptionEn,
+      }),
+      startedAt: item.startedAt,
+      sortOrder: normalizeSortOrder(item.sortOrder),
+    })),
+  workHistory: form.workHistory
+    .filter(
+      (item) =>
+        trimValue(item.organizationJa) ||
+        trimValue(item.organizationEn) ||
+        trimValue(item.roleJa) ||
+        trimValue(item.roleEn),
+    )
+    .map((item) => ({
+      id: item.id,
+      organization: normalizeLocalizedField({
+        ja: item.organizationJa,
+        en: item.organizationEn,
+      }),
+      role: normalizeLocalizedField({
+        ja: item.roleJa,
+        en: item.roleEn,
+      }),
+      summary: normalizeLocalizedField({
+        ja: item.summaryJa,
+        en: item.summaryEn,
+      }),
+      startedAt: item.startedAt,
+      endedAt: trimValue(item.endedAt) || undefined,
+      externalUrl: trimValue(item.externalUrl) || undefined,
+      sortOrder: normalizeSortOrder(item.sortOrder),
+    })),
+  socialLinks: form.socialLinks.map((item) => ({
+    id: item.id,
+    provider: item.provider,
+    label: normalizeLocalizedField({
+      ja: item.labelJa,
+      en: item.labelEn,
+    }),
+    url: trimValue(item.url),
+    isFooter: item.isFooter,
+    sortOrder: normalizeSortOrder(item.sortOrder),
+  })),
 });
 
 const normalizeContactSettingsOriginal = (
@@ -558,6 +1832,129 @@ const buildContactSettingsDiff = (
   };
 };
 
+const homeSettingsToForm = (
+  settings: HomePageConfig | null,
+  fallbackProfileId?: number,
+): HomeSettingsFormState => {
+  if (!settings) {
+    return createEmptyHomeSettingsForm(fallbackProfileId);
+  }
+  return {
+    id: settings.id,
+    profileId: settings.profileId ?? fallbackProfileId ?? null,
+    heroSubtitleJa: settings.heroSubtitle.ja ?? "",
+    heroSubtitleEn: settings.heroSubtitle.en ?? "",
+    quickLinks:
+      settings.quickLinks.length > 0
+        ? settings.quickLinks.map((link) => ({
+            id: link.id,
+            section: link.section,
+            labelJa: link.label.ja ?? "",
+            labelEn: link.label.en ?? "",
+            descriptionJa: link.description.ja ?? "",
+            descriptionEn: link.description.en ?? "",
+            ctaJa: link.cta.ja ?? "",
+            ctaEn: link.cta.en ?? "",
+            targetUrl: link.targetUrl,
+            sortOrder: String(link.sortOrder ?? 0),
+          }))
+        : [createEmptyQuickLink()],
+    chipSources:
+      settings.chipSources.length > 0
+        ? settings.chipSources.map((chip) => ({
+            id: chip.id,
+            source: chip.source as HomeChipSourceType,
+            labelJa: chip.label.ja ?? "",
+            labelEn: chip.label.en ?? "",
+            limit: String(chip.limit ?? 0),
+            sortOrder: String(chip.sortOrder ?? 0),
+          }))
+        : [createEmptyChipSource()],
+    updatedAt: settings.updatedAt,
+  };
+};
+
+const normalizeHomeSettingsForm = (
+  form: HomeSettingsFormState,
+): HomeSettingsPayload => {
+  if (form.id == null || form.profileId == null || !form.updatedAt) {
+    throw new Error("home settings missing required identifiers");
+  }
+
+  return {
+    id: form.id,
+    profileId: form.profileId,
+    heroSubtitle: normalizeLocalizedField({
+      ja: form.heroSubtitleJa,
+      en: form.heroSubtitleEn,
+    }),
+    quickLinks: form.quickLinks
+      .filter((link) => trimValue(link.labelJa) || trimValue(link.labelEn))
+      .map((link) => ({
+        id: link.id,
+        section: link.section,
+        label: normalizeLocalizedField({
+          ja: link.labelJa,
+          en: link.labelEn,
+        }),
+        description: normalizeLocalizedField({
+          ja: link.descriptionJa,
+          en: link.descriptionEn,
+        }),
+        cta: normalizeLocalizedField({
+          ja: link.ctaJa,
+          en: link.ctaEn,
+        }),
+        targetUrl: trimValue(link.targetUrl),
+        sortOrder: normalizeSortOrder(link.sortOrder),
+      })),
+    chipSources: form.chipSources.map((chip) => ({
+      id: chip.id,
+      source: chip.source,
+      label: normalizeLocalizedField({
+        ja: chip.labelJa,
+        en: chip.labelEn,
+      }),
+      limit: parseNumber(chip.limit, 0),
+      sortOrder: normalizeSortOrder(chip.sortOrder),
+    })),
+    updatedAt: form.updatedAt,
+  };
+};
+
+const validateHomeSettingsForm = (
+  form: HomeSettingsFormState,
+): string | null => {
+  if (form.id == null || form.profileId == null || !form.updatedAt) {
+    return "homeSettings.validation.missingRecord";
+  }
+
+  const heroSubtitleJa = trimValue(form.heroSubtitleJa);
+  const heroSubtitleEn = trimValue(form.heroSubtitleEn);
+  if (!heroSubtitleJa && !heroSubtitleEn) {
+    return "homeSettings.validation.heroSubtitle";
+  }
+
+  if (form.quickLinks.length === 0) {
+    return "homeSettings.validation.quickLinks";
+  }
+  for (const link of form.quickLinks) {
+    const hasLabel = trimValue(link.labelJa) || trimValue(link.labelEn);
+    if (!hasLabel) {
+      return "homeSettings.validation.quickLinkLabel";
+    }
+    if (!trimValue(link.targetUrl)) {
+      return "homeSettings.validation.quickLinkUrl";
+    }
+  }
+
+  if (form.chipSources.length === 0) {
+    return "homeSettings.validation.chipSources";
+  }
+
+  return null;
+};
+
 const isValidEmail = (value: string): boolean =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -649,19 +2046,99 @@ function profileToForm(profile: AdminProfile | null): ProfileFormState {
   if (!profile) {
     return createEmptyProfileForm();
   }
-  const skills = profile.skills.length > 0 ? profile.skills : [{ ja: "", en: "" }];
-  const focusAreas =
-    profile.focusAreas.length > 0
-      ? profile.focusAreas
-      : [{ ja: "", en: "" }];
+
+  const affiliations =
+    profile.affiliations.length > 0
+      ? profile.affiliations.map((item) => ({
+          id: item.id,
+          name: item.name,
+          url: item.url ?? "",
+          descriptionJa: item.description.ja ?? "",
+          descriptionEn: item.description.en ?? "",
+          startedAt: item.startedAt,
+          sortOrder: String(item.sortOrder ?? 0),
+        }))
+      : [createEmptyAffiliation()];
+
+  const communities =
+    profile.communities.length > 0
+      ? profile.communities.map((item) => ({
+          id: item.id,
+          name: item.name,
+          url: item.url ?? "",
+          descriptionJa: item.description.ja ?? "",
+          descriptionEn: item.description.en ?? "",
+          startedAt: item.startedAt,
+          sortOrder: String(item.sortOrder ?? 0),
+        }))
+      : [createEmptyAffiliation()];
+
+  const workHistory =
+    profile.workHistory.length > 0
+      ? profile.workHistory.map((item) => ({
+          id: item.id,
+          organizationJa: item.organization.ja ?? "",
+          organizationEn: item.organization.en ?? "",
+          roleJa: item.role.ja ?? "",
+          roleEn: item.role.en ?? "",
+          summaryJa: item.summary.ja ?? "",
+          summaryEn: item.summary.en ?? "",
+          startedAt: item.startedAt,
+          endedAt: item.endedAt ?? "",
+          externalUrl: item.externalUrl ?? "",
+          sortOrder: String(item.sortOrder ?? 0),
+        }))
+      : [createEmptyWorkHistory()];
+
+  const socialLinksMap = new Map<SocialProvider, SocialLinkForm>();
+  profile.socialLinks.forEach((link) => {
+    const provider = link.provider as SocialProvider;
+    socialLinksMap.set(provider, {
+      id: link.id,
+      provider,
+      labelJa: link.label.ja ?? "",
+      labelEn: link.label.en ?? "",
+      url: link.url,
+      isFooter: link.isFooter,
+      sortOrder: String(link.sortOrder ?? 0),
+    });
+  });
+
+  const requiredProviders: SocialProvider[] = [
+    "github",
+    "zenn",
+    "linkedin",
+  ];
+  requiredProviders.forEach((provider) => {
+    if (!socialLinksMap.has(provider)) {
+      socialLinksMap.set(provider, createSocialLink(provider));
+    }
+  });
+
+  const socialLinks = Array.from(socialLinksMap.values());
+
   return {
-    name: { ...profile.name },
-    title: { ...profile.title },
-    affiliation: { ...profile.affiliation },
-    lab: { ...profile.lab },
-    summary: { ...profile.summary },
-    skills: skills.map((item) => ({ ...item })),
-    focusAreas: focusAreas.map((item) => ({ ...item })),
+    displayName: profile.displayName,
+    headlineJa: profile.headline.ja ?? "",
+    headlineEn: profile.headline.en ?? "",
+    summaryJa: profile.summary.ja ?? "",
+    summaryEn: profile.summary.en ?? "",
+    avatarUrl: profile.avatarUrl ?? "",
+    locationJa: profile.location.ja ?? "",
+    locationEn: profile.location.en ?? "",
+    themeMode: profile.theme.mode,
+    themeAccentColor: profile.theme.accentColor ?? "",
+    labNameJa: profile.lab.name.ja ?? "",
+    labNameEn: profile.lab.name.en ?? "",
+    labAdvisorJa: profile.lab.advisor.ja ?? "",
+    labAdvisorEn: profile.lab.advisor.en ?? "",
+    labRoomJa: profile.lab.room.ja ?? "",
+    labRoomEn: profile.lab.room.en ?? "",
+    labUrl: profile.lab.url ?? "",
+    affiliations,
+    communities,
+    workHistory,
+    socialLinks,
   };
 }
 
@@ -923,6 +2400,13 @@ function App() {
   const [contactPreviewLocale, setContactPreviewLocale] = useState<"ja" | "en">(
     "ja",
   );
+  const [homeSettingsForm, setHomeSettingsForm] =
+    useState<HomeSettingsFormState>(createEmptyHomeSettingsForm());
+  const [homeSettingsSaving, setHomeSettingsSaving] = useState(false);
+  const [homeSettingsNotice, setHomeSettingsNotice] = useState<string | null>(
+    null,
+  );
+  const [homeSettingsError, setHomeSettingsError] = useState<string | null>(null);
 
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
   const [editingResearchId, setEditingResearchId] = useState<number | null>(
@@ -1042,6 +2526,10 @@ function App() {
     setEditingProjectId(null);
     setEditingResearchId(null);
     setEditingBlacklistId(null);
+    setHomeSettingsForm(createEmptyHomeSettingsForm());
+    setHomeSettingsError(null);
+    setHomeSettingsNotice(null);
+    setHomeSettingsSaving(false);
     setError(null);
   }, [clearSession]);
 
@@ -1096,6 +2584,42 @@ function App() {
     setContactSettingsError(null);
     setContactSettingsNotice(null);
   }, []);
+
+  const handleHomeSettingsFieldChange = useCallback(
+    (field: "heroSubtitleJa" | "heroSubtitleEn", value: string) => {
+      setHomeSettingsForm((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+      setHomeSettingsError(null);
+      setHomeSettingsNotice(null);
+    },
+    [],
+  );
+
+  const handleHomeQuickLinksChange = useCallback(
+    (updater: ListUpdater<HomeQuickLinkForm>) => {
+      setHomeSettingsForm((prev) => ({
+        ...prev,
+        quickLinks: updater(prev.quickLinks),
+      }));
+      setHomeSettingsError(null);
+      setHomeSettingsNotice(null);
+    },
+    [],
+  );
+
+  const handleHomeChipSourcesChange = useCallback(
+    (updater: ListUpdater<HomeChipSourceForm>) => {
+      setHomeSettingsForm((prev) => ({
+        ...prev,
+        chipSources: updater(prev.chipSources),
+      }));
+      setHomeSettingsError(null);
+      setHomeSettingsNotice(null);
+    },
+    [],
+  );
 
   const handleRemoveContactTopic = useCallback((index: number) => {
     setContactSettingsForm((prev) => {
@@ -1213,6 +2737,7 @@ function App() {
         contactRes,
         blacklistRes,
         techCatalogRes,
+        homeRes,
       ] = await Promise.all([
         adminApi.fetchSummary(),
         adminApi.getProfile(),
@@ -1221,6 +2746,15 @@ function App() {
         adminApi.listContacts(),
         adminApi.listBlacklist(),
         adminApi.listTechCatalog({ includeInactive: false }),
+        adminApi
+          .getHomeSettings()
+          .then((res) => res)
+          .catch((err) => {
+            if (isNotFoundError(err)) {
+              return { data: null };
+            }
+            throw err;
+          }),
       ]);
 
       let contactSettingsData: ContactFormSettings | null = null;
@@ -1237,13 +2771,17 @@ function App() {
       }
 
       setSummary(summaryRes.data);
-      setProfileForm(profileToForm(profileRes.data));
+      const profileData = profileRes.data;
+      setProfileForm(profileToForm(profileData));
       setProjects(projectRes.data);
       setResearch(researchRes.data);
       setContacts(contactRes.data);
       setContactEdits(buildContactEditMap(contactRes.data));
       setBlacklist(blacklistRes.data);
       setTechCatalog(techCatalogRes.data);
+      setHomeSettingsForm(
+        homeSettingsToForm(homeRes.data ?? null, profileData.id),
+      );
       setContactSettings(contactSettingsData);
       setContactSettingsForm(contactSettingsToForm(contactSettingsData));
       setContactSettingsError(null);
@@ -1251,6 +2789,9 @@ function App() {
       setContactSettingsSaving(false);
       setShowContactSettingsDiff(false);
       setContactPreviewLocale("ja");
+      setHomeSettingsError(null);
+      setHomeSettingsNotice(null);
+      setHomeSettingsSaving(false);
       setError(null);
     } catch (err) {
       if (isUnauthorizedError(err)) {
@@ -1369,18 +2910,65 @@ function App() {
 
   const handleSaveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const payload = {
-      name: { ...profileForm.name },
-      title: { ...profileForm.title },
-      affiliation: { ...profileForm.affiliation },
-      lab: { ...profileForm.lab },
-      summary: { ...profileForm.summary },
-      skills: profileForm.skills.map((item) => ({ ...item })),
-      focusAreas: profileForm.focusAreas.map((item) => ({ ...item })),
-    };
+    const missingProviders = requiredSocialProviders.filter(
+      (provider) =>
+        !profileForm.socialLinks.some(
+          (link) =>
+            link.provider === provider && trimValue(link.url).length > 0,
+        ),
+    );
+    if (missingProviders.length > 0) {
+      setError("profile.validation.requiredSocialLinks");
+      return;
+    }
+    setError(null);
+    const payload = normalizeProfileFormState(profileForm);
     await run(async () => {
       await adminApi.updateProfile(payload);
     });
+  };
+
+  const handleSaveHomeSettings = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setHomeSettingsNotice(null);
+    setHomeSettingsError(null);
+
+    const validationMessage = validateHomeSettingsForm(homeSettingsForm);
+    if (validationMessage) {
+      setHomeSettingsError(validationMessage);
+      return;
+    }
+
+    let payload: Parameters<
+      typeof adminApi.updateHomeSettings
+    >[0];
+    try {
+      payload = normalizeHomeSettingsForm(homeSettingsForm);
+    } catch {
+      setHomeSettingsError("homeSettings.validation.missingRecord");
+      return;
+    }
+
+    setHomeSettingsSaving(true);
+    try {
+      const response = await adminApi.updateHomeSettings(payload);
+      setHomeSettingsForm(
+        homeSettingsToForm(response.data, payload.profileId),
+      );
+      setHomeSettingsNotice("homeSettings.saveSuccess");
+    } catch (err) {
+      if (isUnauthorizedError(err)) {
+        handleUnauthorized();
+      } else if (isConflictError(err)) {
+        setHomeSettingsError("homeSettings.conflict");
+        await refreshAll();
+      } else {
+        console.error(err);
+        setHomeSettingsError("homeSettings.saveError");
+      }
+    } finally {
+      setHomeSettingsSaving(false);
+    }
   };
 
   const handleSubmitProject = async (event: FormEvent<HTMLFormElement>) => {
@@ -2403,6 +3991,107 @@ const resetProjectForm = () => {
 
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-800">
+            {t("homeSettings.title")}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {t("homeSettings.description")}
+          </p>
+          {homeSettingsError && (
+            <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {t(homeSettingsError)}
+            </div>
+          )}
+          {homeSettingsNotice && (
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+              {t(homeSettingsNotice)}
+            </div>
+          )}
+          <form className="mt-4 space-y-6" onSubmit={handleSaveHomeSettings}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("homeSettings.fields.heroSubtitleJa")}
+                </label>
+                <textarea
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={3}
+                  value={homeSettingsForm.heroSubtitleJa}
+                  onChange={(event) =>
+                    handleHomeSettingsFieldChange(
+                      "heroSubtitleJa",
+                      event.target.value,
+                    )
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("homeSettings.fields.heroSubtitleEn")}
+                </label>
+                <textarea
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={3}
+                  value={homeSettingsForm.heroSubtitleEn}
+                  onChange={(event) =>
+                    handleHomeSettingsFieldChange(
+                      "heroSubtitleEn",
+                      event.target.value,
+                    )
+                  }
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-700">
+                  {t("homeSettings.sections.quickLinks")}
+                </h3>
+                <span className="text-xs text-slate-500">
+                  {t("homeSettings.hints.quickLinks")}
+                </span>
+              </div>
+              <div className="mt-3">
+                <HomeQuickLinksEditor
+                  items={homeSettingsForm.quickLinks}
+                  onChange={handleHomeQuickLinksChange}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-700">
+                  {t("homeSettings.sections.chipSources")}
+                </h3>
+                <span className="text-xs text-slate-500">
+                  {t("homeSettings.hints.chipSources")}
+                </span>
+              </div>
+              <div className="mt-3">
+                <HomeChipSourcesEditor
+                  items={homeSettingsForm.chipSources}
+                  onChange={handleHomeChipSourcesChange}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                type="submit"
+                disabled={homeSettingsSaving}
+              >
+                {homeSettingsSaving
+                  ? t("homeSettings.saving", { defaultValue: "Saving…" })
+                  : t("actions.save")}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-800">
             {t("dashboard.systemStatus")}
           </h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -2486,34 +4175,38 @@ const resetProjectForm = () => {
             {t("profile.title")}
           </h2>
           <p className="mt-1 text-sm text-slate-600">{t("profile.description")}</p>
-          <form className="mt-4 space-y-4" onSubmit={handleSaveProfile}>
+          <form className="mt-4 space-y-6" onSubmit={handleSaveProfile}>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.nameJa")}
+                  {t("profile.fields.displayName", {
+                    defaultValue: "Display name",
+                  })}
                 </label>
                 <input
                   className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={profileForm.name.ja ?? ""}
+                  value={profileForm.displayName}
                   onChange={(event) =>
                     setProfileForm((prev) => ({
                       ...prev,
-                      name: { ...prev.name, ja: event.target.value },
+                      displayName: event.target.value,
                     }))
                   }
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.nameEn")}
+                  {t("profile.fields.avatarUrl", {
+                    defaultValue: "Avatar URL",
+                  })}
                 </label>
                 <input
                   className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={profileForm.name.en ?? ""}
+                  value={profileForm.avatarUrl}
                   onChange={(event) =>
                     setProfileForm((prev) => ({
                       ...prev,
-                      name: { ...prev.name, en: event.target.value },
+                      avatarUrl: event.target.value,
                     }))
                   }
                 />
@@ -2524,11 +4217,11 @@ const resetProjectForm = () => {
                 </label>
                 <input
                   className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={profileForm.title.ja ?? ""}
+                  value={profileForm.headlineJa}
                   onChange={(event) =>
                     setProfileForm((prev) => ({
                       ...prev,
-                      title: { ...prev.title, ja: event.target.value },
+                      headlineJa: event.target.value,
                     }))
                   }
                 />
@@ -2539,267 +4232,300 @@ const resetProjectForm = () => {
                 </label>
                 <input
                   className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={profileForm.title.en ?? ""}
+                  value={profileForm.headlineEn}
                   onChange={(event) =>
                     setProfileForm((prev) => ({
                       ...prev,
-                      title: { ...prev.title, en: event.target.value },
+                      headlineEn: event.target.value,
                     }))
                   }
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.affiliationJa")}
+                  {t("profile.fields.themeMode", {
+                    defaultValue: "Theme mode",
+                  })}
                 </label>
-                <input
+                <select
                   className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={profileForm.affiliation.ja ?? ""}
+                  value={profileForm.themeMode}
                   onChange={(event) =>
                     setProfileForm((prev) => ({
                       ...prev,
-                      affiliation: {
-                        ...prev.affiliation,
-                        ja: event.target.value,
-                      },
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.affiliationEn")}
-                </label>
-                <input
-                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={profileForm.affiliation.en ?? ""}
-                  onChange={(event) =>
-                    setProfileForm((prev) => ({
-                      ...prev,
-                      affiliation: {
-                        ...prev.affiliation,
-                        en: event.target.value,
-                      },
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.labJa")}
-                </label>
-                <input
-                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={profileForm.lab.ja ?? ""}
-                  onChange={(event) =>
-                    setProfileForm((prev) => ({
-                      ...prev,
-                      lab: { ...prev.lab, ja: event.target.value },
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  {t("fields.labEn")}
-                </label>
-                <input
-                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  value={profileForm.lab.en ?? ""}
-                  onChange={(event) =>
-                    setProfileForm((prev) => ({
-                      ...prev,
-                      lab: { ...prev.lab, en: event.target.value },
-                    }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700">
-                {t("fields.summaryJa")}
-              </label>
-              <textarea
-                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                rows={3}
-                value={profileForm.summary.ja ?? ""}
-                onChange={(event) =>
-                  setProfileForm((prev) => ({
-                    ...prev,
-                    summary: { ...prev.summary, ja: event.target.value },
-                  }))
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700">
-                {t("fields.summaryEn")}
-              </label>
-              <textarea
-                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                rows={3}
-                value={profileForm.summary.en ?? ""}
-                onChange={(event) =>
-                  setProfileForm((prev) => ({
-                    ...prev,
-                    summary: { ...prev.summary, en: event.target.value },
-                  }))
-                }
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-700">
-                  {t("profile.skills.title")}
-                </h3>
-                <button
-                  type="button"
-                  className="text-sm font-medium text-slate-600 hover:text-slate-800"
-                  onClick={() =>
-                    setProfileForm((prev) => ({
-                      ...prev,
-                      skills: [...prev.skills, { ja: "", en: "" }],
+                      themeMode: event.target.value as ProfileFormState["themeMode"],
                     }))
                   }
                 >
-                  {t("profile.skills.add")}
-                </button>
+                  {themeOptions.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {mode}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div className="mt-2 space-y-2">
-                {profileForm.skills.map((skill, index) => (
-                  <div
-                    className="flex flex-col gap-2 rounded-md border border-slate-200 p-3 md:flex-row"
-                    key={`skill-${index}`}
-                  >
-                    <input
-                      className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm"
-                      placeholder={t("fields.skillJa")}
-                      value={skill.ja ?? ""}
-                      onChange={(event) =>
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          skills: prev.skills.map((item, idx) =>
-                            idx === index
-                              ? { ...item, ja: event.target.value }
-                              : item,
-                          ),
-                        }))
-                      }
-                    />
-                    <input
-                      className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm"
-                      placeholder={t("fields.skillEn")}
-                      value={skill.en ?? ""}
-                      onChange={(event) =>
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          skills: prev.skills.map((item, idx) =>
-                            idx === index
-                              ? { ...item, en: event.target.value }
-                              : item,
-                          ),
-                        }))
-                      }
-                    />
-                    <button
-                      type="button"
-                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={() =>
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          skills: prev.skills.filter((_, idx) => idx !== index),
-                        }))
-                      }
-                      disabled={profileForm.skills.length === 1}
-                    >
-                      {t("actions.remove")}
-                    </button>
-                  </div>
-                ))}
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("profile.fields.themeAccent", {
+                    defaultValue: "Accent color",
+                  })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={profileForm.themeAccentColor}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      themeAccentColor: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.summaryJa")}
+                </label>
+                <textarea
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={4}
+                  value={profileForm.summaryJa}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      summaryJa: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("fields.summaryEn")}
+                </label>
+                <textarea
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  rows={4}
+                  value={profileForm.summaryEn}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      summaryEn: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("profile.fields.locationJa", {
+                    defaultValue: "Location (JA)",
+                  })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={profileForm.locationJa}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      locationJa: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">
+                  {t("profile.fields.locationEn", {
+                    defaultValue: "Location (EN)",
+                  })}
+                </label>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  value={profileForm.locationEn}
+                  onChange={(event) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      locationEn: event.target.value,
+                    }))
+                  }
+                />
               </div>
             </div>
 
             <div>
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-700">
-                  {t("profile.focusAreas.title")}
-                </h3>
-                <button
-                  type="button"
-                  className="text-sm font-medium text-slate-600 hover:text-slate-800"
-                  onClick={() =>
-                    setProfileForm((prev) => ({
-                      ...prev,
-                      focusAreas: [...prev.focusAreas, { ja: "", en: "" }],
-                    }))
-                  }
-                >
-                  {t("profile.focusAreas.add")}
-                </button>
-              </div>
-              <div className="mt-2 space-y-2">
-                {profileForm.focusAreas.map((area, index) => (
-                  <div
-                    className="flex flex-col gap-2 rounded-md border border-slate-200 p-3 md:flex-row"
-                    key={`focus-${index}`}
-                  >
-                    <input
-                      className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm"
-                      placeholder={t("fields.focusJa")}
-                      value={area.ja ?? ""}
-                      onChange={(event) =>
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          focusAreas: prev.focusAreas.map((item, idx) =>
-                            idx === index
-                              ? { ...item, ja: event.target.value }
-                              : item,
-                          ),
-                        }))
-                      }
-                    />
-                    <input
-                      className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm"
-                      placeholder={t("fields.focusEn")}
-                      value={area.en ?? ""}
-                      onChange={(event) =>
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          focusAreas: prev.focusAreas.map((item, idx) =>
-                            idx === index
-                              ? { ...item, en: event.target.value }
-                              : item,
-                          ),
-                        }))
-                      }
-                    />
-                    <button
-                      type="button"
-                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={() =>
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          focusAreas: prev.focusAreas.filter(
-                            (_, idx) => idx !== index,
-                          ),
-                        }))
-                      }
-                      disabled={profileForm.focusAreas.length === 1}
-                    >
-                      {t("actions.remove")}
-                    </button>
-                  </div>
-                ))}
+              <h3 className="text-sm font-semibold text-slate-700">
+                {t("profile.sections.lab", { defaultValue: "Lab information" })}
+              </h3>
+              <div className="mt-2 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("profile.fields.labNameJa", {
+                      defaultValue: "Lab name (JA)",
+                    })}
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={profileForm.labNameJa}
+                    onChange={(event) =>
+                      setProfileForm((prev) => ({
+                        ...prev,
+                        labNameJa: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("profile.fields.labNameEn", {
+                      defaultValue: "Lab name (EN)",
+                    })}
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={profileForm.labNameEn}
+                    onChange={(event) =>
+                      setProfileForm((prev) => ({
+                        ...prev,
+                        labNameEn: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("profile.fields.labAdvisorJa", {
+                      defaultValue: "Advisor (JA)",
+                    })}
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={profileForm.labAdvisorJa}
+                    onChange={(event) =>
+                      setProfileForm((prev) => ({
+                        ...prev,
+                        labAdvisorJa: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("profile.fields.labAdvisorEn", {
+                      defaultValue: "Advisor (EN)",
+                    })}
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={profileForm.labAdvisorEn}
+                    onChange={(event) =>
+                      setProfileForm((prev) => ({
+                        ...prev,
+                        labAdvisorEn: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("profile.fields.labRoomJa", {
+                      defaultValue: "Room (JA)",
+                    })}
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={profileForm.labRoomJa}
+                    onChange={(event) =>
+                      setProfileForm((prev) => ({
+                        ...prev,
+                        labRoomJa: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("profile.fields.labRoomEn", {
+                      defaultValue: "Room (EN)",
+                    })}
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={profileForm.labRoomEn}
+                    onChange={(event) =>
+                      setProfileForm((prev) => ({
+                        ...prev,
+                        labRoomEn: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("profile.fields.labUrl", { defaultValue: "Lab URL" })}
+                  </label>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                    value={profileForm.labUrl}
+                    onChange={(event) =>
+                      setProfileForm((prev) => ({
+                        ...prev,
+                        labUrl: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3">
+            <ProfileAffiliationList
+              title={t("profile.sections.affiliations", { defaultValue: "Affiliations" })}
+              items={profileForm.affiliations}
+              onChange={(updater) =>
+                setProfileForm((prev) => ({
+                  ...prev,
+                  affiliations: updater(prev.affiliations),
+                }))
+              }
+            />
+
+            <ProfileAffiliationList
+              title={t("profile.sections.communities", { defaultValue: "Communities" })}
+              items={profileForm.communities}
+              onChange={(updater) =>
+                setProfileForm((prev) => ({
+                  ...prev,
+                  communities: updater(prev.communities),
+                }))
+              }
+            />
+
+            <ProfileWorkHistoryList
+              items={profileForm.workHistory}
+              onChange={(updater) =>
+                setProfileForm((prev) => ({
+                  ...prev,
+                  workHistory: updater(prev.workHistory),
+                }))
+              }
+            />
+
+            <ProfileSocialLinkList
+              items={profileForm.socialLinks}
+              onChange={(updater) =>
+                setProfileForm((prev) => ({
+                  ...prev,
+                  socialLinks: updater(prev.socialLinks),
+                }))
+              }
+            />
+
+            <div className="flex justify-end">
               <button
+                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
                 type="submit"
-                className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-                disabled={loading}
               >
                 {t("actions.save")}
               </button>

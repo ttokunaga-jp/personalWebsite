@@ -9,21 +9,65 @@ import type {
   BlacklistEntry,
   ContactFormSettings,
   ContactMessage,
+  HomePageConfig,
   LocalizedText,
   ResearchKind,
   ResearchLinkType,
+  SocialProvider,
   TechCatalogEntry,
   TechContext,
 } from "../types";
 
 type ProfilePayload = {
-  name: { ja?: string; en?: string };
-  title: { ja?: string; en?: string };
-  affiliation: { ja?: string; en?: string };
-  lab: { ja?: string; en?: string };
-  summary: { ja?: string; en?: string };
-  skills: { ja?: string; en?: string }[];
-  focusAreas: { ja?: string; en?: string }[];
+  displayName: string;
+  headline: LocalizedText;
+  summary: LocalizedText;
+  avatarUrl: string;
+  location: LocalizedText;
+  theme: {
+    mode: "light" | "dark" | "system";
+    accentColor?: string;
+  };
+  lab: {
+    name: LocalizedText;
+    advisor: LocalizedText;
+    room: LocalizedText;
+    url?: string;
+  };
+  affiliations: {
+    id?: number;
+    name: string;
+    url?: string;
+    description: LocalizedText;
+    startedAt: string;
+    sortOrder: number;
+  }[];
+  communities: {
+    id?: number;
+    name: string;
+    url?: string;
+    description: LocalizedText;
+    startedAt: string;
+    sortOrder: number;
+  }[];
+  workHistory: {
+    id?: number;
+    organization: LocalizedText;
+    role: LocalizedText;
+    summary: LocalizedText;
+    startedAt: string;
+    endedAt?: string | null;
+    externalUrl?: string;
+    sortOrder: number;
+  }[];
+  socialLinks: {
+    id?: number;
+    provider: SocialProvider;
+    label: LocalizedText;
+    url: string;
+    isFooter: boolean;
+    sortOrder: number;
+  }[];
 };
 
 type ProjectPayload = {
@@ -108,6 +152,29 @@ type ContactSettingsPayload = {
   updatedAt: string;
 };
 
+type HomeSettingsPayload = {
+  id: number;
+  profileId: number;
+  heroSubtitle: LocalizedText;
+  quickLinks: {
+    id?: number;
+    section: "profile" | "research_blog" | "projects" | "contact";
+    label: LocalizedText;
+    description: LocalizedText;
+    cta: LocalizedText;
+    targetUrl: string;
+    sortOrder: number;
+  }[];
+  chipSources: {
+    id?: number;
+    source: "affiliation" | "community" | "skill";
+    label: LocalizedText;
+    limit: number;
+    sortOrder: number;
+  }[];
+  updatedAt: string;
+};
+
 export class DomainError extends Error {
   readonly status: number;
 
@@ -168,6 +235,10 @@ type AdminApi = {
   updateContactSettings: (
     payload: ContactSettingsPayload,
   ) => ApiResult<ContactFormSettings>;
+  getHomeSettings: () => ApiResult<HomePageConfig>;
+  updateHomeSettings: (
+    payload: HomeSettingsPayload,
+  ) => ApiResult<HomePageConfig>;
 
   listBlacklist: () => ApiResult<BlacklistEntry[]>;
   createBlacklist: (
@@ -228,6 +299,9 @@ export const adminApi: AdminApi = {
     unwrap(
       apiClient.put<ContactFormSettings>("/admin/contact-settings", payload),
     ),
+  getHomeSettings: () => unwrap(apiClient.get<HomePageConfig>("/admin/home")),
+  updateHomeSettings: (payload: HomeSettingsPayload) =>
+    unwrap(apiClient.put<HomePageConfig>("/admin/home", payload)),
 
   listBlacklist: () => unwrap(apiClient.get<BlacklistEntry[]>("/admin/blacklist")),
   createBlacklist: (payload: BlacklistPayload) =>

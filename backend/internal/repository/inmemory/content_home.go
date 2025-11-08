@@ -71,3 +71,19 @@ func (r *homePageConfigRepository) GetHomePageConfig(ctx context.Context) (*mode
 
 	return config, nil
 }
+
+func (r *homePageConfigRepository) UpdateHomePageConfig(ctx context.Context, config *model.HomePageConfigDocument, expectedUpdatedAt time.Time) (*model.HomePageConfigDocument, error) {
+	_ = ctx
+	if config == nil {
+		return nil, repository.ErrInvalidInput
+	}
+	if config.ID == 0 {
+		config.ID = 1
+	}
+	if expectedUpdatedAt.IsZero() {
+		return nil, repository.ErrInvalidInput
+	}
+	updated := *config
+	updated.UpdatedAt = time.Now().UTC()
+	return &updated, nil
+}

@@ -2,17 +2,8 @@ package model
 
 import "time"
 
-// AdminProfile captures editable profile metadata for the administrator UI.
-type AdminProfile struct {
-	Name        LocalizedText   `json:"name"`
-	Title       LocalizedText   `json:"title"`
-	Affiliation LocalizedText   `json:"affiliation"`
-	Lab         LocalizedText   `json:"lab"`
-	Summary     LocalizedText   `json:"summary"`
-	Skills      []LocalizedText `json:"skills"`
-	FocusAreas  []LocalizedText `json:"focusAreas"`
-	UpdatedAt   *time.Time      `json:"updatedAt,omitempty"`
-}
+// AdminProfile exposes the full profile aggregate (v2 schema) for administrative editing.
+type AdminProfile = ProfileDocument
 
 // AdminProject represents a project entry including administrative metadata.
 type AdminProject struct {

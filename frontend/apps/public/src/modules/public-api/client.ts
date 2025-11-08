@@ -30,8 +30,9 @@ import type {
 
 const BASE_PATH = "/v1/public";
 const USE_MOCK_PUBLIC_API =
-  import.meta.env.MODE !== "test" &&
-  (import.meta.env.VITE_USE_MOCK_PUBLIC_API ?? "false") === "true";
+  import.meta.env.MODE === "lhci" ||
+  (import.meta.env.MODE !== "test" &&
+    (import.meta.env.VITE_USE_MOCK_PUBLIC_API ?? "false") === "true");
 
 function withAbortSignal(signal: AbortSignal) {
   return { signal };

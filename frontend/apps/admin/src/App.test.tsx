@@ -9,10 +9,13 @@ const apiMocks = vi.hoisted(() => ({
   health: vi.fn(),
   fetchSummary: vi.fn(),
   getProfile: vi.fn(),
+  updateProfile: vi.fn(),
   listTechCatalog: vi.fn(),
   listProjects: vi.fn(),
   listResearch: vi.fn(),
   listContacts: vi.fn(),
+  getHomeSettings: vi.fn(),
+  updateHomeSettings: vi.fn(),
   getContactSettings: vi.fn(),
   updateContactSettings: vi.fn(),
   listBlacklist: vi.fn(),
@@ -31,10 +34,13 @@ const {
   health: healthMock,
   fetchSummary: summaryMock,
   getProfile: profileMock,
+  updateProfile: updateProfileMock,
   listTechCatalog: techCatalogMock,
   listProjects: projectsMock,
   listResearch: researchMock,
   listContacts: contactsMock,
+  getHomeSettings: homeSettingsMock,
+  updateHomeSettings: updateHomeSettingsMock,
   getContactSettings: contactSettingsMock,
   updateContactSettings: updateContactSettingsMock,
   listBlacklist: blacklistMock,
@@ -43,6 +49,114 @@ const {
 
 describe("Admin App", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    const now = new Date().toISOString();
+    const profileResponse = {
+      id: 1,
+      displayName: "Takumi Takami",
+      headline: { ja: "エンジニア", en: "Engineer" },
+      summary: { ja: "概要", en: "Summary" },
+      avatarUrl: null,
+      location: { ja: "東京都", en: "Tokyo" },
+      theme: { mode: "light", accentColor: "#00a0e9" },
+      lab: {
+        name: { ja: "未来創造研究室", en: "Future Lab" },
+        advisor: { ja: "山田 教授", en: "Prof. Yamada" },
+        room: { ja: "305", en: "305" },
+        url: "https://example.com/lab",
+      },
+      affiliations: [
+        {
+          id: 1,
+          kind: "affiliation" as const,
+          name: "東京大学",
+          url: "https://example.com",
+          description: { ja: "所属説明", en: "Affiliation description" },
+          startedAt: now,
+          sortOrder: 1,
+        },
+      ],
+      communities: [
+        {
+          id: 2,
+          kind: "community" as const,
+          name: "OSS Community",
+          url: "https://community.example.com",
+          description: { ja: "コミュニティ", en: "Community" },
+          startedAt: now,
+          sortOrder: 1,
+        },
+      ],
+      workHistory: [
+        {
+          id: 1,
+          organization: { ja: "株式会社テスト", en: "Test Inc." },
+          role: { ja: "ソフトウェアエンジニア", en: "Software Engineer" },
+          summary: { ja: "開発業務を担当。", en: "Handled development tasks." },
+          startedAt: now,
+          endedAt: null,
+          externalUrl: "https://example.com/work",
+          sortOrder: 1,
+        },
+      ],
+      socialLinks: [
+        {
+          id: 1,
+          provider: "github" as const,
+          label: { ja: "GitHub", en: "GitHub" },
+          url: "https://github.com/example",
+          isFooter: true,
+          sortOrder: 1,
+        },
+        {
+          id: 2,
+          provider: "zenn" as const,
+          label: { ja: "Zenn", en: "Zenn" },
+          url: "https://zenn.dev/example",
+          isFooter: true,
+          sortOrder: 2,
+        },
+        {
+          id: 3,
+          provider: "linkedin" as const,
+          label: { ja: "LinkedIn", en: "LinkedIn" },
+          url: "https://linkedin.com/in/example",
+          isFooter: true,
+          sortOrder: 3,
+        },
+      ],
+      techSections: [],
+      home: null,
+      updatedAt: now,
+    };
+
+    const homeSettingsResponse = {
+      id: 1,
+      profileId: profileResponse.id,
+      heroSubtitle: { ja: "研究と実践の融合", en: "Crafting research and practice" },
+      quickLinks: [
+        {
+          id: 1,
+          section: "profile" as const,
+          label: { ja: "プロフィール", en: "Profile" },
+          description: { ja: "略歴を見る", en: "Read biography" },
+          cta: { ja: "詳細", en: "Details" },
+          targetUrl: "/profile",
+          sortOrder: 1,
+        },
+      ],
+      chipSources: [
+        {
+          id: 1,
+          source: "affiliation" as const,
+          label: { ja: "所属", en: "Affiliations" },
+          limit: 3,
+          sortOrder: 1,
+        },
+      ],
+      updatedAt: now,
+    };
+
     healthMock.mockResolvedValue({ data: { status: "ok" } });
     summaryMock.mockResolvedValue({
       data: {
@@ -54,21 +168,17 @@ describe("Admin App", () => {
         blacklistEntries: 1,
         skillCount: 4,
         focusAreaCount: 2,
-        profileUpdatedAt: new Date().toISOString(),
+        profileUpdatedAt: now,
       },
     });
     profileMock.mockResolvedValue({
-      data: {
-        name: { ja: "高見 拓実", en: "Takumi Takami" },
-        title: { ja: "エンジニア", en: "Engineer" },
-        affiliation: { ja: "", en: "" },
-        lab: { ja: "", en: "" },
-        summary: { ja: "概要", en: "Summary" },
-        skills: [],
-        focusAreas: [],
-        updatedAt: new Date().toISOString(),
-      },
+      data: profileResponse,
     });
+    updateProfileMock.mockResolvedValue({
+      data: profileResponse,
+    });
+    homeSettingsMock.mockResolvedValue({ data: homeSettingsResponse });
+    updateHomeSettingsMock.mockResolvedValue({ data: homeSettingsResponse });
     const contactSettingsResponse = {
       id: 1,
       heroTitle: { ja: "お問い合わせ", en: "Contact" },
@@ -96,8 +206,8 @@ describe("Admin App", () => {
       calendarTimezone: "Asia/Tokyo",
       googleCalendarId: "primary",
       bookingWindowDays: 30,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
     contactSettingsMock.mockResolvedValue({ data: contactSettingsResponse });
     updateContactSettingsMock.mockResolvedValue({
@@ -157,8 +267,8 @@ describe("Admin App", () => {
           year: 2024,
           published: true,
           sortOrder: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdAt: now,
+          updatedAt: now,
         },
       ],
     });
@@ -175,10 +285,10 @@ describe("Admin App", () => {
           externalUrl: "https://example.com",
           highlightImageUrl: "",
           imageAlt: { ja: "", en: "" },
-          publishedAt: new Date().toISOString(),
+          publishedAt: now,
           isDraft: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdAt: now,
+          updatedAt: now,
           tags: [],
           links: [],
           assets: [],
@@ -196,8 +306,8 @@ describe("Admin App", () => {
           message: "テストメッセージ",
           status: "pending",
           adminNote: "",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdAt: now,
+          updatedAt: now,
         },
       ],
     });

@@ -592,31 +592,163 @@ type stubAdminService struct{}
 func (s *stubAdminService) GetProfile(context.Context) (*model.AdminProfile, error) {
 	now := time.Now().UTC()
 	return &model.AdminProfile{
-		Name:        model.NewLocalizedText("管理者", "Admin"),
-		Title:       model.NewLocalizedText("肩書", "Title"),
-		Affiliation: model.NewLocalizedText("所属", "Affiliation"),
-		Lab:         model.NewLocalizedText("ラボ", "Lab"),
+		ID:          1,
+		DisplayName: "管理者",
+		Headline:    model.NewLocalizedText("肩書", "Title"),
 		Summary:     model.NewLocalizedText("要約", "Summary"),
-		Skills: []model.LocalizedText{
-			model.NewLocalizedText("Go", "Go"),
-			model.NewLocalizedText("React", "React"),
+		Location:    model.NewLocalizedText("東京", "Tokyo"),
+		Theme: model.ProfileTheme{
+			Mode:        model.ProfileThemeModeLight,
+			AccentColor: "#3b82f6",
 		},
-		FocusAreas: []model.LocalizedText{
-			model.NewLocalizedText("AI", "AI"),
+		Lab: model.ProfileLab{
+			Name:    model.NewLocalizedText("ラボ", "Lab"),
+			Advisor: model.NewLocalizedText("教授", "Professor"),
+			Room:    model.NewLocalizedText("4F", "4F"),
+			URL:     "https://example.dev/lab",
 		},
-		UpdatedAt: &now,
+		Affiliations: []model.ProfileAffiliation{
+			{
+				ID:          1,
+				Kind:        model.ProfileAffiliationKindAffiliation,
+				Name:        "Example University",
+				URL:         "https://example.dev",
+				Description: model.NewLocalizedText("研究員", "Researcher"),
+				StartedAt:   now.AddDate(-3, 0, 0),
+				SortOrder:   1,
+			},
+		},
+		Communities: []model.ProfileAffiliation{
+			{
+				ID:          2,
+				Kind:        model.ProfileAffiliationKindCommunity,
+				Name:        "OSS Guild",
+				URL:         "https://oss.dev",
+				Description: model.NewLocalizedText("コミュニティ", "Community"),
+				StartedAt:   now.AddDate(-2, 0, 0),
+				SortOrder:   1,
+			},
+		},
+		WorkHistory: []model.ProfileWorkExperience{
+			{
+				ID:           1,
+				Organization: model.NewLocalizedText("Example Corp", "Example Corp"),
+				Role:         model.NewLocalizedText("エンジニア", "Engineer"),
+				Summary:      model.NewLocalizedText("プロダクト開発", "Product development"),
+				StartedAt:    now.AddDate(-4, 0, 0),
+				SortOrder:    1,
+			},
+		},
+		SocialLinks: []model.ProfileSocialLink{
+			{
+				ID:        1,
+				Provider:  model.ProfileSocialProviderGitHub,
+				Label:     model.NewLocalizedText("GitHub", "GitHub"),
+				URL:       "https://github.com/example",
+				IsFooter:  true,
+				SortOrder: 1,
+			},
+			{
+				ID:        2,
+				Provider:  model.ProfileSocialProviderZenn,
+				Label:     model.NewLocalizedText("Zenn", "Zenn"),
+				URL:       "https://zenn.dev/example",
+				IsFooter:  true,
+				SortOrder: 2,
+			},
+			{
+				ID:        3,
+				Provider:  model.ProfileSocialProviderLinkedIn,
+				Label:     model.NewLocalizedText("LinkedIn", "LinkedIn"),
+				URL:       "https://linkedin.com/in/example",
+				IsFooter:  true,
+				SortOrder: 3,
+			},
+		},
+		UpdatedAt: now,
 	}, nil
 }
 
 func (s *stubAdminService) UpdateProfile(ctx context.Context, input adminsvc.ProfileInput) (*model.AdminProfile, error) {
+	_ = ctx
+	now := time.Now().UTC()
 	return &model.AdminProfile{
-		Name:        input.Name,
-		Title:       input.Title,
-		Affiliation: input.Affiliation,
-		Lab:         input.Lab,
+		DisplayName: strings.TrimSpace(input.DisplayName),
+		Headline:    input.Headline,
 		Summary:     input.Summary,
-		Skills:      input.Skills,
-		FocusAreas:  input.FocusAreas,
+		AvatarURL:   strings.TrimSpace(input.AvatarURL),
+		Location:    input.Location,
+		Theme: model.ProfileTheme{
+			Mode:        model.ProfileThemeMode(strings.ToLower(strings.TrimSpace(input.Theme.Mode))),
+			AccentColor: strings.TrimSpace(input.Theme.AccentColor),
+		},
+		Lab: model.ProfileLab{
+			Name:    input.Lab.Name,
+			Advisor: input.Lab.Advisor,
+			Room:    input.Lab.Room,
+			URL:     strings.TrimSpace(input.Lab.URL),
+		},
+		Affiliations: func() []model.ProfileAffiliation {
+			out := make([]model.ProfileAffiliation, 0, len(input.Affiliations))
+			for _, item := range input.Affiliations {
+				out = append(out, model.ProfileAffiliation{
+					ID:          item.ID,
+					Kind:        model.ProfileAffiliationKindAffiliation,
+					Name:        item.Name,
+					URL:         item.URL,
+					Description: item.Description,
+					StartedAt:   item.StartedAt,
+					SortOrder:   item.SortOrder,
+				})
+			}
+			return out
+		}(),
+		Communities: func() []model.ProfileAffiliation {
+			out := make([]model.ProfileAffiliation, 0, len(input.Communities))
+			for _, item := range input.Communities {
+				out = append(out, model.ProfileAffiliation{
+					ID:          item.ID,
+					Kind:        model.ProfileAffiliationKindCommunity,
+					Name:        item.Name,
+					URL:         item.URL,
+					Description: item.Description,
+					StartedAt:   item.StartedAt,
+					SortOrder:   item.SortOrder,
+				})
+			}
+			return out
+		}(),
+		WorkHistory: func() []model.ProfileWorkExperience {
+			out := make([]model.ProfileWorkExperience, 0, len(input.WorkHistory))
+			for _, item := range input.WorkHistory {
+				out = append(out, model.ProfileWorkExperience{
+					ID:           item.ID,
+					Organization: item.Organization,
+					Role:         item.Role,
+					Summary:      item.Summary,
+					StartedAt:    item.StartedAt,
+					EndedAt:      item.EndedAt,
+					ExternalURL:  item.ExternalURL,
+					SortOrder:    item.SortOrder,
+				})
+			}
+			return out
+		}(),
+		SocialLinks: func() []model.ProfileSocialLink {
+			out := make([]model.ProfileSocialLink, 0, len(input.SocialLinks))
+			for _, link := range input.SocialLinks {
+				out = append(out, model.ProfileSocialLink{
+					ID:        link.ID,
+					Provider:  link.Provider,
+					Label:     link.Label,
+					URL:       strings.TrimSpace(link.URL),
+					IsFooter:  link.IsFooter,
+					SortOrder: link.SortOrder,
+				})
+			}
+			return out
+		}(),
+		UpdatedAt: now,
 	}, nil
 }
 
@@ -776,6 +908,75 @@ func (s *stubAdminService) UpdateContactSettings(ctx context.Context, input admi
 		BookingWindowDays: input.BookingWindowDays,
 		CreatedAt:         now.Add(-time.Hour),
 		UpdatedAt:         now,
+	}, nil
+}
+
+func (s *stubAdminService) GetHomeSettings(context.Context) (*model.HomePageConfigDocument, error) {
+	now := time.Now().UTC()
+	return &model.HomePageConfigDocument{
+		ID:           1,
+		ProfileID:    1,
+		HeroSubtitle: model.NewLocalizedText("副題", "Subtitle"),
+		QuickLinks: []model.HomeQuickLink{
+			{
+				ID:          1,
+				ConfigID:    1,
+				Section:     "profile",
+				Label:       model.NewLocalizedText("プロフィール", "Profile"),
+				Description: model.NewLocalizedText("概要", "Overview"),
+				CTA:         model.NewLocalizedText("開く", "Open"),
+				TargetURL:   "/profile",
+				SortOrder:   1,
+			},
+		},
+		ChipSources: []model.HomeChipSource{
+			{
+				ID:        1,
+				ConfigID:  1,
+				Source:    "affiliation",
+				Label:     model.NewLocalizedText("所属", "Affiliations"),
+				Limit:     3,
+				SortOrder: 1,
+			},
+		},
+		UpdatedAt: now,
+	}, nil
+}
+
+func (s *stubAdminService) UpdateHomeSettings(ctx context.Context, input adminsvc.HomeSettingsInput) (*model.HomePageConfigDocument, error) {
+	_ = ctx
+	now := time.Now().UTC()
+	quickLinks := make([]model.HomeQuickLink, 0, len(input.QuickLinks))
+	for _, link := range input.QuickLinks {
+		quickLinks = append(quickLinks, model.HomeQuickLink{
+			ID:          link.ID,
+			ConfigID:    input.ID,
+			Section:     strings.TrimSpace(link.Section),
+			Label:       link.Label,
+			Description: link.Description,
+			CTA:         link.CTA,
+			TargetURL:   strings.TrimSpace(link.TargetURL),
+			SortOrder:   link.SortOrder,
+		})
+	}
+	chipSources := make([]model.HomeChipSource, 0, len(input.ChipSources))
+	for _, chip := range input.ChipSources {
+		chipSources = append(chipSources, model.HomeChipSource{
+			ID:        chip.ID,
+			ConfigID:  input.ID,
+			Source:    strings.TrimSpace(chip.Source),
+			Label:     chip.Label,
+			Limit:     chip.Limit,
+			SortOrder: chip.SortOrder,
+		})
+	}
+	return &model.HomePageConfigDocument{
+		ID:           input.ID,
+		ProfileID:    input.ProfileID,
+		HeroSubtitle: input.HeroSubtitle,
+		QuickLinks:   quickLinks,
+		ChipSources:  chipSources,
+		UpdatedAt:    now,
 	}, nil
 }
 

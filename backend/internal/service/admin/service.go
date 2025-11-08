@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -39,6 +40,9 @@ type Service interface {
 	GetContactSettings(ctx context.Context) (*model.ContactFormSettingsV2, error)
 	UpdateContactSettings(ctx context.Context, input ContactSettingsInput) (*model.ContactFormSettingsV2, error)
 
+	GetHomeSettings(ctx context.Context) (*model.HomePageConfigDocument, error)
+	UpdateHomeSettings(ctx context.Context, input HomeSettingsInput) (*model.HomePageConfigDocument, error)
+
 	ListBlacklist(ctx context.Context) ([]model.BlacklistEntry, error)
 	AddBlacklistEntry(ctx context.Context, input BlacklistInput) (*model.BlacklistEntry, error)
 	UpdateBlacklistEntry(ctx context.Context, id int64, input BlacklistInput) (*model.BlacklistEntry, error)
@@ -56,6 +60,7 @@ type service struct {
 	research    repository.AdminResearchRepository
 	contacts    repository.AdminContactRepository
 	contactCfg  repository.AdminContactSettingsRepository
+	home        repository.AdminHomePageConfigRepository
 	blacklist   repository.BlacklistRepository
 	techCatalog repository.TechCatalogRepository
 }
@@ -67,10 +72,11 @@ func NewService(
 	research repository.AdminResearchRepository,
 	contacts repository.AdminContactRepository,
 	contactCfg repository.AdminContactSettingsRepository,
+	home repository.AdminHomePageConfigRepository,
 	blacklist repository.BlacklistRepository,
 	techCatalog repository.TechCatalogRepository,
 ) (Service, error) {
-	if profile == nil || projects == nil || research == nil || contacts == nil || contactCfg == nil || blacklist == nil || techCatalog == nil {
+	if profile == nil || projects == nil || research == nil || contacts == nil || contactCfg == nil || home == nil || blacklist == nil || techCatalog == nil {
 		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "admin service: missing dependencies", nil)
 	}
 
@@ -80,20 +86,71 @@ func NewService(
 		research:    research,
 		contacts:    contacts,
 		contactCfg:  contactCfg,
+		home:        home,
 		blacklist:   blacklist,
 		techCatalog: techCatalog,
 	}, nil
 }
 
-// ProfileInput captures administrator-provided profile data.
+// ProfileInput captures administrator-provided profile data (v2 schema).
 type ProfileInput struct {
-	Name        model.LocalizedText
-	Title       model.LocalizedText
-	Affiliation model.LocalizedText
-	Lab         model.LocalizedText
-	Summary     model.LocalizedText
-	Skills      []model.LocalizedText
-	FocusAreas  []model.LocalizedText
+	DisplayName  string
+	Headline     model.LocalizedText
+	Summary      model.LocalizedText
+	AvatarURL    string
+	Location     model.LocalizedText
+	Theme        ProfileThemeInput
+	Lab          ProfileLabInput
+	Affiliations []ProfileAffiliationInput
+	Communities  []ProfileAffiliationInput
+	WorkHistory  []ProfileWorkHistoryInput
+	SocialLinks  []ProfileSocialLinkInput
+}
+
+// ProfileThemeInput represents editable theme preferences.
+type ProfileThemeInput struct {
+	Mode        string
+	AccentColor string
+}
+
+// ProfileLabInput represents laboratory metadata.
+type ProfileLabInput struct {
+	Name    model.LocalizedText
+	Advisor model.LocalizedText
+	Room    model.LocalizedText
+	URL     string
+}
+
+// ProfileAffiliationInput represents affiliation/community rows.
+type ProfileAffiliationInput struct {
+	ID          uint64
+	Name        string
+	URL         string
+	Description model.LocalizedText
+	StartedAt   time.Time
+	SortOrder   int
+}
+
+// ProfileWorkHistoryInput represents work history entries.
+type ProfileWorkHistoryInput struct {
+	ID           uint64
+	Organization model.LocalizedText
+	Role         model.LocalizedText
+	Summary      model.LocalizedText
+	StartedAt    time.Time
+	EndedAt      *time.Time
+	ExternalURL  string
+	SortOrder    int
+}
+
+// ProfileSocialLinkInput represents social link rows.
+type ProfileSocialLinkInput struct {
+	ID        uint64
+	Provider  model.ProfileSocialProvider
+	Label     model.LocalizedText
+	URL       string
+	IsFooter  bool
+	SortOrder int
 }
 
 func (s *service) GetProfile(ctx context.Context) (*model.AdminProfile, error) {
@@ -105,17 +162,22 @@ func (s *service) UpdateProfile(ctx context.Context, input ProfileInput) (*model
 		return nil, err
 	}
 
-	adminProfile := model.AdminProfile{
-		Name:        normalizeLocalized(input.Name),
-		Title:       normalizeLocalized(input.Title),
-		Affiliation: normalizeLocalized(input.Affiliation),
-		Lab:         normalizeLocalized(input.Lab),
+	profile := &model.AdminProfile{
+		DisplayName: strings.TrimSpace(input.DisplayName),
+		Headline:    normalizeLocalized(input.Headline),
 		Summary:     normalizeLocalized(input.Summary),
-		Skills:      normalizeLocalizedList(input.Skills),
-		FocusAreas:  normalizeLocalizedList(input.FocusAreas),
+		AvatarURL:   strings.TrimSpace(input.AvatarURL),
+		Location:    normalizeLocalized(input.Location),
+		Theme:       normalizeProfileTheme(input.Theme),
+		Lab:         normalizeProfileLab(input.Lab),
 	}
 
-	return s.profile.UpdateAdminProfile(ctx, &adminProfile)
+	profile.Affiliations = buildAffiliations(input.Affiliations, model.ProfileAffiliationKindAffiliation)
+	profile.Communities = buildAffiliations(input.Communities, model.ProfileAffiliationKindCommunity)
+	profile.WorkHistory = buildWorkHistory(input.WorkHistory)
+	profile.SocialLinks = buildSocialLinks(input.SocialLinks)
+
+	return s.profile.UpdateAdminProfile(ctx, profile)
 }
 
 // ProjectInput captures administrator-provided project data.
@@ -518,6 +580,36 @@ type ContactTopicInput struct {
 	Description model.LocalizedText
 }
 
+// HomeSettingsInput captures administrator-provided home page configuration data.
+type HomeSettingsInput struct {
+	ID                uint64
+	ProfileID         uint64
+	HeroSubtitle      model.LocalizedText
+	QuickLinks        []HomeQuickLinkInput
+	ChipSources       []HomeChipSourceInput
+	ExpectedUpdatedAt time.Time
+}
+
+// HomeQuickLinkInput describes a single quick link card configuration.
+type HomeQuickLinkInput struct {
+	ID          uint64
+	Section     string
+	Label       model.LocalizedText
+	Description model.LocalizedText
+	CTA         model.LocalizedText
+	TargetURL   string
+	SortOrder   int
+}
+
+// HomeChipSourceInput describes chip source configuration for the home page.
+type HomeChipSourceInput struct {
+	ID        uint64
+	Source    string
+	Label     model.LocalizedText
+	Limit     int
+	SortOrder int
+}
+
 func (s *service) ListContactMessages(ctx context.Context) ([]model.ContactMessage, error) {
 	return s.contacts.ListContactMessages(ctx)
 }
@@ -575,6 +667,34 @@ func (s *service) UpdateContactSettings(ctx context.Context, input ContactSettin
 	updated, err := s.contactCfg.UpdateContactFormSettings(ctx, document, input.ExpectedUpdatedAt.UTC())
 	if err != nil {
 		return nil, support.MapRepositoryError(err, "contact settings")
+	}
+	return updated, nil
+}
+
+func (s *service) GetHomeSettings(ctx context.Context) (*model.HomePageConfigDocument, error) {
+	config, err := s.home.GetHomePageConfig(ctx)
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "home settings")
+	}
+	return config, nil
+}
+
+func (s *service) UpdateHomeSettings(ctx context.Context, input HomeSettingsInput) (*model.HomePageConfigDocument, error) {
+	if err := validateHomeSettingsInput(input); err != nil {
+		return nil, err
+	}
+
+	document := &model.HomePageConfigDocument{
+		ID:           input.ID,
+		ProfileID:    input.ProfileID,
+		HeroSubtitle: normalizeLocalized(input.HeroSubtitle),
+		QuickLinks:   normalizeHomeQuickLinks(input.ID, input.QuickLinks),
+		ChipSources:  normalizeHomeChipSources(input.ID, input.ChipSources),
+	}
+
+	updated, err := s.home.UpdateHomePageConfig(ctx, document, input.ExpectedUpdatedAt.UTC())
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "home settings")
 	}
 	return updated, nil
 }
@@ -708,22 +828,91 @@ func (s *service) Summary(ctx context.Context) (*model.AdminSummary, error) {
 		BlacklistEntries:  len(blacklist),
 	}
 	if profile != nil {
-		summary.SkillCount = len(profile.Skills)
-		summary.FocusAreaCount = len(profile.FocusAreas)
-		summary.ProfileUpdatedAt = profile.UpdatedAt
+		summary.SkillCount = countTechMembers(profile.TechSections)
+		summary.FocusAreaCount = len(profile.Affiliations) + len(profile.Communities)
+		updatedAt := profile.UpdatedAt
+		summary.ProfileUpdatedAt = &updatedAt
 	}
 	return summary, nil
 }
 
 func validateProfileInput(input ProfileInput) error {
-	nameEmpty := strings.TrimSpace(input.Name.Ja) == "" && strings.TrimSpace(input.Name.En) == ""
-	summaryEmpty := strings.TrimSpace(input.Summary.Ja) == "" && strings.TrimSpace(input.Summary.En) == ""
-	if nameEmpty {
-		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "profile name is required", nil)
+	if strings.TrimSpace(input.DisplayName) == "" {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "displayName is required", nil)
 	}
-	if summaryEmpty {
+	summary := normalizeLocalized(input.Summary)
+	if summary.Ja == "" && summary.En == "" {
 		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "profile summary is required", nil)
 	}
+
+	for idx, item := range input.Affiliations {
+		if strings.TrimSpace(item.Name) == "" {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("affiliations[%d] name is required", idx), nil)
+		}
+		if item.StartedAt.IsZero() {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("affiliations[%d] startedAt is required", idx), nil)
+		}
+	}
+
+	for idx, item := range input.Communities {
+		if strings.TrimSpace(item.Name) == "" {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("communities[%d] name is required", idx), nil)
+		}
+		if item.StartedAt.IsZero() {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("communities[%d] startedAt is required", idx), nil)
+		}
+	}
+
+	for idx, item := range input.WorkHistory {
+		org := normalizeLocalized(item.Organization)
+		role := normalizeLocalized(item.Role)
+		if org.Ja == "" && org.En == "" {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("workHistory[%d] organization is required", idx), nil)
+		}
+		if role.Ja == "" && role.En == "" {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("workHistory[%d] role is required", idx), nil)
+		}
+		if item.StartedAt.IsZero() {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("workHistory[%d] startedAt is required", idx), nil)
+		}
+	}
+
+	if len(input.SocialLinks) == 0 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "at least one social link is required", nil)
+	}
+
+	requiredProviders := map[model.ProfileSocialProvider]struct{}{
+		model.ProfileSocialProviderGitHub:   {},
+		model.ProfileSocialProviderZenn:     {},
+		model.ProfileSocialProviderLinkedIn: {},
+	}
+	seen := make(map[model.ProfileSocialProvider]struct{}, len(input.SocialLinks))
+
+	for idx, link := range input.SocialLinks {
+		if strings.TrimSpace(link.URL) == "" {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("socialLinks[%d] url is required", idx), nil)
+		}
+		provider := link.Provider
+		switch provider {
+		case model.ProfileSocialProviderGitHub,
+			model.ProfileSocialProviderZenn,
+			model.ProfileSocialProviderLinkedIn,
+			model.ProfileSocialProviderX,
+			model.ProfileSocialProviderEmail,
+			model.ProfileSocialProviderOther:
+			// valid
+		default:
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("socialLinks[%d] has invalid provider", idx), nil)
+		}
+		seen[provider] = struct{}{}
+	}
+
+	for provider := range requiredProviders {
+		if _, ok := seen[provider]; !ok {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("social link for %s is required", provider), nil)
+		}
+	}
+
 	return nil
 }
 
@@ -863,11 +1052,128 @@ func validateContactSettingsInput(input ContactSettingsInput) error {
 	return nil
 }
 
+func validateHomeSettingsInput(input HomeSettingsInput) error {
+	if input.ID == 0 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "home settings id is required", nil)
+	}
+	if input.ProfileID == 0 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "profileId is required", nil)
+	}
+	if input.ExpectedUpdatedAt.IsZero() {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "updatedAt is required", nil)
+	}
+
+	if len(input.QuickLinks) == 0 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "at least one quick link is required", nil)
+	}
+
+	for idx, link := range input.QuickLinks {
+		section := normalizeHomeSection(link.Section)
+		if !isValidHomeQuickLinkSection(section) {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("quickLinks[%d] has invalid section", idx), nil)
+		}
+		label := normalizeLocalized(link.Label)
+		if strings.TrimSpace(label.Ja) == "" && strings.TrimSpace(label.En) == "" {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("quickLinks[%d] label is required", idx), nil)
+		}
+		cta := normalizeLocalized(link.CTA)
+		if strings.TrimSpace(cta.Ja) == "" && strings.TrimSpace(cta.En) == "" {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("quickLinks[%d] cta is required", idx), nil)
+		}
+		if strings.TrimSpace(link.TargetURL) == "" {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("quickLinks[%d] targetUrl is required", idx), nil)
+		}
+	}
+
+	for idx, chip := range input.ChipSources {
+		source := normalizeHomeSource(chip.Source)
+		if !isValidHomeChipSource(source) {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("chipSources[%d] has invalid source", idx), nil)
+		}
+		if chip.Limit < 0 {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("chipSources[%d] limit must be zero or greater", idx), nil)
+		}
+	}
+
+	return nil
+}
+
 func validateBlacklistInput(input BlacklistInput) error {
 	if strings.TrimSpace(input.Email) == "" {
 		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "email is required", nil)
 	}
 	return nil
+}
+
+func normalizeHomeQuickLinks(configID uint64, items []HomeQuickLinkInput) []model.HomeQuickLink {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]model.HomeQuickLink, 0, len(items))
+	for _, item := range items {
+		link := model.HomeQuickLink{
+			ID:          item.ID,
+			ConfigID:    configID,
+			Section:     normalizeHomeSection(item.Section),
+			Label:       normalizeLocalized(item.Label),
+			Description: normalizeLocalized(item.Description),
+			CTA:         normalizeLocalized(item.CTA),
+			TargetURL:   strings.TrimSpace(item.TargetURL),
+			SortOrder:   item.SortOrder,
+		}
+		result = append(result, link)
+	}
+	return result
+}
+
+func normalizeHomeChipSources(configID uint64, items []HomeChipSourceInput) []model.HomeChipSource {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]model.HomeChipSource, 0, len(items))
+	for _, item := range items {
+		source := model.HomeChipSource{
+			ID:        item.ID,
+			ConfigID:  configID,
+			Source:    normalizeHomeSource(item.Source),
+			Label:     normalizeLocalized(item.Label),
+			Limit:     item.Limit,
+			SortOrder: item.SortOrder,
+		}
+		result = append(result, source)
+	}
+	return result
+}
+
+func normalizeHomeSection(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func normalizeHomeSource(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+var validHomeSections = map[string]struct{}{
+	"profile":       {},
+	"research_blog": {},
+	"projects":      {},
+	"contact":       {},
+}
+
+func isValidHomeQuickLinkSection(section string) bool {
+	_, ok := validHomeSections[section]
+	return ok
+}
+
+var validHomeChipSources = map[string]struct{}{
+	"affiliation": {},
+	"community":   {},
+	"skill":       {},
+}
+
+func isValidHomeChipSource(source string) bool {
+	_, ok := validHomeChipSources[source]
+	return ok
 }
 
 func normalizeLocalized(text model.LocalizedText) model.LocalizedText {
@@ -895,10 +1201,105 @@ func normalizeLocalizedList(items []model.LocalizedText) []model.LocalizedText {
 	return result
 }
 
+func normalizeProfileTheme(input ProfileThemeInput) model.ProfileTheme {
+	mode := strings.ToLower(strings.TrimSpace(input.Mode))
+	switch model.ProfileThemeMode(mode) {
+	case model.ProfileThemeModeLight,
+		model.ProfileThemeModeDark,
+		model.ProfileThemeModeSystem:
+		// valid
+	default:
+		mode = string(model.ProfileThemeModeSystem)
+	}
+	return model.ProfileTheme{
+		Mode:        model.ProfileThemeMode(mode),
+		AccentColor: strings.TrimSpace(input.AccentColor),
+	}
+}
+
+func normalizeProfileLab(input ProfileLabInput) model.ProfileLab {
+	return model.ProfileLab{
+		Name:    normalizeLocalized(input.Name),
+		Advisor: normalizeLocalized(input.Advisor),
+		Room:    normalizeLocalized(input.Room),
+		URL:     strings.TrimSpace(input.URL),
+	}
+}
+
+func buildAffiliations(inputs []ProfileAffiliationInput, kind model.ProfileAffiliationKind) []model.ProfileAffiliation {
+	if len(inputs) == 0 {
+		return nil
+	}
+	out := make([]model.ProfileAffiliation, 0, len(inputs))
+	for _, item := range inputs {
+		out = append(out, model.ProfileAffiliation{
+			ID:          item.ID,
+			Kind:        kind,
+			Name:        strings.TrimSpace(item.Name),
+			URL:         strings.TrimSpace(item.URL),
+			Description: normalizeLocalized(item.Description),
+			StartedAt:   item.StartedAt.UTC(),
+			SortOrder:   item.SortOrder,
+		})
+	}
+	return out
+}
+
+func buildWorkHistory(inputs []ProfileWorkHistoryInput) []model.ProfileWorkExperience {
+	if len(inputs) == 0 {
+		return nil
+	}
+	out := make([]model.ProfileWorkExperience, 0, len(inputs))
+	for _, item := range inputs {
+		var endedAt *time.Time
+		if item.EndedAt != nil && !item.EndedAt.IsZero() {
+			ended := item.EndedAt.UTC()
+			endedAt = &ended
+		}
+		out = append(out, model.ProfileWorkExperience{
+			ID:           item.ID,
+			Organization: normalizeLocalized(item.Organization),
+			Role:         normalizeLocalized(item.Role),
+			Summary:      normalizeLocalized(item.Summary),
+			StartedAt:    item.StartedAt.UTC(),
+			EndedAt:      endedAt,
+			ExternalURL:  strings.TrimSpace(item.ExternalURL),
+			SortOrder:    item.SortOrder,
+		})
+	}
+	return out
+}
+
+func buildSocialLinks(inputs []ProfileSocialLinkInput) []model.ProfileSocialLink {
+	if len(inputs) == 0 {
+		return nil
+	}
+	out := make([]model.ProfileSocialLink, 0, len(inputs))
+	for _, item := range inputs {
+		out = append(out, model.ProfileSocialLink{
+			ID:        item.ID,
+			Provider:  item.Provider,
+			Label:     normalizeLocalized(item.Label),
+			URL:       strings.TrimSpace(item.URL),
+			IsFooter:  item.IsFooter,
+			SortOrder: item.SortOrder,
+		})
+	}
+	return out
+}
+
 func copyIntPointer(value *int) *int {
 	if value == nil {
 		return nil
 	}
 	v := *value
 	return &v
+}
+
+func countTechMembers(sections []model.ProfileTechSection) int {
+	total := 0
+	for _, section := range sections {
+		total += len(section.Members)
+	}
+	return total
 }

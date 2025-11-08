@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -67,12 +68,50 @@ func (h *AdminHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	profile, err := h.svc.UpdateProfile(c.Request.Context(), req.toInput())
+	input, err := req.toInput()
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	profile, err := h.svc.UpdateProfile(c.Request.Context(), input)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, profile)
+}
+
+// Home settings ------------------------------------------------------------
+
+func (h *AdminHandler) GetHomeSettings(c *gin.Context) {
+	settings, err := h.svc.GetHomeSettings(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, settings)
+}
+
+func (h *AdminHandler) UpdateHomeSettings(c *gin.Context) {
+	var req homeSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid home settings payload", err))
+		return
+	}
+
+	input, err := req.toInput()
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	settings, err := h.svc.UpdateHomeSettings(c.Request.Context(), input)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, settings)
 }
 
 // Project management -------------------------------------------------------
@@ -381,25 +420,158 @@ func parseIDParam(c *gin.Context) (int64, bool) {
 // Request payloads ---------------------------------------------------------
 
 type profileRequest struct {
-	Name        model.LocalizedText   `json:"name"`
-	Title       model.LocalizedText   `json:"title"`
-	Affiliation model.LocalizedText   `json:"affiliation"`
-	Lab         model.LocalizedText   `json:"lab"`
-	Summary     model.LocalizedText   `json:"summary"`
-	Skills      []model.LocalizedText `json:"skills"`
-	FocusAreas  []model.LocalizedText `json:"focusAreas"`
+	DisplayName  string               `json:"displayName"`
+	Headline     model.LocalizedText  `json:"headline"`
+	Summary      model.LocalizedText  `json:"summary"`
+	AvatarURL    string               `json:"avatarUrl"`
+	Location     model.LocalizedText  `json:"location"`
+	Theme        profileThemeRequest  `json:"theme"`
+	Lab          profileLabRequest    `json:"lab"`
+	Affiliations []affiliationRequest `json:"affiliations"`
+	Communities  []affiliationRequest `json:"communities"`
+	WorkHistory  []workHistoryRequest `json:"workHistory"`
+	SocialLinks  []socialLinkRequest  `json:"socialLinks"`
 }
 
-func (r profileRequest) toInput() adminsvc.ProfileInput {
-	return adminsvc.ProfileInput{
-		Name:        r.Name,
-		Title:       r.Title,
-		Affiliation: r.Affiliation,
-		Lab:         r.Lab,
+type profileThemeRequest struct {
+	Mode        string `json:"mode"`
+	AccentColor string `json:"accentColor"`
+}
+
+type profileLabRequest struct {
+	Name    model.LocalizedText `json:"name"`
+	Advisor model.LocalizedText `json:"advisor"`
+	Room    model.LocalizedText `json:"room"`
+	URL     string              `json:"url"`
+}
+
+type affiliationRequest struct {
+	ID          uint64              `json:"id"`
+	Name        string              `json:"name"`
+	URL         string              `json:"url"`
+	Description model.LocalizedText `json:"description"`
+	StartedAt   string              `json:"startedAt"`
+	SortOrder   int                 `json:"sortOrder"`
+}
+
+type workHistoryRequest struct {
+	ID           uint64              `json:"id"`
+	Organization model.LocalizedText `json:"organization"`
+	Role         model.LocalizedText `json:"role"`
+	Summary      model.LocalizedText `json:"summary"`
+	StartedAt    string              `json:"startedAt"`
+	EndedAt      *string             `json:"endedAt"`
+	ExternalURL  string              `json:"externalUrl"`
+	SortOrder    int                 `json:"sortOrder"`
+}
+
+type socialLinkRequest struct {
+	ID        uint64              `json:"id"`
+	Provider  string              `json:"provider"`
+	Label     model.LocalizedText `json:"label"`
+	URL       string              `json:"url"`
+	IsFooter  bool                `json:"isFooter"`
+	SortOrder int                 `json:"sortOrder"`
+}
+
+func (r profileRequest) toInput() (adminsvc.ProfileInput, error) {
+	input := adminsvc.ProfileInput{
+		DisplayName: strings.TrimSpace(r.DisplayName),
+		Headline:    r.Headline,
 		Summary:     r.Summary,
-		Skills:      r.Skills,
-		FocusAreas:  r.FocusAreas,
+		AvatarURL:   strings.TrimSpace(r.AvatarURL),
+		Location:    r.Location,
+		Theme: adminsvc.ProfileThemeInput{
+			Mode:        strings.TrimSpace(r.Theme.Mode),
+			AccentColor: strings.TrimSpace(r.Theme.AccentColor),
+		},
+		Lab: adminsvc.ProfileLabInput{
+			Name:    r.Lab.Name,
+			Advisor: r.Lab.Advisor,
+			Room:    r.Lab.Room,
+			URL:     strings.TrimSpace(r.Lab.URL),
+		},
 	}
+
+	for idx, affiliation := range r.Affiliations {
+		startedAt, err := parseISOTime(affiliation.StartedAt, fmt.Sprintf("affiliations[%d].startedAt", idx))
+		if err != nil {
+			return adminsvc.ProfileInput{}, err
+		}
+		input.Affiliations = append(input.Affiliations, adminsvc.ProfileAffiliationInput{
+			ID:          affiliation.ID,
+			Name:        affiliation.Name,
+			URL:         affiliation.URL,
+			Description: affiliation.Description,
+			StartedAt:   startedAt,
+			SortOrder:   affiliation.SortOrder,
+		})
+	}
+
+	for idx, community := range r.Communities {
+		startedAt, err := parseISOTime(community.StartedAt, fmt.Sprintf("communities[%d].startedAt", idx))
+		if err != nil {
+			return adminsvc.ProfileInput{}, err
+		}
+		input.Communities = append(input.Communities, adminsvc.ProfileAffiliationInput{
+			ID:          community.ID,
+			Name:        community.Name,
+			URL:         community.URL,
+			Description: community.Description,
+			StartedAt:   startedAt,
+			SortOrder:   community.SortOrder,
+		})
+	}
+
+	for idx, history := range r.WorkHistory {
+		startedAt, err := parseISOTime(history.StartedAt, fmt.Sprintf("workHistory[%d].startedAt", idx))
+		if err != nil {
+			return adminsvc.ProfileInput{}, err
+		}
+		var endedAt *time.Time
+		if history.EndedAt != nil && strings.TrimSpace(*history.EndedAt) != "" {
+			parsed, err := parseISOTime(*history.EndedAt, fmt.Sprintf("workHistory[%d].endedAt", idx))
+			if err != nil {
+				return adminsvc.ProfileInput{}, err
+			}
+			endedAt = &parsed
+		}
+		input.WorkHistory = append(input.WorkHistory, adminsvc.ProfileWorkHistoryInput{
+			ID:           history.ID,
+			Organization: history.Organization,
+			Role:         history.Role,
+			Summary:      history.Summary,
+			StartedAt:    startedAt,
+			EndedAt:      endedAt,
+			ExternalURL:  history.ExternalURL,
+			SortOrder:    history.SortOrder,
+		})
+	}
+
+	for idx, link := range r.SocialLinks {
+		provider := model.ProfileSocialProvider(strings.ToLower(strings.TrimSpace(link.Provider)))
+		switch provider {
+		case model.ProfileSocialProviderGitHub,
+			model.ProfileSocialProviderZenn,
+			model.ProfileSocialProviderLinkedIn,
+			model.ProfileSocialProviderX,
+			model.ProfileSocialProviderEmail,
+			model.ProfileSocialProviderOther:
+			// ok
+		default:
+			return adminsvc.ProfileInput{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("socialLinks[%d].provider is invalid", idx), nil)
+		}
+		input.SocialLinks = append(input.SocialLinks, adminsvc.ProfileSocialLinkInput{
+			ID:        link.ID,
+			Provider:  provider,
+			Label:     link.Label,
+			URL:       link.URL,
+			IsFooter:  link.IsFooter,
+			SortOrder: link.SortOrder,
+		})
+	}
+
+	return input, nil
 }
 
 type projectRequest struct {
@@ -610,6 +782,33 @@ type contactTopicRequest struct {
 	Description model.LocalizedText `json:"description"`
 }
 
+type homeSettingsRequest struct {
+	ID           uint64                  `json:"id"`
+	ProfileID    uint64                  `json:"profileId"`
+	HeroSubtitle model.LocalizedText     `json:"heroSubtitle"`
+	QuickLinks   []homeQuickLinkRequest  `json:"quickLinks"`
+	ChipSources  []homeChipSourceRequest `json:"chipSources"`
+	UpdatedAt    string                  `json:"updatedAt"`
+}
+
+type homeQuickLinkRequest struct {
+	ID          uint64              `json:"id"`
+	Section     string              `json:"section"`
+	Label       model.LocalizedText `json:"label"`
+	Description model.LocalizedText `json:"description"`
+	CTA         model.LocalizedText `json:"cta"`
+	TargetURL   string              `json:"targetUrl"`
+	SortOrder   int                 `json:"sortOrder"`
+}
+
+type homeChipSourceRequest struct {
+	ID        uint64              `json:"id"`
+	Source    string              `json:"source"`
+	Label     model.LocalizedText `json:"label"`
+	Limit     int                 `json:"limit"`
+	SortOrder int                 `json:"sortOrder"`
+}
+
 func (r contactSettingsRequest) toInput() (adminsvc.ContactSettingsInput, error) {
 	updatedAt := strings.TrimSpace(r.UpdatedAt)
 	if updatedAt == "" {
@@ -645,6 +844,50 @@ func (r contactSettingsRequest) toInput() (adminsvc.ContactSettingsInput, error)
 	}, nil
 }
 
+func (r homeSettingsRequest) toInput() (adminsvc.HomeSettingsInput, error) {
+	updatedAt := strings.TrimSpace(r.UpdatedAt)
+	if updatedAt == "" {
+		return adminsvc.HomeSettingsInput{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "updatedAt is required", nil)
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, updatedAt)
+	if err != nil {
+		return adminsvc.HomeSettingsInput{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "updatedAt must be RFC3339 timestamp", err)
+	}
+
+	quickLinks := make([]adminsvc.HomeQuickLinkInput, 0, len(r.QuickLinks))
+	for _, link := range r.QuickLinks {
+		quickLinks = append(quickLinks, adminsvc.HomeQuickLinkInput{
+			ID:          link.ID,
+			Section:     link.Section,
+			Label:       link.Label,
+			Description: link.Description,
+			CTA:         link.CTA,
+			TargetURL:   strings.TrimSpace(link.TargetURL),
+			SortOrder:   link.SortOrder,
+		})
+	}
+
+	chipSources := make([]adminsvc.HomeChipSourceInput, 0, len(r.ChipSources))
+	for _, chip := range r.ChipSources {
+		chipSources = append(chipSources, adminsvc.HomeChipSourceInput{
+			ID:        chip.ID,
+			Source:    chip.Source,
+			Label:     chip.Label,
+			Limit:     chip.Limit,
+			SortOrder: chip.SortOrder,
+		})
+	}
+
+	return adminsvc.HomeSettingsInput{
+		ID:                r.ID,
+		ProfileID:         r.ProfileID,
+		HeroSubtitle:      r.HeroSubtitle,
+		QuickLinks:        quickLinks,
+		ChipSources:       chipSources,
+		ExpectedUpdatedAt: parsed,
+	}, nil
+}
+
 func (r blacklistRequest) toInput() adminsvc.BlacklistInput {
 	return adminsvc.BlacklistInput{
 		Email:  r.Email,
@@ -667,4 +910,27 @@ func parseRFC3339Timestamp(value string) (time.Time, error) {
 		}
 	}
 	return time.Time{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid publishedAt", parseErr)
+}
+
+func parseISOTime(value string, field string) (time.Time, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return time.Time{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("%s is required", field), nil)
+	}
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04",
+		"2006-01-02",
+	}
+	var parseErr error
+	for _, layout := range layouts {
+		if ts, err := time.Parse(layout, trimmed); err == nil {
+			return ts, nil
+		} else {
+			parseErr = err
+		}
+	}
+	return time.Time{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("%s must be an ISO8601 timestamp", field), parseErr)
 }

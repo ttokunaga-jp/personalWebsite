@@ -11,4 +11,6 @@ var (
 	ErrDuplicate = errors.New("repository: duplicate")
 	// ErrConflict indicates a concurrent modification or stale data was supplied.
 	ErrConflict = errors.New("repository: conflict")
+	// ErrNotImplemented indicates the repository does not support the requested operation.
+	ErrNotImplemented = errors.New("repository: not implemented")
 )

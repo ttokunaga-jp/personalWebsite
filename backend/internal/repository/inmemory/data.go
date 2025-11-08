@@ -8,32 +8,164 @@ import (
 
 var (
 	defaultAdminProfile = &model.AdminProfile{
-		Name:        model.NewLocalizedText("高見 拓実", "Takumi Takami"),
-		Title:       model.NewLocalizedText("ソフトウェアエンジニア / リサーチャー", "Software Engineer / Researcher"),
-		Affiliation: model.NewLocalizedText("架空大学", "Example University"),
-		Lab:         model.NewLocalizedText("ヒューマンコンピュータインタラクション研究室", "Human-Computer Interaction Lab"),
+		ID:          1,
+		DisplayName: "Takumi Takami",
+		Headline: model.NewLocalizedText(
+			"ソフトウェアエンジニア / リサーチャー",
+			"Software Engineer / Researcher",
+		),
 		Summary: model.NewLocalizedText(
 			"人に寄り添う体験と堅牢なインフラを両立させるプロダクト開発に取り組んでいます。",
 			"Building delightful experiences backed by resilient infrastructure.",
 		),
-		Skills: []model.LocalizedText{
-			model.NewLocalizedText("Go", "Go"),
-			model.NewLocalizedText("React", "React"),
-			model.NewLocalizedText("GCP", "GCP"),
-			model.NewLocalizedText("機械学習", "Machine Learning"),
+		AvatarURL: "https://example.dev/avatar.png",
+		Location:  model.NewLocalizedText("東京", "Tokyo"),
+		Theme: model.ProfileTheme{
+			Mode:        model.ProfileThemeModeLight,
+			AccentColor: "#3b82f6",
 		},
-		FocusAreas: []model.LocalizedText{
-			model.NewLocalizedText("AI支援開発", "AI-assisted development"),
-			model.NewLocalizedText("分散システム", "Distributed systems"),
-			model.NewLocalizedText("開発プロセス改善", "Development workflow improvement"),
+		Lab: model.ProfileLab{
+			Name:    model.NewLocalizedText("ヒューマンコンピュータインタラクション研究室", "Human-Computer Interaction Lab"),
+			Advisor: model.NewLocalizedText("指導教員", "Advisor"),
+			Room:    model.NewLocalizedText("4F 研究室", "Lab 4F"),
+			URL:     "https://example.dev/lab",
 		},
-		UpdatedAt: func() *time.Time {
-			t := time.Date(2024, 5, 1, 9, 0, 0, 0, time.UTC)
-			return &t
-		}(),
+		Affiliations: []model.ProfileAffiliation{
+			{
+				ID:          1,
+				ProfileID:   1,
+				Kind:        model.ProfileAffiliationKindAffiliation,
+				Name:        "Example University",
+				URL:         "https://example.dev",
+				Description: model.NewLocalizedText("研究員", "Researcher"),
+				StartedAt:   time.Date(2021, 4, 1, 0, 0, 0, 0, time.UTC),
+				SortOrder:   1,
+			},
+			{
+				ID:          2,
+				ProfileID:   1,
+				Kind:        model.ProfileAffiliationKindAffiliation,
+				Name:        "Example Graduate School",
+				URL:         "https://grad.example",
+				Description: model.NewLocalizedText("修士課程", "Graduate program"),
+				StartedAt:   time.Date(2019, 4, 1, 0, 0, 0, 0, time.UTC),
+				SortOrder:   2,
+			},
+		},
+		Communities: []model.ProfileAffiliation{
+			{
+				ID:          3,
+				ProfileID:   1,
+				Kind:        model.ProfileAffiliationKindCommunity,
+				Name:        "Open Source Guild",
+				URL:         "https://oss.example",
+				Description: model.NewLocalizedText("OSS コミュニティ", "OSS community"),
+				StartedAt:   time.Date(2020, 9, 1, 0, 0, 0, 0, time.UTC),
+				SortOrder:   1,
+			},
+		},
+		WorkHistory: []model.ProfileWorkExperience{
+			{
+				ID:           1,
+				ProfileID:    1,
+				Organization: model.NewLocalizedText("Example Corp", "Example Corp"),
+				Role:         model.NewLocalizedText("フルスタックエンジニア", "Full-stack Engineer"),
+				Summary:      model.NewLocalizedText("AI と Web を横断するプロダクト開発をリード。", "Led AI and web product initiatives."),
+				StartedAt:    time.Date(2019, 4, 1, 0, 0, 0, 0, time.UTC),
+				ExternalURL:  "https://example.dev/company",
+				SortOrder:    1,
+			},
+			{
+				ID:           2,
+				ProfileID:    1,
+				Organization: model.NewLocalizedText("Example Labs", "Example Labs"),
+				Role:         model.NewLocalizedText("リサーチエンジニア", "Research Engineer"),
+				Summary:      model.NewLocalizedText("ユーザー行動分析とプロトタイピングを担当。", "Focused on user research and prototyping."),
+				StartedAt:    time.Date(2022, 6, 1, 0, 0, 0, 0, time.UTC),
+				SortOrder:    2,
+			},
+		},
+		TechSections: []model.ProfileTechSection{
+			{
+				ID:         1,
+				ProfileID:  1,
+				Title:      model.NewLocalizedText("スキルセット", "Skill Set"),
+				Layout:     "chips",
+				Breakpoint: "lg",
+				SortOrder:  1,
+				Members: []model.TechMembership{
+					{
+						MembershipID: 1,
+						EntityType:   "profile_section",
+						EntityID:     1,
+						Tech: model.TechCatalogEntry{
+							ID:          1,
+							Slug:        "go",
+							DisplayName: "Go",
+							Category:    "backend",
+							Level:       model.TechLevelAdvanced,
+							SortOrder:   1,
+							Active:      true,
+							CreatedAt:   time.Now().Add(-365 * 24 * time.Hour),
+							UpdatedAt:   time.Now(),
+						},
+						Context:   model.TechContextPrimary,
+						SortOrder: 1,
+					},
+					{
+						MembershipID: 2,
+						EntityType:   "profile_section",
+						EntityID:     1,
+						Tech: model.TechCatalogEntry{
+							ID:          2,
+							Slug:        "react",
+							DisplayName: "React",
+							Category:    "frontend",
+							Level:       model.TechLevelAdvanced,
+							SortOrder:   2,
+							Active:      true,
+							CreatedAt:   time.Now().Add(-400 * 24 * time.Hour),
+							UpdatedAt:   time.Now(),
+						},
+						Context:   model.TechContextSupporting,
+						SortOrder: 2,
+					},
+				},
+			},
+		},
+		SocialLinks: []model.ProfileSocialLink{
+			{
+				ID:        1,
+				ProfileID: 1,
+				Provider:  model.ProfileSocialProviderGitHub,
+				Label:     model.NewLocalizedText("GitHub", "GitHub"),
+				URL:       "https://github.com/example",
+				IsFooter:  true,
+				SortOrder: 1,
+			},
+			{
+				ID:        2,
+				ProfileID: 1,
+				Provider:  model.ProfileSocialProviderZenn,
+				Label:     model.NewLocalizedText("Zenn", "Zenn"),
+				URL:       "https://zenn.dev/example",
+				IsFooter:  true,
+				SortOrder: 2,
+			},
+			{
+				ID:        3,
+				ProfileID: 1,
+				Provider:  model.ProfileSocialProviderLinkedIn,
+				Label:     model.NewLocalizedText("LinkedIn", "LinkedIn"),
+				URL:       "https://linkedin.com/in/example",
+				IsFooter:  true,
+				SortOrder: 3,
+			},
+		},
+		UpdatedAt: time.Date(2024, 5, 1, 9, 0, 0, 0, time.UTC),
 	}
 
-	defaultProfile = adminProfileToPublic(defaultAdminProfile)
+	defaultProfile = documentToLegacy(defaultAdminProfile)
 
 	defaultAdminProjects = []model.AdminProject{
 		{

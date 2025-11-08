@@ -30,6 +30,12 @@ type AdminProfileRepository interface {
 	UpdateAdminProfile(ctx context.Context, profile *model.AdminProfile) (*model.AdminProfile, error)
 }
 
+// AdminHomePageConfigRepository exposes administrative operations for the home page configuration.
+type AdminHomePageConfigRepository interface {
+	GetHomePageConfig(ctx context.Context) (*model.HomePageConfigDocument, error)
+	UpdateHomePageConfig(ctx context.Context, config *model.HomePageConfigDocument, expectedUpdatedAt time.Time) (*model.HomePageConfigDocument, error)
+}
+
 // AdminResearchRepository manages research CRUD operations for the admin surface.
 type AdminResearchRepository interface {
 	ListAdminResearch(ctx context.Context) ([]model.AdminResearch, error)

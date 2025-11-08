@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -87,29 +88,93 @@ func TestService_UpdateProfileNormalisesInput(t *testing.T) {
 
 	svc := newTestService(t)
 	ctx := context.Background()
+	startedAt := time.Now().Add(-24 * time.Hour)
 	input := ProfileInput{
-		Name:        model.NewLocalizedText(" 名前 ", " Name "),
-		Title:       model.NewLocalizedText("肩書", "Title"),
-		Affiliation: model.NewLocalizedText("所属", "Affiliation"),
-		Lab:         model.NewLocalizedText("ラボ", "Lab"),
+		DisplayName: " 高見 拓実 ",
+		Headline:    model.NewLocalizedText(" 見出し ", " Headline "),
 		Summary:     model.NewLocalizedText(" 要約 ", " Summary "),
-		Skills: []model.LocalizedText{
-			{Ja: " Go ", En: " Go "},
-			{},
+		AvatarURL:   " https://example.dev/avatar.png ",
+		Location:    model.NewLocalizedText(" 東京 ", " Tokyo "),
+		Theme: ProfileThemeInput{
+			Mode:        "dark",
+			AccentColor: " #111827 ",
 		},
-		FocusAreas: []model.LocalizedText{
-			{Ja: " AI ", En: " AI "},
-			{Ja: "", En: ""},
+		Lab: ProfileLabInput{
+			Name:    model.NewLocalizedText(" ラボ ", " Lab "),
+			Advisor: model.NewLocalizedText(" 指導教員 ", " Advisor "),
+			Room:    model.NewLocalizedText(" 4F ", " 4F "),
+			URL:     " https://example.dev/lab ",
+		},
+		Affiliations: []ProfileAffiliationInput{
+			{
+				ID:          1,
+				Name:        " Example University ",
+				URL:         " https://example.dev ",
+				Description: model.NewLocalizedText(" 研究員 ", " Researcher "),
+				StartedAt:   startedAt,
+				SortOrder:   1,
+			},
+		},
+		Communities: []ProfileAffiliationInput{
+			{
+				ID:          2,
+				Name:        " Open Source Guild ",
+				URL:         " https://oss.example ",
+				Description: model.NewLocalizedText(" コミュニティ ", " Community "),
+				StartedAt:   startedAt,
+				SortOrder:   1,
+			},
+		},
+		WorkHistory: []ProfileWorkHistoryInput{
+			{
+				ID:           1,
+				Organization: model.NewLocalizedText(" Example Corp ", " Example Corp "),
+				Role:         model.NewLocalizedText(" エンジニア ", " Engineer "),
+				Summary:      model.NewLocalizedText(" プロダクト開発 ", " Product development "),
+				StartedAt:    startedAt,
+				ExternalURL:  " https://example.dev/work ",
+				SortOrder:    1,
+			},
+		},
+		SocialLinks: []ProfileSocialLinkInput{
+			{
+				ID:        1,
+				Provider:  model.ProfileSocialProviderGitHub,
+				Label:     model.NewLocalizedText(" GitHub ", " GitHub "),
+				URL:       " https://github.com/example ",
+				IsFooter:  true,
+				SortOrder: 1,
+			},
+			{
+				ID:        2,
+				Provider:  model.ProfileSocialProviderZenn,
+				Label:     model.NewLocalizedText(" Zenn ", " Zenn "),
+				URL:       " https://zenn.dev/example ",
+				IsFooter:  true,
+				SortOrder: 2,
+			},
+			{
+				ID:        3,
+				Provider:  model.ProfileSocialProviderLinkedIn,
+				Label:     model.NewLocalizedText(" LinkedIn ", " LinkedIn "),
+				URL:       " https://linkedin.com/in/example ",
+				IsFooter:  true,
+				SortOrder: 3,
+			},
 		},
 	}
 
 	profile, err := svc.UpdateProfile(ctx, input)
 	require.NoError(t, err)
-	require.Len(t, profile.Skills, 1)
-	require.Equal(t, "Go", profile.Skills[0].Ja)
-	require.Len(t, profile.FocusAreas, 1)
-	require.Equal(t, "AI", profile.FocusAreas[0].Ja)
-	require.NotNil(t, profile.UpdatedAt)
+	require.Equal(t, "高見 拓実", profile.DisplayName)
+	require.Equal(t, "見出し", profile.Headline.Ja)
+	require.Equal(t, "https://example.dev/avatar.png", profile.AvatarURL)
+	require.Len(t, profile.Affiliations, 1)
+	require.Equal(t, "Example University", profile.Affiliations[0].Name)
+	require.Len(t, profile.WorkHistory, 1)
+	require.Equal(t, "Example Corp", profile.WorkHistory[0].Organization.Ja)
+	require.Len(t, profile.SocialLinks, 3)
+	require.False(t, profile.UpdatedAt.IsZero())
 }
 
 func TestService_UpdateContactMessageInvalidStatus(t *testing.T) {
@@ -202,6 +267,12 @@ func newTestService(t *testing.T) Service {
 		t.Fatalf("contact settings repository missing admin interface")
 	}
 
+	homeRepo := inmemory.NewHomePageConfigRepository()
+	adminHomeRepo, ok := homeRepo.(repository.AdminHomePageConfigRepository)
+	if !ok {
+		t.Fatalf("home repository missing admin interface")
+	}
+
 	bl := inmemory.NewBlacklistRepository()
 	techCatalog := inmemory.NewTechCatalogRepository()
 
@@ -211,6 +282,7 @@ func newTestService(t *testing.T) Service {
 		adminResearchRepo,
 		adminContactRepo,
 		adminContactSettingsRepo,
+		adminHomeRepo,
 		bl,
 		techCatalog,
 	)

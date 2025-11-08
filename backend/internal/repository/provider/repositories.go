@@ -108,6 +108,14 @@ func NewHomePageConfigRepository(db *sqlx.DB, client *firestore.Client, cfg *con
 	}
 }
 
+// NewAdminHomePageConfigRepository exposes administrative operations for home settings.
+func NewAdminHomePageConfigRepository(repo repository.HomePageConfigRepository) repository.AdminHomePageConfigRepository {
+	if adminRepo, ok := repo.(repository.AdminHomePageConfigRepository); ok {
+		return adminRepo
+	}
+	panic("home page config repository does not implement admin interface")
+}
+
 // NewAdminProfileRepository exposes administrative profile capabilities.
 func NewAdminProfileRepository(repo repository.ProfileRepository) repository.AdminProfileRepository {
 	if adminRepo, ok := repo.(repository.AdminProfileRepository); ok {

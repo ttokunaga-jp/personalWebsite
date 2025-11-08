@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -282,6 +283,10 @@ func load() (*AppConfig, error) {
 	var cfg AppConfig
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
+	}
+
+	if port := strings.TrimSpace(os.Getenv("PORT")); port != "" {
+		cfg.Server.Port = port
 	}
 
 	return &cfg, nil

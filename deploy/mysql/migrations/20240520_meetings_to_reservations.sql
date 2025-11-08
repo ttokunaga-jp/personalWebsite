@@ -1,6 +1,14 @@
 START TRANSACTION;
 
-INSERT INTO meeting_reservations (
+-- Only migrate when the legacy meetings table exists and target table is empty
+SET @has_meetings = (
+  SELECT COUNT(*) FROM information_schema.tables
+  WHERE table_schema = DATABASE() AND table_name = 'meetings'
+);
+
+SET @sql = IF(
+  @has_meetings > 0,
+  'INSERT INTO meeting_reservations (
   name,
   email,
   topic,
@@ -17,8 +25,7 @@ INSERT INTO meeting_reservations (
   cancellation_reason,
   created_at,
   updated_at
-)
-SELECT
+) SELECT
   m.name,
   m.email,
   NULL,
@@ -49,6 +56,12 @@ SELECT
   m.created_at,
   m.updated_at
 FROM meetings m
-WHERE NOT EXISTS (SELECT 1 FROM meeting_reservations LIMIT 1);
+WHERE NOT EXISTS (SELECT 1 FROM meeting_reservations LIMIT 1);',
+  'SELECT 1'
+);
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 COMMIT;

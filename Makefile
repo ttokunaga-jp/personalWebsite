@@ -110,4 +110,4 @@ db-migrate-refactor:
 	cd backend && $(GO) run ./cmd/tools/contentmodelrefactor --dsn "$${APP_DATABASE_DSN:?set APP_DATABASE_DSN}" --dry-run
 
 ops-validate:
-	./scripts/ops/validate.sh
+	bash ./scripts/ops/validate.sh

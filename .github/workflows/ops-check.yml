@@ -41,4 +41,3 @@ jobs:
 
       - name: Ops validation
         run: make ops-validate
-

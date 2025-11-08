@@ -8,7 +8,7 @@ SET @has_meetings = (
 
 SET @sql = IF(
   @has_meetings > 0,
-  'INSERT INTO meeting_reservations (
+  "INSERT INTO meeting_reservations (
   name,
   email,
   topic,
@@ -56,8 +56,8 @@ SET @sql = IF(
   m.created_at,
   m.updated_at
 FROM meetings m
-WHERE NOT EXISTS (SELECT 1 FROM meeting_reservations LIMIT 1);',
-  'SELECT 1'
+WHERE NOT EXISTS (SELECT 1 FROM meeting_reservations LIMIT 1);",
+  "SELECT 1"
 );
 
 PREPARE stmt FROM @sql;

@@ -129,11 +129,15 @@ func NewAdminProjectRepository(repo repository.ProjectRepository) repository.Adm
 }
 
 // NewAdminSessionRepository constructs the administrative session repository.
-func NewAdminSessionRepository(db *sqlx.DB) repository.AdminSessionRepository {
-	if db == nil {
+func NewAdminSessionRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.AdminSessionRepository {
+	switch {
+	case db != nil:
+		return repoMySQL.NewAdminSessionRepository(db)
+	case client != nil:
+		return repoFirestore.NewAdminSessionRepository(client, prefix(cfg))
+	default:
 		return nil
 	}
-	return repoMySQL.NewAdminSessionRepository(db)
 }
 
 // NewResearchRepository selects an appropriate research repository implementation.

@@ -6,7 +6,7 @@
 - **システム全体構成**：Cloud Run 上でフロント SPA と Go API を個別デプロイし、Cloud Firestore と Cloud Storage をバックエンドに据える。Cloudflare で DNS/HTTPS 終端、Terraform で IaC 管理。
 - **モジュール分割（Go API）**：`handler`（HTTP 入出力 & 認証）、`usecase`（アプリケーションロジック）、`repository`（DB・外部 API）、`domain`（エンティティ）、`infrastructure`（DI コンテナ、設定、クライアント管理）。
 - **モジュール分割（React SPA）**：`apps/public` と `apps/admin` をルーティングで分岐し、共通 UI / i18n / API クライアントは `packages/shared` に集約。 `/admin` のビルドは Guard で保護し、通常ナビゲーションから除外。
-- **認証・認可**：Cloudflare で HTTPS 強制。Google OAuth 2.0 を Cloud Run API に設定し、認証成功時に短命の JWT+Refresh Token を発行。管理 API は JWT とロールで保護。公開 API は IP Rate Limiting + ReCAPTCHA で濫用防止。
+- **認証・認可**：Cloudflare で HTTPS 強制。Google OAuth 2.0 を Cloud Run API に設定し、認証成功時に HttpOnly/Secure なサーバーサイドセッションを発行。管理 API はセッション + ロールで保護。公開 API は IP Rate Limiting + ReCAPTCHA で濫用防止。
 - **予約ドメイン**：Contact フローで Google Calendar API と連携。30 分前後のバッファ除外を usecase 層で実装し、DB・Calendar 双方へ整合性書き込み。外部呼び出しは Circuit Breaker & Retry (指数バックオフ) を備える。
 - **非機能対策**：slog による構造化ログ、OpenTelemetry Exporter、Cloud Monitoring Alert。キャッシュ層は Cloud CDN (静的) + API レスポンスの ETag/Conditional Request。DB クエリはインデックス計画と SQLX Prepared Statement。Rate Limiting は Redis 互換 Memorystore で固定窓 + バースト吸収。
 - **DI / Config**：fx や wire 等の DI フレームワークで API コンポーネント生成。Viper で環境ごとに設定分離。認証鍵、DSN、API キーは Secret Manager 管理。
@@ -55,7 +55,7 @@ flowchart TD
     Repo -->|Document API| Firestore
     Repo -->|Signed URL| Storage
     Repo -->|Calendar REST| GoogleCalendar
-    Handler -->|JWT| GoogleOAuth
+    Handler -->|Session| GoogleOAuth
     Handler -->|Rate Limit Check| Cache
     Infra --> Monitoring
 ```
@@ -140,10 +140,10 @@ graph LR
   /ops
     makefile targets, scripts
   ```
-- **環境変数**：`APP_ENV`, `PORT`, `APP_FIRESTORE_PROJECT_ID`, `APP_GOOGLE_CLIENT_ID/SECRET`, `APP_AUTH_JWT_SECRET`, `APP_SECURITY_CSRF_SIGNING_KEY`, `APP_BOOKING_*`, `RECAPTCHA_SECRET`, `RATE_LIMIT_RPS`, `CACHE_TTL_SECONDS` 等を Secret Manager で管理し Cloud Run に注入。
+- **環境変数**：`APP_ENV`, `PORT`, `APP_FIRESTORE_PROJECT_ID`, `APP_GOOGLE_CLIENT_ID/SECRET`, `APP_AUTH_JWT_SECRET`, `APP_AUTH_ADMIN_SESSION_TTL`, `APP_SECURITY_CSRF_SIGNING_KEY`, `APP_BOOKING_*`, `RECAPTCHA_SECRET`, `RATE_LIMIT_RPS`, `CACHE_TTL_SECONDS` 等を Secret Manager で管理し Cloud Run に注入。
 - **ネットワーク構成**：Cloudflare → (HTTPS) → Cloud Run → Serverless VPC Connector → Firestore / Cloud Storage。Firestore には IAM 認証で接続。Memorystore/Cloud Storage も VPC 経由。
 - **CI/CD**：GitHub Actions → Cloud Build。Actions で lint/test。Terraform Plan/Apply は承認付き。Cloud Build が Cloud Run/Storage へデプロイ。Artifact Registry にコンテナ保管。
-- **セキュリティ設定**：Cloud Armor で WAF ルール、OWASP Top10 対応の Security Middleware（Helmet 相当）、JWT 署名鍵ローテーション。Cloud Run ingress を internal + Cloudflare 経由に限定。
+- **セキュリティ設定**：Cloud Armor で WAF ルール、OWASP Top10 対応の Security Middleware（Helmet 相当）、セッション Cookie のローテーションと TTL 管理。Cloud Run ingress を internal + Cloudflare 経由に限定。
 
 # テスト
 - **依存循環検知**：Go は `go list -json ./... | go vet` + `golangci-lint` の `depguard`。React は ESLint `import/no-cycle`。CI で必須化。

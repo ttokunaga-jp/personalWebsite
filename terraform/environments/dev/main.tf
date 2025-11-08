@@ -30,6 +30,13 @@ locals {
     "_",
     "-"
   )
+  backup_bucket_name = (
+    var.backup_bucket_name != null && var.backup_bucket_name != ""
+    ) ? var.backup_bucket_name : replace(
+    lower(format("%s-%s-assets-backup", var.project_id, var.environment)),
+    "_",
+    "-"
+  )
   api_base_raw        = trimspace(var.public_api_base_url)
   api_base_normalized = local.api_base_raw != "" ? regexreplace(local.api_base_raw, "/+$", "") : ""
   api_base_canonical = local.api_base_normalized == "" ? "" : (
@@ -95,9 +102,9 @@ module "cloudsql" {
 module "firestore" {
   source = "../../modules/firestore"
 
-  project_id         = var.project_id
-  database_id        = var.firestore_database_id
-  collection_prefix  = var.firestore_collection_prefix
+  project_id        = var.project_id
+  database_id       = var.firestore_database_id
+  collection_prefix = var.firestore_collection_prefix
 }
 
 module "assets_bucket" {
@@ -120,6 +127,20 @@ module "assets_bucket" {
   depends_on = [module.project_services]
 }
 
+module "backup" {
+  source = "../../modules/backup"
+
+  project_id             = var.project_id
+  source_bucket          = module.assets_bucket.bucket_name
+  backup_bucket_name     = local.backup_bucket_name
+  backup_bucket_location = var.backup_bucket_location
+  schedule_hour          = var.backup_schedule_hour
+  schedule_minute        = var.backup_schedule_minute
+  labels                 = local.common_labels
+
+  depends_on = [module.project_services, module.assets_bucket]
+}
+
 module "dns" {
   source = "../../modules/dns"
 
@@ -134,22 +155,41 @@ module "dns" {
   depends_on = [module.project_services]
 }
 
+module "logging" {
+  source = "../../modules/logging"
+
+  project_id                = var.project_id
+  log_location              = var.log_location
+  log_bucket_id             = var.log_bucket_id
+  log_bucket_retention_days = var.log_retention_days
+  bucket_sink_name          = var.log_bucket_sink_name
+  bigquery_sink_name        = var.log_bigquery_sink_name
+  storage_sink_name         = var.log_storage_sink_name
+  bigquery_dataset_id       = var.log_bigquery_dataset_id
+  bigquery_dataset_location = var.log_bigquery_dataset_location
+  archive_bucket_name       = var.log_archive_bucket_name
+  archive_bucket_location   = var.log_archive_bucket_location
+  labels                    = local.common_labels
+
+  depends_on = [module.project_services]
+}
+
 module "monitoring" {
   source = "../../modules/monitoring"
 
   project_id                 = var.project_id
-  log_location               = var.log_location
-  log_bucket_id              = var.log_bucket_id
-  log_retention_days         = var.log_retention_days
-  log_sink_name              = var.log_sink_name
   error_metric_name          = var.log_error_metric_name
   notification_channels      = var.notification_channels
   error_threshold_per_minute = var.monitoring_error_threshold_per_minute
   api_service_name           = var.api_service_name
   api_uptime_check           = var.api_uptime_check
   error_log_filter           = var.monitoring_error_log_filter
+  latency_threshold_ms       = var.monitoring_latency_threshold_ms
+  dashboard_display_name     = var.monitoring_dashboard_display_name
+  dashboard_enabled          = var.monitoring_enable_dashboard
+  sql_backup_alert_enabled   = var.monitoring_sql_backup_alert_enabled
 
-  depends_on = [module.project_services]
+  depends_on = [module.project_services, module.logging]
 }
 
 module "api" {

@@ -16,6 +16,14 @@ type AdminProjectRepository interface {
 	DeleteAdminProject(ctx context.Context, id int64) error
 }
 
+// AdminSessionRepository persists and retrieves administrator sessions.
+type AdminSessionRepository interface {
+	CreateSession(ctx context.Context, session *model.AdminSession) (*model.AdminSession, error)
+	FindSessionByHash(ctx context.Context, hash string) (*model.AdminSession, error)
+	UpdateSessionActivity(ctx context.Context, hash string, lastAccessed time.Time, expiresAt time.Time) (*model.AdminSession, error)
+	RevokeSession(ctx context.Context, hash string) error
+}
+
 // AdminProfileRepository manages author profile metadata.
 type AdminProfileRepository interface {
 	GetAdminProfile(ctx context.Context) (*model.AdminProfile, error)

@@ -3,11 +3,7 @@ import { vi } from "vitest";
 
 import App from "./App";
 import { DomainError } from "./modules/admin-api";
-import {
-  AuthSessionProvider,
-  clearToken,
-  setToken as persistToken,
-} from "./modules/auth-session";
+import { AuthSessionProvider } from "./modules/auth-session";
 
 const apiMocks = vi.hoisted(() => ({
   health: vi.fn(),
@@ -43,9 +39,6 @@ const {
 
 describe("Admin App", () => {
   beforeEach(() => {
-    clearToken();
-    window.sessionStorage.clear();
-    window.location.hash = "";
     healthMock.mockResolvedValue({ data: { status: "ok" } });
     summaryMock.mockResolvedValue({
       data: {
@@ -188,8 +181,6 @@ describe("Admin App", () => {
   });
 
   it("renders dashboard title", async () => {
-    persistToken("test-token");
-
     render(
       <AuthSessionProvider>
         <App />

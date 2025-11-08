@@ -39,6 +39,14 @@
   - リストア：ロールバック対象オブジェクトのバージョン ID を指定し `gsutil cp` で復元。
 - **Terraform State**：Cloud Storage バケット + バージョニング + Lock（DynamoDB 互換）で管理。週次でローカル暗号化アーカイブを Cloud Storage Coldline に保管。
 
+## 運用自動化
+- **IaC 検証コマンド**：`make ops-validate` で Terraform fmt/validate・TFLint・yamllint・(任意の gcloud lint) を実行。CI では `.github/workflows/ops-check.yml` が同フローを定期／PR ベースで実行する。
+- **ログルーター & エクスポート**：Terraform `modules/logging` で Log Router → Log Bucket／BigQuery／Coldline アーカイブを構成。BigQuery で長期保管し、Cloud Storage で規定日数のアーカイブを取る。
+- **ダッシュボード／アラート**：`modules/monitoring` で 5xx / レイテンシ / Cloud SQL バックアップ失敗アラートと Cloud Monitoring ダッシュボード（運用 Overview）を生成。Runbook URL を `notification_channels` で配布。
+- **静的アセットバックアップ**：`modules/backup` で Storage Transfer Service のジョブを定義し、日次でアセットバケットをバックアップバケットへ同期。
+- **Runbook テンプレート**：`docs/runbooks/` に雛形を配置し、アラートから参照できる URL を維持する。DR 記録は `docs/ops/dr-drill-<YYYYMM>.md` を作成。
+- **運用レポート**：CI 成果（アラート lint やバックアップ同期結果）は `docs/ops/ops-report-template.md` を雛形として月次で記録する。
+
 ## 障害対応 Runbook（抜粋）
 - **API レスポンス 5xx 増加**：
   1. Cloud Monitoring ダッシュボードでレイテンシ・エラーメッセージを確認。

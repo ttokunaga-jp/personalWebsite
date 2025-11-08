@@ -3,30 +3,6 @@ variable "project_id" {
   type        = string
 }
 
-variable "log_location" {
-  description = "Location for the logging bucket"
-  type        = string
-  default     = "global"
-}
-
-variable "log_bucket_id" {
-  description = "Bucket ID for centralized logs"
-  type        = string
-  default     = "personal-logs"
-}
-
-variable "log_retention_days" {
-  description = "Retention period in days for logs"
-  type        = number
-  default     = 30
-}
-
-variable "log_sink_name" {
-  description = "Name of the aggregated log sink for Cloud Run"
-  type        = string
-  default     = "cloud-run-logs"
-}
-
 variable "error_metric_name" {
   description = "Name of the log-based metric used for error tracking"
   type        = string
@@ -74,4 +50,28 @@ variable "error_log_filter" {
   description = "Custom filter for the log-based error metric (optional)"
   type        = string
   default     = null
+}
+
+variable "latency_threshold_ms" {
+  description = "Request latency threshold (milliseconds) that triggers the latency alert"
+  type        = number
+  default     = 800
+}
+
+variable "dashboard_display_name" {
+  description = "Display name for the Cloud Monitoring dashboard"
+  type        = string
+  default     = "Personal Website Operations Overview"
+}
+
+variable "dashboard_enabled" {
+  description = "Create the operational dashboard when true"
+  type        = bool
+  default     = true
+}
+
+variable "sql_backup_alert_enabled" {
+  description = "Enable alerting on Cloud SQL backup failures"
+  type        = bool
+  default     = true
 }

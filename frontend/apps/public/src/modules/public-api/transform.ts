@@ -1,5 +1,6 @@
 import i18next from "i18next";
 
+import { FALLBACK_LANGUAGE } from "../language/config";
 import {
   getCanonicalHomeConfig,
   getCanonicalProfile,
@@ -234,8 +235,6 @@ export type RawContactConfig = {
   googleCalendarId?: string | null;
   bookingWindowDays?: number | null;
 };
-
-const FALLBACK_LANGUAGE: SupportedLanguage = "en";
 
 function clone<T>(value: T): T {
   if (typeof structuredClone === "function") {

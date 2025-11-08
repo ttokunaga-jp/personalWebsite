@@ -2,11 +2,11 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/takumi/personal-website/internal/errs"
-	"github.com/takumi/personal-website/internal/service/auth"
 )
 
 // AdminGuard ensures routes are only accessible by users with the admin role.
@@ -20,8 +20,8 @@ func NewAdminGuard() *AdminGuard {
 // RequireAdmin validates JWT claims contain the admin role.
 func (g *AdminGuard) RequireAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		claimsAny, exists := c.Get(ContextClaimsKey)
-		if !exists {
+		session, ok := GetSessionFromContext(c)
+		if !ok {
 			appErr := errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "authentication required", nil)
 			c.AbortWithStatusJSON(appErr.Status, gin.H{
 				"error":   appErr.Code,
@@ -30,17 +30,7 @@ func (g *AdminGuard) RequireAdmin() gin.HandlerFunc {
 			return
 		}
 
-		claims, ok := claimsAny.(*auth.Claims)
-		if !ok || claims == nil {
-			appErr := errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "invalid authentication context", nil)
-			c.AbortWithStatusJSON(appErr.Status, gin.H{
-				"error":   appErr.Code,
-				"message": appErr.Message,
-			})
-			return
-		}
-
-		if !claims.HasRole("admin") {
+		if !hasAdminRole(session.Roles) {
 			appErr := errs.New(errs.CodeForbidden, http.StatusForbidden, "admin role required", nil)
 			c.AbortWithStatusJSON(appErr.Status, gin.H{
 				"error":   appErr.Code,
@@ -51,4 +41,13 @@ func (g *AdminGuard) RequireAdmin() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func hasAdminRole(roles []string) bool {
+	for _, role := range roles {
+		if strings.EqualFold(strings.TrimSpace(role), "admin") {
+			return true
+		}
+	}
+	return false
 }

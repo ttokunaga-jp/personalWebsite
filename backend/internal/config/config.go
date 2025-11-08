@@ -139,15 +139,18 @@ type AppConfig struct {
 }
 
 type AdminAuthConfig struct {
-	DefaultRedirectURI    string   `mapstructure:"default_redirect_uri"`
-	AllowedDomains        []string `mapstructure:"allowed_domains"`
-	AllowedEmails         []string `mapstructure:"allowed_emails"`
-	SessionCookieName     string   `mapstructure:"session_cookie_name"`
-	SessionCookieDomain   string   `mapstructure:"session_cookie_domain"`
-	SessionCookiePath     string   `mapstructure:"session_cookie_path"`
-	SessionCookieSecure   bool     `mapstructure:"session_cookie_secure"`
-	SessionCookieHTTPOnly bool     `mapstructure:"session_cookie_http_only"`
-	SessionCookieSameSite string   `mapstructure:"session_cookie_same_site"`
+	DefaultRedirectURI    string        `mapstructure:"default_redirect_uri"`
+	AllowedDomains        []string      `mapstructure:"allowed_domains"`
+	AllowedEmails         []string      `mapstructure:"allowed_emails"`
+	SessionCookieName     string        `mapstructure:"session_cookie_name"`
+	SessionCookieDomain   string        `mapstructure:"session_cookie_domain"`
+	SessionCookiePath     string        `mapstructure:"session_cookie_path"`
+	SessionCookieSecure   bool          `mapstructure:"session_cookie_secure"`
+	SessionCookieHTTPOnly bool          `mapstructure:"session_cookie_http_only"`
+	SessionCookieSameSite string        `mapstructure:"session_cookie_same_site"`
+	SessionTTL            time.Duration `mapstructure:"session_ttl"`
+	SessionIdleTimeout    time.Duration `mapstructure:"session_idle_timeout"`
+	SessionRefreshWindow  time.Duration `mapstructure:"session_refresh_window"`
 }
 
 var Module = fx.Module("config",
@@ -184,12 +187,15 @@ func load() (*AppConfig, error) {
 	v.SetDefault("auth.admin.default_redirect_uri", "/admin/")
 	v.SetDefault("auth.admin.allowed_domains", []string{})
 	v.SetDefault("auth.admin.allowed_emails", []string{})
-	v.SetDefault("auth.admin.session_cookie_name", "ps_admin_jwt")
+	v.SetDefault("auth.admin.session_cookie_name", "ps_admin_session")
 	v.SetDefault("auth.admin.session_cookie_domain", "")
 	v.SetDefault("auth.admin.session_cookie_path", "/")
 	v.SetDefault("auth.admin.session_cookie_secure", true)
 	v.SetDefault("auth.admin.session_cookie_http_only", true)
-	v.SetDefault("auth.admin.session_cookie_same_site", "lax")
+	v.SetDefault("auth.admin.session_cookie_same_site", "strict")
+	v.SetDefault("auth.admin.session_ttl", "24h")
+	v.SetDefault("auth.admin.session_idle_timeout", "2h")
+	v.SetDefault("auth.admin.session_refresh_window", "20m")
 	v.SetDefault("google.auth_url", "https://accounts.google.com/o/oauth2/v2/auth")
 	v.SetDefault("google.token_url", "https://oauth2.googleapis.com/token")
 	v.SetDefault("google.userinfo_url", "https://openidconnect.googleapis.com/v1/userinfo")

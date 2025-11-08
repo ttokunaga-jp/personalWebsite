@@ -1,6 +1,17 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
+import {
+  FALLBACK_LANGUAGE,
+  SUPPORTED_LANGUAGES,
+  type SupportedLanguage,
+} from "./language/config";
+import {
+  matchSupportedLanguage,
+  persistLanguagePreference,
+  resolveInitialLanguage,
+} from "./language/preference";
+
 export const resources = {
   en: {
     translation: {
@@ -562,9 +573,14 @@ export const resources = {
   },
 };
 
+const initialLanguageResolution = resolveInitialLanguage();
+const initialLanguage: SupportedLanguage = initialLanguageResolution.language;
+
 void i18n.use(initReactI18next).init({
   resources,
-  fallbackLng: "en",
+  fallbackLng: FALLBACK_LANGUAGE,
+  lng: initialLanguage,
+  supportedLngs: SUPPORTED_LANGUAGES,
   react: {
     useSuspense: false,
   },
@@ -573,5 +589,18 @@ void i18n.use(initReactI18next).init({
     escapeValue: false,
   },
 });
+
+persistLanguagePreference(initialLanguage);
+
+const handleLanguageChanged = (language: string) => {
+  const matched = matchSupportedLanguage(language);
+  if (!matched) {
+    return;
+  }
+  persistLanguagePreference(matched);
+};
+
+i18n.off("languageChanged", handleLanguageChanged);
+i18n.on("languageChanged", handleLanguageChanged);
 
 export default i18n;

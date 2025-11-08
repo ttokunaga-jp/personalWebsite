@@ -24,14 +24,16 @@ type AdminLoginResult struct {
 
 // AdminCallbackResult carries the outcome of a successful administrator login.
 type AdminCallbackResult struct {
-	Token        string
+	SessionID    string
 	ExpiresAt    int64
 	RedirectPath string
+	Email        string
+	Roles        []string
 }
 
 type adminService struct {
 	provider       OAuthProvider
-	issuer         TokenIssuer
+	sessions       AdminSessionManager
 	stateManager   *StateManager
 	authCfg        config.AuthConfig
 	adminCfg       config.AdminAuthConfig
@@ -44,7 +46,7 @@ type adminService struct {
 func NewAdminService(
 	cfg *config.AppConfig,
 	provider OAuthProvider,
-	issuer TokenIssuer,
+	sessions AdminSessionManager,
 	stateManager *StateManager,
 	tokenSaver TokenSaver,
 ) (AdminService, error) {
@@ -54,8 +56,8 @@ func NewAdminService(
 	if provider == nil {
 		return nil, errs.New(errs.CodeInternal, 500, "admin auth service: missing oauth provider", nil)
 	}
-	if issuer == nil {
-		return nil, errs.New(errs.CodeInternal, 500, "admin auth service: missing token issuer", nil)
+	if sessions == nil {
+		return nil, errs.New(errs.CodeInternal, 500, "admin auth service: missing session manager", nil)
 	}
 	if stateManager == nil {
 		return nil, errs.New(errs.CodeInternal, 500, "admin auth service: missing state manager", nil)
@@ -84,7 +86,7 @@ func NewAdminService(
 
 	return &adminService{
 		provider:       provider,
-		issuer:         issuer,
+		sessions:       sessions,
 		stateManager:   stateManager,
 		authCfg:        cfg.Auth,
 		adminCfg:       adminCfg,
@@ -132,14 +134,20 @@ func (s *adminService) HandleCallback(ctx context.Context, state, code string) (
 	redirectPath := sanitizeAdminRedirect(statePayload.RedirectURI, s.adminCfg.DefaultRedirectURI)
 
 	if s.authCfg.Disabled {
-		token, expiresAt, err := s.issuer.Issue(ctx, "disabled-auth", "", "admin")
+		session, err := s.sessions.Create(ctx, AdminPrincipal{
+			Subject: "disabled-auth",
+			Email:   "disabled@example.com",
+			Roles:   []string{"admin"},
+		})
 		if err != nil {
 			return nil, err
 		}
 		return &AdminCallbackResult{
-			Token:        token,
-			ExpiresAt:    expiresAt.Unix(),
+			SessionID:    session.ID,
+			ExpiresAt:    session.ExpiresAt.Unix(),
 			RedirectPath: redirectPath,
+			Email:        session.Email,
+			Roles:        append([]string(nil), session.Roles...),
 		}, nil
 	}
 
@@ -171,15 +179,21 @@ func (s *adminService) HandleCallback(ctx context.Context, state, code string) (
 		log.Printf("admin auth service: token saver not configured; skipping token persistence")
 	}
 
-	appToken, expiresAt, err := s.issuer.Issue(ctx, userInfo.Subject, userInfo.Email, "admin")
+	session, err := s.sessions.Create(ctx, AdminPrincipal{
+		Subject: userInfo.Subject,
+		Email:   userInfo.Email,
+		Roles:   []string{"admin"},
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	return &AdminCallbackResult{
-		Token:        appToken,
-		ExpiresAt:    expiresAt.Unix(),
+		SessionID:    session.ID,
+		ExpiresAt:    session.ExpiresAt.Unix(),
 		RedirectPath: redirectPath,
+		Email:        session.Email,
+		Roles:        append([]string(nil), session.Roles...),
 	}, nil
 }
 

@@ -1,0 +1,173 @@
+{
+  "displayName": "${DISPLAY_NAME}",
+  "mosaicLayout": {
+    "columns": 12,
+    "tiles": [
+      {
+        "xPos": 0,
+        "yPos": 0,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "HTTP 5xx rate",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "resource.type=\\"cloud_run_revision\\" AND metric.type=\\"run.googleapis.com/request_count\\" AND metric.label.response_code_class=\\"5xx\\" AND resource.label.service_name=\\"${API_SERVICE_NAME}\\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "groupByFields": [
+                        "metric.label.response_code"
+                      ]
+                    }
+                  }
+                }
+              }
+            ],
+            "thresholds": [
+              {
+                "label": "Alert threshold",
+                "value": 5,
+                "color": "RED"
+              }
+            ],
+            "timeshiftDuration": "0s",
+            "yAxis": {
+              "label": "Requests / min",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "yPos": 0,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Request latency p95",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "resource.type=\\"cloud_run_revision\\" AND metric.type=\\"run.googleapis.com/request_latencies\\" AND resource.label.service_name=\\"${API_SERVICE_NAME}\\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_PERCENTILE_95",
+                      "crossSeriesReducer": "REDUCE_MEAN"
+                    }
+                  }
+                }
+              }
+            ],
+            "thresholds": [
+              {
+                "label": "Target",
+                "value": ${LATENCY_THRESHOLD},
+                "color": "YELLOW"
+              }
+            ],
+            "yAxis": {
+              "label": "Milliseconds",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 4,
+        "width": 4,
+        "height": 4,
+        "widget": {
+          "title": "Cloud Run CPU utilisation",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesQueryLanguage": "fetch cloud_run_revision\n| filter (resource.project_id = \\"${PROJECT_ID}\\" and resource.service_name = \\"${API_SERVICE_NAME}\\")\n| { metric run.googleapis.com/container/cpu/utilization }\n| align rate(1m)\n| every 1m\n| group_by [metric.instance_id],\n    [value_utilization_aggregate: aggregate(value.utilization)]"
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "CPU %",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 4,
+        "yPos": 4,
+        "width": 4,
+        "height": 4,
+        "widget": {
+          "title": "Cloud SQL connections",
+          "xyChart": {
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "resource.type=\\"cloudsql_database\\" AND metric.type=\\"cloudsql.googleapis.com/database/network/connections\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_MEAN"
+                    }
+                  }
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "Connections",
+              "scale": "LINEAR"
+            }
+          }
+        }
+      },
+      {
+        "xPos": 8,
+        "yPos": 4,
+        "width": 4,
+        "height": 4,
+        "widget": {
+          "title": "Alerting policies",
+          "alertChart": {
+            "policy": "${ERROR_POLICY_NAME}"
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 8,
+        "width": 12,
+        "height": 4,
+        "widget": {
+          "title": "Uptime check status",
+          "collapsibleGroup": {
+            "widgets": [
+              {
+                "title": "API uptime",
+                "uptimeView": {
+                  "uptimeCheckId": "${UPTIME_CHECK_ID}"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

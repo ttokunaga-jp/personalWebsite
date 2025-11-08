@@ -4,7 +4,7 @@
 > 基準スキーマ: `deploy/mysql/schema.sql` / `docs/content-model-refactor.md`
 
 ## 共通方針
-- エンドポイントは `/api/admin/*` 配下。認証は JWT（`Authorization: Bearer <token>`）必須。
+- エンドポイントは `/api/admin/*` 配下。認証は HttpOnly/Admin セッション Cookie（`ps_admin_session`）必須。
 - リクエスト/レスポンスは JSON。レスポンスは `{ "data": <payload> }` フォーマットで統一し、エラーは `errs.AppError` で定義された構造を返す。
 - 時刻はすべて ISO8601（UTC）。多言語フィールドは `LocalizedText`（`{ "ja"?: string, "en"?: string }`）に統一。
 - バリデーション違反は `400 Bad Request`（`CodeInvalidInput`）、競合は `409 Conflict`、存在しないリソースは `404 Not Found` を返す。
@@ -305,4 +305,3 @@ type TechMembership = {
 - 本仕様は管理 API 実装のソース (handler/service) と同リポジトリ内で同期する。
 - JSON スキーマの自動生成（`openapi.yaml` 更新）はフェーズ 2 にて対応予定。
 - 管理 SPA では上記 DTO を TypeScript 型として取り込み、FieldArray / バリデーションは Yup/React Hook Form 等で実装する。
-

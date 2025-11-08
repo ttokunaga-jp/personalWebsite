@@ -17,7 +17,7 @@ func registerRoutes(
 	bookingHandler *handler.BookingHandler,
 	authHandler *handler.AuthHandler,
 	adminAuthHandler *handler.AdminAuthHandler,
-	jwtMiddleware *middleware.JWTMiddleware,
+	sessionMiddleware *middleware.AdminSessionMiddleware,
 	adminHandler *handler.AdminHandler,
 	adminGuard *middleware.AdminGuard,
 	securityHandler *handler.SecurityHandler,
@@ -61,7 +61,7 @@ func registerRoutes(
 	}
 
 	admin := api.Group("/admin")
-	admin.Use(jwtMiddleware.Handler(), adminGuard.RequireAdmin())
+	admin.Use(sessionMiddleware.Handler(), adminGuard.RequireAdmin())
 	{
 		admin.GET("/health", healthHandler.Ping)
 		admin.GET("/summary", adminHandler.Summary)

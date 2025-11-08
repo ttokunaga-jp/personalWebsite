@@ -35,8 +35,8 @@ resource "google_firestore_index" "research_tags" {
   collection = local.collections.research_blog_entries
 
   fields {
-    field_path  = "kind"
-    order       = "ASCENDING"
+    field_path = "kind"
+    order      = "ASCENDING"
   }
   fields {
     field_path   = "tags"

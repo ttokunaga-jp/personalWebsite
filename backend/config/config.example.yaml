@@ -16,6 +16,19 @@ auth:
     - "personal-website-admin"
   clock_skew_seconds: 30
   disabled: false
+  admin:
+    default_redirect_uri: "/admin/"
+    allowed_domains: []
+    allowed_emails: []
+    session_cookie_name: "ps_admin_session"
+    session_cookie_domain: ""
+    session_cookie_path: "/"
+    session_cookie_secure: true
+    session_cookie_http_only: true
+    session_cookie_same_site: "strict"
+    session_ttl: "24h"
+    session_idle_timeout: "2h"
+    session_refresh_window: "20m"
 contact:
   timezone: "Asia/Tokyo"
   calendar_timezone: "Asia/Tokyo"

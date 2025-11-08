@@ -97,6 +97,7 @@ start_local_backend() {
   APP_DATABASE_HOST="" \
   APP_SERVER_PORT="${port}" \
   APP_SERVER_MODE="${mode}" \
+  APP_SECURITY_HTTPS_REDIRECT="false" \
   APP_AUTH_DISABLED="${SMOKE_BACKEND_AUTH_DISABLED:-true}" \
   APP_GOOGLE_CLIENT_ID="${APP_GOOGLE_CLIENT_ID:-dummy-client-id}" \
   APP_GOOGLE_CLIENT_SECRET="${APP_GOOGLE_CLIENT_SECRET:-dummy-client-secret}" \

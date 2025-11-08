@@ -2,11 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { adminApi, DomainError } from "./modules/admin-api";
-import {
-  extractTokenFromHash,
-  getToken,
-  useAuthSession,
-} from "./modules/auth-session";
+import { useAuthSession } from "./modules/auth-session";
 import type {
   AdminProfile,
   AdminProject,
@@ -424,7 +420,7 @@ const researchToPayload = (item: AdminResearch) =>
 
 function App() {
   const { t } = useTranslation();
-  const { token, setToken: storeToken, clearToken } = useAuthSession();
+  const { setSession, clearSession } = useAuthSession();
 
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [status, setStatus] = useState("unknown");
@@ -491,7 +487,7 @@ function App() {
   }, [projectTechSearch, techCatalog, selectedProjectTechIds]);
 
   const handleUnauthorized = useCallback(() => {
-    clearToken();
+    clearSession();
     setAuthState("unauthorized");
     setLoading(false);
     setSummary(null);
@@ -510,7 +506,7 @@ function App() {
     setEditingResearchId(null);
     setEditingBlacklistId(null);
     setError(null);
-  }, [clearToken]);
+  }, [clearSession]);
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
@@ -575,26 +571,14 @@ function App() {
     }
 
     let cancelled = false;
-
     const resumeSession = async () => {
       try {
-        const hashToken = extractTokenFromHash(window.location.hash ?? "");
-        if (hashToken) {
-          storeToken(hashToken);
-          setAuthState("authenticated");
-          void refreshAll();
-
-          const cleanUrl = `${window.location.pathname}${window.location.search}`;
-          window.history.replaceState(null, "", cleanUrl);
+        const sessionRes = await adminApi.session();
+        if (cancelled) {
           return;
         }
-
-        const sessionRes = await adminApi.session();
-        const sessionToken = sessionRes.data.token?.trim();
-        if (sessionToken) {
-          storeToken(sessionToken);
-        }
         if (sessionRes.data.active) {
+          setSession(sessionRes.data);
           setAuthState("authenticated");
           void refreshAll();
         } else {
@@ -605,13 +589,14 @@ function App() {
           return;
         }
         if (isUnauthorizedError(err)) {
-          if (getToken()) {
-            return;
-          }
           handleUnauthorized();
         } else {
           console.error(err);
           handleUnauthorized();
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
         }
       }
     };
@@ -621,18 +606,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [authState, token, refreshAll, handleUnauthorized, storeToken]);
-
-  useEffect(() => {
-    if (authState !== "authenticated") {
-      return;
-    }
-
-    const currentToken = token ?? getToken();
-    if (currentToken == null || currentToken === "") {
-      handleUnauthorized();
-    }
-  }, [authState, token, handleUnauthorized]);
+  }, [authState, refreshAll, handleUnauthorized, setSession]);
 
   useEffect(() => {
     if (authState !== "authenticated") {
@@ -642,9 +616,10 @@ function App() {
     const poll = async () => {
       try {
         const sessionRes = await adminApi.session();
-        const sessionToken = sessionRes.data.token?.trim();
-        if (sessionToken) {
-          storeToken(sessionToken);
+        if (sessionRes.data.active) {
+          setSession(sessionRes.data);
+        } else {
+          handleUnauthorized();
         }
       } catch (err) {
         if (isUnauthorizedError(err)) {
@@ -658,7 +633,7 @@ function App() {
     void poll();
     const intervalId = window.setInterval(poll, 60_000);
     return () => window.clearInterval(intervalId);
-  }, [authState, handleUnauthorized, storeToken]);
+  }, [authState, handleUnauthorized, setSession]);
 
   const run = useCallback(
     async (operation: () => Promise<unknown>) => {

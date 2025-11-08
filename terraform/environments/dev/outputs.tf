@@ -48,17 +48,37 @@ output "dns_name_servers" {
   value       = module.dns.name_servers
 }
 
-output "monitoring_log_bucket_id" {
-  description = "Centralized logging bucket ID"
-  value       = module.monitoring.log_bucket_id
-}
-
 output "monitoring_uptime_check_id" {
   description = "Uptime check ID for the API endpoint"
   value       = module.monitoring.uptime_check_id
 }
 
+output "monitoring_dashboard_id" {
+  description = "Cloud Monitoring dashboard resource ID"
+  value       = module.monitoring.dashboard_id
+}
+
 output "firestore_collections" {
   description = "Computed Firestore collection names (with prefix applied)"
   value       = module.firestore.collections
+}
+
+output "logging_log_bucket_id" {
+  description = "Centralized logging bucket ID"
+  value       = module.logging.log_bucket_id
+}
+
+output "logging_bigquery_dataset_id" {
+  description = "BigQuery dataset receiving log exports"
+  value       = module.logging.bigquery_dataset_id
+}
+
+output "backup_bucket_name" {
+  description = "Backup bucket receiving nightly transfers"
+  value       = module.backup.backup_bucket_name
+}
+
+output "backup_transfer_job_name" {
+  description = "Storage Transfer Service job responsible for nightly backups"
+  value       = module.backup.transfer_job_name
 }

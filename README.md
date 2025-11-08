@@ -28,8 +28,8 @@
 | --- | --- | --- |
 | フロントエンド（公開 SPA） | 完了 | Home / Profile / Research / Projects / Contact を実装。i18n、フォーム検証、予約枠表示、reCAPTCHA 連携を含む。|
 | フロントエンド（管理 SPA） | MVP | プロジェクト・研究・ブログ・予約・ブラックリスト CRUD を提供。UI/UX と e2e 自動テストは今後拡充予定。|
-| バックエンド API | 完了 | 公開 / 管理エンドポイント、Google OAuth + JWT、予約（カレンダー・通知）処理、Clean Architecture 風レイヤ分離済み。|
-| 認証・権限 | MVP | Google OAuth, ドメイン/メール許可リスト, JWT, Admin Guard を実装。Secret 管理と本番向け WIF 設定は環境依存。|
+| バックエンド API | 完了 | 公開 / 管理エンドポイント、Google OAuth + サーバーサイドセッション、予約（カレンダー・通知）処理、Clean Architecture 風レイヤ分離済み。|
+| 認証・権限 | MVP | Google OAuth、ドメイン/メール許可リスト、HttpOnly 管理セッション、Admin Guard を実装。Secret 管理と本番向け WIF 設定は環境依存。|
 | 予約・外部連携 | MVP | Google Calendar への予定挿入、Gmail API 経由の通知をサポート。トークン更新やバックアップ導線は継続改善対象。|
 | テスト | 進行中 | Go/Vitest 単体テストと ESLint を整備。Playwright など E2E、自動ビジュアル回帰は未導入。|
 | CI/CD | 完了 | GitHub Actions → Cloud Build → Cloud Run で lint/test/build/deploy を自動化。Workload Identity Federation を使用。|
@@ -87,7 +87,7 @@
 | `APP_FIRESTORE_DATABASE_ID` | Firestore のデータベース ID（通常は `(default)`）。 |
 | `APP_FIRESTORE_COLLECTION_PREFIX` | コレクションに付与するプレフィックス（環境ごとの名前空間分離に利用）。 |
 | `APP_FIRESTORE_EMULATOR_HOST` | Firestore Emulator に接続する場合のホスト（例: `localhost:8080`）。 |
-| `APP_AUTH_JWT_SECRET` | 管理者 JWT 用のシークレット。 |
+| `APP_AUTH_JWT_SECRET` | 管理 API で JWT を発行する際のシークレット（管理者セッション移行後は互換用途）。 |
 | `APP_AUTH_STATE_SECRET` | Google OAuth の state/トークン暗号化に使用するシークレット。 |
 | `APP_SECURITY_CSRF_SIGNING_KEY` | CSRF トークン署名キー。 |
 | `APP_GOOGLE_CLIENT_ID` / `APP_GOOGLE_CLIENT_SECRET` | Google OAuth クライアント情報。 |
@@ -114,7 +114,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 
 #### その他
 - Terraform 変数は `terraform/environments/<env>/terraform.tfvars` で管理。
-- Cloud Build は Secret Manager に保管した JWT / OAuth / CSRF / reCAPTCHA シークレットを参照します（後述）。
+- Cloud Build は Secret Manager に保管した セッション / OAuth / CSRF / reCAPTCHA シークレットを参照します（後述）。
 
 ### 初期セットアップ手順
 1. `.env` を作成:
@@ -181,7 +181,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 
 ### 管理 SPA (`frontend/apps/admin`)
 - 認証済み管理者向けの CRUD UI。ダッシュボードサマリ、プロジェクト / 研究 / ブログ / 予約 / ブラックリスト管理を実装。
-- API: `/api/admin/*`。JWT を `Authorization: Bearer` ヘッダで付与。
+- API: `/api/admin/*`。HttpOnly / Secure セッション Cookie で認証。
 - テスト: `pnpm --filter @personal-website/admin test`。現状はユニットレベル中心で、E2E は今後 Playwright 導入予定。
 - スタイル: Tailwind + Headless UI コンポーネントをベース。
 
@@ -202,7 +202,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 | GET /api/auth/callback | OAuth コールバックで JWT を発行。 |
 | GET /api/security/csrf | CSRF トークン / ダブルサブミット Cookie を発行。 |
 
-### 管理エンドポイント（`/api/admin/*`、JWT + AdminGuard 必須）
+### 管理エンドポイント（`/api/admin/*`、サーバーセッション + AdminGuard 必須）
 - サマリ: `GET /summary`
 - プロジェクト: `GET/POST/PUT/DELETE /projects` (+ `/projects/:id`)
 - 研究: 同上（`/research`）
@@ -212,7 +212,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 - ヘルス: `GET /health`
 
 ### 認証・セキュリティ
-- Google OAuth 2.0 + JWT（HS256）。ドメイン / メールの許可リストを設定可能。
+- Google OAuth 2.0 + サーバーサイドセッション。ドメイン / メールの許可リストを設定可能。
 - CSRF: ダブルサブミットトークン（`ps_csrf` Cookie + `X-CSRF-Token` ヘッダ）。
 - レートリミット: デフォルト 120req/min（`APP_SECURITY_RATE_LIMIT_*` で調整）。
 - セキュリティヘッダ: CSP / HSTS / Referrer-Policy / X-Content-Type-Options / X-Frame-Options。
@@ -326,7 +326,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 
 ## セキュリティと可観測性
 - Secrets: GitHub Actions → Secret Manager → Cloud Run 環境変数で運用。コードへの直書きは禁止。
-- ミドルウェア: CSRF / JWT / 管理者ガード / HTTPS リダイレクト / Security Headers / Rate Limiter / Request ID / 構造化ログ。
+- ミドルウェア: CSRF / セッション検証 / 管理者ガード / HTTPS リダイレクト / Security Headers / Rate Limiter / Request ID / 構造化ログ。
 - 可観測性: Prometheus メトリクス (`/metrics`)、構造化ログ（`internal/logging`）、Google Calendar / Gmail API の障害を Circuit Breaker で緩和。
 - リトライ / バックオフ: 予約処理で指数バックオフ + Circuit Breaker。カレンダー API 障害時も即座に失敗せず再試行。
 - 監視連携: Cloud Monitoring / Logging と組み合わせてダッシュボードやアラートを設定することを推奨。

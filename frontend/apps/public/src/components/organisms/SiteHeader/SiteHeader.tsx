@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
 import { navigationItems } from "../../../app/routes/routeConfig";
+import { useAdminSession } from "../../../hooks/useAdminSession";
 import { classNames } from "../../../lib/classNames";
 import { LanguageSwitcher } from "../../molecules/LanguageSwitcher";
 import { ThemeToggle } from "../../molecules/ThemeToggle";
@@ -10,6 +11,7 @@ import { ThemeToggle } from "../../molecules/ThemeToggle";
 export function SiteHeader() {
   const { t } = useTranslation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { session } = useAdminSession();
 
   useEffect(() => {
     const handleResize = () => {
@@ -20,6 +22,18 @@ export function SiteHeader() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  const adminNavItem = useMemo(
+    () => ({ path: "/admin", labelKey: "navigation.admin" }),
+    [],
+  );
+
+  const dynamicNavigationItems = useMemo(() => {
+    if (session?.active) {
+      return [...navigationItems, adminNavItem];
+    }
+    return navigationItems;
+  }, [session?.active, adminNavItem]);
 
   return (
     <header className="border-b border-slate-200 bg-white/80 backdrop-blur-md transition-colors dark:border-slate-800 dark:bg-slate-950/80">
@@ -74,7 +88,7 @@ export function SiteHeader() {
           className="hidden items-center gap-6 md:flex"
           aria-label={t("navigation.label")}
         >
-          {navigationItems.map((item) => (
+          {dynamicNavigationItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -100,7 +114,7 @@ export function SiteHeader() {
           className="flex flex-col gap-2 border-t border-slate-200 bg-white px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-950"
           aria-label={t("navigation.mobileLabel")}
         >
-          {navigationItems.map((item) => (
+          {dynamicNavigationItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}

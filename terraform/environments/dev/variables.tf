@@ -34,9 +34,11 @@ variable "enabled_apis" {
     "sqladmin.googleapis.com",
     "secretmanager.googleapis.com",
     "dns.googleapis.com",
+    "bigquery.googleapis.com",
     "logging.googleapis.com",
     "monitoring.googleapis.com",
-    "iam.googleapis.com"
+    "iam.googleapis.com",
+    "storagetransfer.googleapis.com"
   ]
 }
 
@@ -278,6 +280,30 @@ variable "storage_enable_public_read" {
   default     = false
 }
 
+variable "backup_bucket_name" {
+  description = "Override for the backup bucket that receives nightly copies (auto-generated when omitted)"
+  type        = string
+  default     = null
+}
+
+variable "backup_bucket_location" {
+  description = "Location for the backup bucket"
+  type        = string
+  default     = "asia-northeast1"
+}
+
+variable "backup_schedule_hour" {
+  description = "Hour of day (0-23) when the backup transfer job executes"
+  type        = number
+  default     = 3
+}
+
+variable "backup_schedule_minute" {
+  description = "Minute (0-59) when the backup transfer job executes"
+  type        = number
+  default     = 0
+}
+
 # DNS
 variable "dns_zone_name" {
   description = "Cloud DNS managed zone name"
@@ -327,10 +353,46 @@ variable "log_retention_days" {
   default     = 30
 }
 
-variable "log_sink_name" {
-  description = "Log sink name aggregating Cloud Run logs"
+variable "log_bucket_sink_name" {
+  description = "Log router sink name for the centralized log bucket"
   type        = string
-  default     = "cloud-run-logs"
+  default     = "cloud-run-central-bucket"
+}
+
+variable "log_bigquery_sink_name" {
+  description = "Log router sink exporting to BigQuery"
+  type        = string
+  default     = "cloud-run-bq-export"
+}
+
+variable "log_storage_sink_name" {
+  description = "Log router sink exporting to Cloud Storage archive"
+  type        = string
+  default     = "cloud-run-storage-archive"
+}
+
+variable "log_bigquery_dataset_id" {
+  description = "Dataset ID for structured log exports"
+  type        = string
+  default     = "app_logs"
+}
+
+variable "log_bigquery_dataset_location" {
+  description = "Location for the structured log dataset"
+  type        = string
+  default     = "asia-northeast1"
+}
+
+variable "log_archive_bucket_name" {
+  description = "Cloud Storage bucket for long-term log archives"
+  type        = string
+  default     = "personal-website-log-archive"
+}
+
+variable "log_archive_bucket_location" {
+  description = "Location for the log archive bucket"
+  type        = string
+  default     = "asia-northeast1"
 }
 
 variable "log_error_metric_name" {
@@ -355,6 +417,30 @@ variable "monitoring_error_log_filter" {
   description = "Optional custom filter for the error log metric"
   type        = string
   default     = null
+}
+
+variable "monitoring_latency_threshold_ms" {
+  description = "Latency threshold in milliseconds that triggers the latency alert"
+  type        = number
+  default     = 800
+}
+
+variable "monitoring_dashboard_display_name" {
+  description = "Display name for the Cloud Monitoring dashboard"
+  type        = string
+  default     = "Personal Website Operations Overview"
+}
+
+variable "monitoring_enable_dashboard" {
+  description = "Enable creation of the Cloud Monitoring dashboard"
+  type        = bool
+  default     = true
+}
+
+variable "monitoring_sql_backup_alert_enabled" {
+  description = "Enable alerting on Cloud SQL automated backup failures"
+  type        = bool
+  default     = true
 }
 
 variable "api_uptime_check" {

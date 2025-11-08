@@ -1,0 +1,44 @@
+name: Ops Checks
+
+on:
+  pull_request:
+    paths:
+      - "terraform/**"
+      - "docs/**"
+      - "scripts/ops/**"
+      - ".github/workflows/ops-check.yml"
+      - "Makefile"
+  push:
+    branches:
+      - main
+    paths:
+      - "terraform/**"
+      - "docs/**"
+      - "scripts/ops/**"
+      - ".github/workflows/ops-check.yml"
+      - "Makefile"
+
+jobs:
+  ops-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+
+      - name: Set up TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: Install yamllint
+        run: sudo apt-get update && sudo apt-get install -y yamllint
+
+      - name: Ops validation
+        run: make ops-validate
+

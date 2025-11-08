@@ -3,7 +3,7 @@ export type LocalizedText = {
   en?: string | null;
 };
 
-export type SupportedLanguage = "ja" | "en";
+export type { SupportedLanguage } from "../language/config";
 
 export type TechLevel = "beginner" | "intermediate" | "advanced";
 

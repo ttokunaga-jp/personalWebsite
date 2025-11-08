@@ -13,6 +13,7 @@ import (
 
 	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/errs"
+	"github.com/takumi/personal-website/internal/model"
 	authsvc "github.com/takumi/personal-website/internal/service/auth"
 )
 
@@ -22,12 +23,14 @@ func TestAdminAuthCallbackSetsCookieAndRedirects(t *testing.T) {
 
 	service := &stubAdminAuthService{
 		callbackResult: &authsvc.AdminCallbackResult{
-			Token:        "jwt-token",
+			SessionID:    "session-token",
 			ExpiresAt:    time.Now().Add(30 * time.Minute).Unix(),
 			RedirectPath: "/admin/dashboard",
+			Email:        "admin@example.com",
+			Roles:        []string{"admin"},
 		},
 	}
-	handler := NewAdminAuthHandler(service, nil, nil, testAuthConfig())
+	handler := NewAdminAuthHandler(service, &stubSessionManager{}, testAuthConfig())
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -37,28 +40,28 @@ func TestAdminAuthCallbackSetsCookieAndRedirects(t *testing.T) {
 	handler.Callback(c)
 
 	require.Equal(t, http.StatusTemporaryRedirect, rec.Code)
-	require.Equal(t, "/admin/dashboard#token=jwt-token", rec.Header().Get("Location"))
+	require.Equal(t, "/admin/dashboard", rec.Header().Get("Location"))
 	require.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 
 	res := rec.Result()
-	var jwtCookie *http.Cookie
+	var sessionCookie *http.Cookie
 	for _, cookie := range res.Cookies() {
-		if cookie.Name == "ps_admin_jwt" {
-			jwtCookie = cookie
+		if cookie.Name == "ps_admin_session" {
+			sessionCookie = cookie
 			break
 		}
 	}
-	require.NotNil(t, jwtCookie, "ps_admin_jwt cookie should be set")
-	require.Equal(t, "jwt-token", jwtCookie.Value)
-	require.True(t, jwtCookie.HttpOnly)
-	require.True(t, jwtCookie.Secure)
+	require.NotNil(t, sessionCookie, "session cookie should be set")
+	require.Equal(t, "session-token", sessionCookie.Value)
+	require.True(t, sessionCookie.HttpOnly)
+	require.True(t, sessionCookie.Secure)
 }
 
 func TestAdminAuthCallbackValidatesQueryParameters(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
 
-	handler := NewAdminAuthHandler(&stubAdminAuthService{}, nil, nil, testAuthConfig())
+	handler := NewAdminAuthHandler(&stubAdminAuthService{}, &stubSessionManager{}, testAuthConfig())
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -78,7 +81,7 @@ func TestAdminAuthCallbackPropagatesServiceErrors(t *testing.T) {
 	service := &stubAdminAuthService{
 		callbackErr: errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "invalid oauth state", nil),
 	}
-	handler := NewAdminAuthHandler(service, nil, nil, testAuthConfig())
+	handler := NewAdminAuthHandler(service, &stubSessionManager{}, testAuthConfig())
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -95,26 +98,39 @@ func TestAdminSessionRehydratesFromCookie(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
 
-	verifier := &stubTokenVerifier{
-		expectedToken: "cookie-token",
-		claims: &authsvc.Claims{
-			Subject:   "admin-subject",
-			Email:     "admin@example.com",
-			Roles:     []string{"admin"},
-			ExpiresAt: time.Now().Add(5 * time.Minute),
-		},
+	now := time.Now()
+	validateSession := &model.AdminSession{
+		ID:             "cookie-token",
+		TokenHash:      "hash",
+		Email:          "admin@example.com",
+		Roles:          []string{"admin"},
+		ExpiresAt:      now.Add(30 * time.Second),
+		LastAccessedAt: now.Add(-time.Minute),
 	}
-	issuer := &stubTokenIssuer{
-		issuedToken: "refreshed-token",
-		expiresAt:   time.Now().Add(45 * time.Minute),
+	refreshedSession := &model.AdminSession{
+		ID:             "cookie-token",
+		TokenHash:      "hash",
+		Email:          "admin@example.com",
+		Roles:          []string{"admin"},
+		ExpiresAt:      now.Add(2 * time.Hour),
+		LastAccessedAt: now,
 	}
 
-	handler := NewAdminAuthHandler(&stubAdminAuthService{}, issuer, verifier, testAuthConfig())
+	sessions := &stubSessionManager{
+		validateFn: func(string) (*model.AdminSession, error) {
+			return cloneSession(validateSession), nil
+		},
+		refreshFn: func(string) (*model.AdminSession, error) {
+			return cloneSession(refreshedSession), nil
+		},
+	}
+
+	handler := NewAdminAuthHandler(&stubAdminAuthService{}, sessions, testAuthConfig())
 
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/auth/session", nil)
-	req.AddCookie(&http.Cookie{Name: "ps_admin_jwt", Value: "cookie-token"})
+	req.AddCookie(&http.Cookie{Name: "ps_admin_session", Value: "cookie-token"})
 	c.Request = req
 
 	handler.Session(c)
@@ -122,37 +138,44 @@ func TestAdminSessionRehydratesFromCookie(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var payload struct {
-		Data struct {
-			Active    bool   `json:"active"`
-			Token     string `json:"token"`
-			ExpiresAt int64  `json:"expiresAt"`
-		} `json:"data"`
+		Active    bool     `json:"active"`
+		ExpiresAt int64    `json:"expiresAt"`
+		Roles     []string `json:"roles"`
+		Email     string   `json:"email"`
+		Refreshed bool     `json:"refreshed"`
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
-	require.True(t, payload.Data.Active)
-	require.Equal(t, "refreshed-token", payload.Data.Token)
-	require.NotZero(t, payload.Data.ExpiresAt)
+	require.True(t, payload.Active)
+	require.NotZero(t, payload.ExpiresAt)
+	require.Equal(t, refreshedSession.ExpiresAt.Unix(), payload.ExpiresAt)
+	require.Equal(t, []string{"admin"}, payload.Roles)
+	require.Equal(t, "admin@example.com", payload.Email)
+	require.True(t, payload.Refreshed)
 
 	res := rec.Result()
 	var sessionCookie *http.Cookie
 	for _, cookie := range res.Cookies() {
-		if cookie.Name == "ps_admin_jwt" {
+		if cookie.Name == "ps_admin_session" {
 			sessionCookie = cookie
 			break
 		}
 	}
 	require.NotNil(t, sessionCookie)
-	require.Equal(t, "refreshed-token", sessionCookie.Value)
+	require.Equal(t, "cookie-token", sessionCookie.Value)
+	require.True(t, sessionCookie.HttpOnly)
+	require.True(t, sessionCookie.Secure)
 }
 
 func testAuthConfig() config.AuthConfig {
 	return config.AuthConfig{
 		Admin: config.AdminAuthConfig{
-			SessionCookieName:     "ps_admin_jwt",
+			SessionCookieName:     "ps_admin_session",
 			SessionCookiePath:     "/",
 			SessionCookieSecure:   true,
 			SessionCookieHTTPOnly: true,
-			SessionCookieSameSite: "lax",
+			SessionCookieSameSite: "strict",
+			SessionTTL:            time.Hour,
+			SessionRefreshWindow:  10 * time.Minute,
 		},
 	}
 }
@@ -179,40 +202,74 @@ func (s *stubAdminAuthService) HandleCallback(context.Context, string, string) (
 		return s.callbackResult, s.callbackErr
 	}
 	return &authsvc.AdminCallbackResult{
-		Token:        "default-token",
+		SessionID:    "default-session",
 		ExpiresAt:    time.Now().Add(15 * time.Minute).Unix(),
 		RedirectPath: "/admin/",
+		Email:        "admin@example.com",
+		Roles:        []string{"admin"},
 	}, nil
 }
 
-type stubTokenIssuer struct {
-	issuedToken string
-	expiresAt   time.Time
-	err         error
+type stubSessionManager struct {
+	createFn   func(authsvc.AdminPrincipal) (*model.AdminSession, error)
+	validateFn func(string) (*model.AdminSession, error)
+	refreshFn  func(string) (*model.AdminSession, error)
+	revokeFn   func(string) error
 }
 
-func (s *stubTokenIssuer) Issue(_ context.Context, subject, email string, roles ...string) (string, time.Time, error) {
-	_ = subject
-	_ = email
-	_ = roles
-	if s.err != nil {
-		return "", time.Time{}, s.err
+func (s *stubSessionManager) Create(_ context.Context, principal authsvc.AdminPrincipal) (*model.AdminSession, error) {
+	if s.createFn != nil {
+		return s.createFn(principal)
 	}
-	return s.issuedToken, s.expiresAt, nil
+	return &model.AdminSession{
+		ID:        "stub-session",
+		TokenHash: "hash",
+		Email:     principal.Email,
+		Roles:     principal.Roles,
+		ExpiresAt: time.Now().Add(time.Hour),
+	}, nil
 }
 
-type stubTokenVerifier struct {
-	claims        *authsvc.Claims
-	err           error
-	expectedToken string
+func (s *stubSessionManager) Validate(_ context.Context, sessionID string) (*model.AdminSession, error) {
+	if s.validateFn != nil {
+		return s.validateFn(sessionID)
+	}
+	return &model.AdminSession{
+		ID:        sessionID,
+		TokenHash: "hash",
+		Email:     "admin@example.com",
+		Roles:     []string{"admin"},
+		ExpiresAt: time.Now().Add(30 * time.Minute),
+	}, nil
 }
 
-func (s *stubTokenVerifier) Verify(_ context.Context, token string) (*authsvc.Claims, error) {
-	if s.err != nil {
-		return nil, s.err
+func (s *stubSessionManager) Refresh(_ context.Context, sessionID string) (*model.AdminSession, error) {
+	if s.refreshFn != nil {
+		return s.refreshFn(sessionID)
 	}
-	if s.expectedToken != "" && token != s.expectedToken {
-		return nil, errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "unexpected token", nil)
+	return &model.AdminSession{
+		ID:        sessionID,
+		TokenHash: "hash",
+		Email:     "admin@example.com",
+		Roles:     []string{"admin"},
+		ExpiresAt: time.Now().Add(2 * time.Hour),
+	}, nil
+}
+
+func (s *stubSessionManager) Revoke(_ context.Context, sessionID string) error {
+	if s.revokeFn != nil {
+		return s.revokeFn(sessionID)
 	}
-	return s.claims, nil
+	return nil
+}
+
+func cloneSession(src *model.AdminSession) *model.AdminSession {
+	if src == nil {
+		return nil
+	}
+	dest := *src
+	if src.Roles != nil {
+		dest.Roles = append([]string(nil), src.Roles...)
+	}
+	return &dest
 }

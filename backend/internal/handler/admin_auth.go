@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -10,67 +11,29 @@ import (
 
 	"github.com/takumi/personal-website/internal/config"
 	"github.com/takumi/personal-website/internal/errs"
+	"github.com/takumi/personal-website/internal/repository"
 	authsvc "github.com/takumi/personal-website/internal/service/auth"
 )
 
-type adminSessionCookieOptions struct {
-	name     string
-	domain   string
-	path     string
-	secure   bool
-	httpOnly bool
-	sameSite http.SameSite
-}
-
-func newAdminSessionCookieOptions(cfg config.AdminAuthConfig) adminSessionCookieOptions {
-	name := strings.TrimSpace(cfg.SessionCookieName)
-	if name == "" {
-		name = "ps_admin_jwt"
-	}
-
-	path := strings.TrimSpace(cfg.SessionCookiePath)
-	if path == "" {
-		path = "/"
-	}
-
-	return adminSessionCookieOptions{
-		name:     name,
-		domain:   strings.TrimSpace(cfg.SessionCookieDomain),
-		path:     path,
-		secure:   cfg.SessionCookieSecure,
-		httpOnly: cfg.SessionCookieHTTPOnly,
-		sameSite: parseSameSite(cfg.SessionCookieSameSite),
-	}
-}
-
-func parseSameSite(value string) http.SameSite {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "strict":
-		return http.SameSiteStrictMode
-	case "none":
-		return http.SameSiteNoneMode
-	case "lax":
-		return http.SameSiteLaxMode
-	default:
-		return http.SameSiteLaxMode
-	}
-}
-
 // AdminAuthHandler exposes admin-specific OAuth login endpoints.
 type AdminAuthHandler struct {
-	service   authsvc.AdminService
-	issuer    authsvc.TokenIssuer
-	verifier  authsvc.TokenVerifier
-	cookieCfg adminSessionCookieOptions
+	service       authsvc.AdminService
+	sessions      authsvc.AdminSessionManager
+	cookieCfg     authsvc.CookieOptions
+	refreshWindow time.Duration
 }
 
 // NewAdminAuthHandler constructs the handler with the provided service.
-func NewAdminAuthHandler(service authsvc.AdminService, issuer authsvc.TokenIssuer, verifier authsvc.TokenVerifier, authCfg config.AuthConfig) *AdminAuthHandler {
+func NewAdminAuthHandler(service authsvc.AdminService, sessions authsvc.AdminSessionManager, authCfg config.AuthConfig) *AdminAuthHandler {
+	refreshWindow := authCfg.Admin.SessionRefreshWindow
+	if refreshWindow <= 0 {
+		refreshWindow = 20 * time.Minute
+	}
 	return &AdminAuthHandler{
-		service:   service,
-		issuer:    issuer,
-		verifier:  verifier,
-		cookieCfg: newAdminSessionCookieOptions(authCfg.Admin),
+		service:       service,
+		sessions:      sessions,
+		cookieCfg:     authsvc.NewCookieOptions(authCfg.Admin),
+		refreshWindow: refreshWindow,
 	}
 }
 
@@ -113,108 +76,92 @@ func (h *AdminAuthHandler) Callback(c *gin.Context) {
 		return
 	}
 
-	if strings.TrimSpace(result.Token) != "" {
-		expires := time.Unix(result.ExpiresAt, 0)
-		setAdminSessionCookie(c.Writer, result.Token, expires, h.cookieCfg)
+	if strings.TrimSpace(result.SessionID) != "" {
+		expires := time.Unix(result.ExpiresAt, 0).UTC()
+		h.cookieCfg.Write(c.Writer, result.SessionID, expires)
 	}
 
 	c.Header("Cache-Control", "no-store")
-	target := buildAdminRedirect(result.RedirectPath, result.Token)
+	target := buildAdminRedirect(result.RedirectPath)
 	c.Redirect(http.StatusTemporaryRedirect, target)
 }
 
-// Session validates the current administrator session and refreshes JWT/Cookie when appropriate.
+// Session validates the current administrator session and refreshes the cookie when appropriate.
 func (h *AdminAuthHandler) Session(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	authHeader := c.GetHeader("Authorization")
-	token := extractBearerToken(authHeader)
+	sessionID := extractBearerToken(authHeader)
 	tokenSource := "header"
-	if token == "" {
-		if cookieName := strings.TrimSpace(h.cookieCfg.name); cookieName != "" {
+	if sessionID == "" {
+		if cookieName := strings.TrimSpace(h.cookieCfg.Name); cookieName != "" {
 			if cookie, err := c.Cookie(cookieName); err == nil {
-				token = strings.TrimSpace(cookie)
+				sessionID = strings.TrimSpace(cookie)
 				tokenSource = "cookie"
 			}
-		} else if cookie, err := c.Cookie("ps_admin_jwt"); err == nil {
-			token = strings.TrimSpace(cookie)
+		} else if cookie, err := c.Cookie("ps_admin_session"); err == nil {
+			sessionID = strings.TrimSpace(cookie)
 			tokenSource = "cookie"
 		}
 	}
 
-	if strings.TrimSpace(token) == "" {
-		respondError(c, errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "missing token", nil))
+	if strings.TrimSpace(sessionID) == "" {
+		h.cookieCfg.Clear(c.Writer)
+		respondError(c, errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "missing session", nil))
 		return
 	}
 
-	if h.verifier == nil {
-		respondError(c, errs.New(errs.CodeInternal, http.StatusInternalServerError, "token verifier not configured", nil))
+	if h.sessions == nil {
+		respondError(c, errs.New(errs.CodeInternal, http.StatusInternalServerError, "session manager not configured", nil))
 		return
 	}
 
-	claims, err := h.verifier.Verify(ctx, token)
+	session, err := h.sessions.Validate(ctx, sessionID)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			h.cookieCfg.Clear(c.Writer)
+			respondError(c, errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "invalid session", nil))
+			return
+		}
 		respondError(c, err)
 		return
 	}
-	if claims == nil {
-		respondError(c, errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "invalid token", nil))
-		return
-	}
 
-	refreshedToken := ""
-	expiresAt := claims.ExpiresAt
-
-	shouldRefresh := tokenSource != "header"
-	if !shouldRefresh && !claims.ExpiresAt.IsZero() {
-		const refreshWindow = 10 * time.Minute
-		if time.Until(claims.ExpiresAt) <= refreshWindow {
-			shouldRefresh = true
-		}
-	}
-
+	shouldRefresh := time.Until(session.ExpiresAt) <= h.refreshWindow
 	if shouldRefresh {
-		if h.issuer == nil {
-			respondError(c, errs.New(errs.CodeInternal, http.StatusInternalServerError, "token issuer not configured", nil))
+		refreshed, refreshErr := h.sessions.Refresh(ctx, sessionID)
+		if refreshErr != nil {
+			if errors.Is(refreshErr, repository.ErrNotFound) {
+				h.cookieCfg.Clear(c.Writer)
+				respondError(c, errs.New(errs.CodeUnauthorized, http.StatusUnauthorized, "session expired", nil))
+				return
+			}
+			respondError(c, refreshErr)
 			return
 		}
-		issuedToken, issuedExpiry, issueErr := h.issuer.Issue(ctx, claims.Subject, claims.Email, claims.Roles...)
-		if issueErr != nil {
-			respondError(c, issueErr)
-			return
-		}
-		refreshedToken = issuedToken
-		expiresAt = issuedExpiry
-		setAdminSessionCookie(c.Writer, issuedToken, issuedExpiry, h.cookieCfg)
-	} else if tokenSource == "cookie" {
-		// Provide the existing cookie token to the SPA when rehydrating without Authorization headers.
-		refreshedToken = token
+		session = refreshed
 	}
 
+	h.cookieCfg.Write(c.Writer, session.ID, session.ExpiresAt.UTC())
 	c.Header("Cache-Control", "no-store")
 
-	response := gin.H{
-		"data": gin.H{
-			"active":    true,
-			"expiresAt": expiresAt.Unix(),
-		},
-	}
-	if refreshedToken != "" {
-		response["data"].(gin.H)["token"] = refreshedToken
-	}
-
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, gin.H{
+		"active":    true,
+		"expiresAt": session.ExpiresAt.Unix(),
+		"email":     session.Email,
+		"roles":     session.Roles,
+		"source":    tokenSource,
+		"refreshed": shouldRefresh,
+	})
 }
 
-func buildAdminRedirect(path, token string) string {
+func buildAdminRedirect(path string) string {
 	stripped := strings.TrimSpace(path)
 	if strings.Contains(stripped, "#") {
 		parts := strings.SplitN(stripped, "#", 2)
 		stripped = parts[0]
 	}
-	normalized := normalizeAdminRedirectLocation(stripped)
-	fragment := "token=" + url.QueryEscape(token)
-	return normalized + "#" + fragment
+	return normalizeAdminRedirectLocation(stripped)
 }
 
 func normalizeAdminRedirectLocation(path string) string {
@@ -248,42 +195,6 @@ func ensureAdminRedirectPath(path string) string {
 		return "/admin/"
 	}
 	return cleaned
-}
-
-func setAdminSessionCookie(w http.ResponseWriter, token string, expires time.Time, opts adminSessionCookieOptions) {
-	if strings.TrimSpace(token) == "" {
-		return
-	}
-
-	name := strings.TrimSpace(opts.name)
-	if name == "" {
-		name = "ps_admin_jwt"
-	}
-
-	path := strings.TrimSpace(opts.path)
-	if path == "" {
-		path = "/"
-	}
-
-	cookie := &http.Cookie{
-		Name:     name,
-		Value:    token,
-		Path:     path,
-		HttpOnly: opts.httpOnly,
-		Secure:   opts.secure,
-		SameSite: opts.sameSite,
-	}
-
-	if domain := strings.TrimSpace(opts.domain); domain != "" {
-		cookie.Domain = domain
-	}
-
-	if !expires.IsZero() && expires.After(time.Now()) {
-		cookie.Expires = expires
-		cookie.MaxAge = int(time.Until(expires).Seconds())
-	}
-
-	http.SetCookie(w, cookie)
 }
 
 func extractBearerToken(header string) string {

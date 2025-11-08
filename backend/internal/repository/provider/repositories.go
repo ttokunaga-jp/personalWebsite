@@ -128,6 +128,14 @@ func NewAdminProjectRepository(repo repository.ProjectRepository) repository.Adm
 	panic("project repository does not implement admin interface")
 }
 
+// NewAdminSessionRepository constructs the administrative session repository.
+func NewAdminSessionRepository(db *sqlx.DB) repository.AdminSessionRepository {
+	if db == nil {
+		return nil
+	}
+	return repoMySQL.NewAdminSessionRepository(db)
+}
+
 // NewResearchRepository selects an appropriate research repository implementation.
 func NewResearchRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.ResearchRepository {
 	switch {

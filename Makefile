@@ -6,7 +6,7 @@ DOCKER_COMPOSE ?= docker compose
 GCLOUD ?= gcloud
 CLOUD_BUILD_CONFIG ?= deploy/cloudbuild/cloudbuild.yaml
 
-.PHONY: deps deps-backend deps-frontend lint lint-backend lint-frontend test test-backend test-frontend test-perf build build-backend build-frontend fmt fmt-backend fmt-frontend ci cloudbuild up up-detached stop down clean smoke-backend db-verify db-migrate-refactor
+.PHONY: deps deps-backend deps-frontend lint lint-backend lint-frontend test test-backend test-frontend test-perf build build-backend build-frontend fmt fmt-backend fmt-frontend ci cloudbuild up up-detached stop down clean smoke-backend db-verify db-migrate-refactor ops-validate
 
 deps: deps-backend deps-frontend
 
@@ -108,3 +108,6 @@ db-verify:
 
 db-migrate-refactor:
 	cd backend && $(GO) run ./cmd/tools/contentmodelrefactor --dsn "$${APP_DATABASE_DSN:?set APP_DATABASE_DSN}" --dry-run
+
+ops-validate:
+	./scripts/ops/validate.sh

@@ -210,8 +210,11 @@ export const adminApi: AdminApi = {
     unwrap(
       apiClient.get<{
         active: boolean;
-        token?: string;
         expiresAt?: number;
+        email?: string;
+        roles?: string[];
+        source?: string;
+        refreshed?: boolean;
       }>("/admin/auth/session"),
     ),
 };

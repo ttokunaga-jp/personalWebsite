@@ -42,6 +42,9 @@ export const defaultHandlers = [
   http.get("/api/v1/public/contact/config", () =>
     HttpResponse.json({ data: contactConfigFixture }),
   ),
+  http.get("/api/admin/auth/session", () =>
+    HttpResponse.json({ active: false }),
+  ),
   http.post("/api/v1/public/contact/bookings", async ({ request }) => {
     const payload = (await request.json()) as CreateBookingPayload;
     const result: BookingResult = {

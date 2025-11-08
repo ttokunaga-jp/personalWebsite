@@ -62,11 +62,13 @@ func TestRegisterRoutes(t *testing.T) {
 	appCfg := &config.AppConfig{
 		Auth: config.AuthConfig{
 			Admin: config.AdminAuthConfig{
-				SessionCookieName:     "ps_admin_jwt",
+				SessionCookieName:     "ps_admin_session",
 				SessionCookiePath:     "/",
 				SessionCookieHTTPOnly: true,
 				SessionCookieSecure:   true,
-				SessionCookieSameSite: "lax",
+				SessionCookieSameSite: "strict",
+				SessionTTL:            time.Hour,
+				SessionRefreshWindow:  15 * time.Minute,
 			},
 		},
 		Contact: config.ContactConfig{
@@ -77,14 +79,7 @@ func TestRegisterRoutes(t *testing.T) {
 		},
 	}
 
-	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
-		JWTSecret:        "test-secret",
-		Issuer:           "personal-website",
-		Audience:         []string{"personal-website-admin"},
-		ClockSkewSeconds: 30,
-		Disabled:         true,
-	})
-	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier, appCfg.Auth)
+	sessionManager := &stubSessionManager{}
 	adminSvc := &stubAdminService{}
 
 	registerRoutes(
@@ -96,8 +91,8 @@ func TestRegisterRoutes(t *testing.T) {
 		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
-		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}, appCfg.Auth),
-		jwtMiddleware,
+		handler.NewAdminAuthHandler(&stubAdminAuthService{}, sessionManager, appCfg.Auth),
+		middleware.NewAdminSessionMiddleware(sessionManager, appCfg.Auth),
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
 		nil,
@@ -434,11 +429,13 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 	appCfg := &config.AppConfig{
 		Auth: config.AuthConfig{
 			Admin: config.AdminAuthConfig{
-				SessionCookieName:     "ps_admin_jwt",
+				SessionCookieName:     "ps_admin_session",
 				SessionCookiePath:     "/",
 				SessionCookieHTTPOnly: true,
 				SessionCookieSecure:   true,
-				SessionCookieSameSite: "lax",
+				SessionCookieSameSite: "strict",
+				SessionTTL:            time.Hour,
+				SessionRefreshWindow:  10 * time.Minute,
 			},
 		},
 		Contact: config.ContactConfig{
@@ -449,14 +446,7 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 		},
 	}
 
-	jwtVerifier := auth.NewJWTVerifier(config.AuthConfig{
-		JWTSecret:        "test-jwt-secret",
-		Issuer:           "personal-website",
-		Audience:         []string{"personal-website-admin"},
-		ClockSkewSeconds: 30,
-		Disabled:         true,
-	})
-	jwtMiddleware := middleware.NewJWTMiddleware(jwtVerifier, appCfg.Auth)
+	sessionManager := &stubSessionManager{}
 	adminSvc := &stubAdminService{}
 	securityHandler := handler.NewSecurityHandler(csrfManager, cfg)
 
@@ -469,8 +459,8 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 		handler.NewContactHandler(contactSvc, availabilitySvc, appCfg),
 		handler.NewBookingHandler(&stubBookingService{}),
 		handler.NewAuthHandler(&stubAuthService{}),
-		handler.NewAdminAuthHandler(&stubAdminAuthService{}, &stubTokenIssuer{}, &stubTokenVerifier{}, appCfg.Auth),
-		jwtMiddleware,
+		handler.NewAdminAuthHandler(&stubAdminAuthService{}, sessionManager, appCfg.Auth),
+		middleware.NewAdminSessionMiddleware(sessionManager, appCfg.Auth),
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
 		securityHandler,
@@ -511,27 +501,48 @@ func (s *stubAdminAuthService) StartLogin(context.Context, string) (*auth.AdminL
 
 func (s *stubAdminAuthService) HandleCallback(context.Context, string, string) (*auth.AdminCallbackResult, error) {
 	return &auth.AdminCallbackResult{
-		Token:        "admin-stub-token",
-		ExpiresAt:    456,
+		SessionID:    "admin-session-stub",
+		ExpiresAt:    time.Now().Add(time.Hour).Unix(),
 		RedirectPath: "/admin/",
+		Email:        "admin@example.com",
+		Roles:        []string{"admin"},
 	}, nil
 }
 
-type stubTokenIssuer struct{}
+type stubSessionManager struct{}
 
-func (s *stubTokenIssuer) Issue(context.Context, string, string, ...string) (string, time.Time, error) {
-	return "stub-issued-token", time.Now().Add(time.Hour), nil
-}
-
-type stubTokenVerifier struct{}
-
-func (s *stubTokenVerifier) Verify(context.Context, string) (*auth.Claims, error) {
-	return &auth.Claims{
-		Subject:   "stub-admin",
-		Email:     "stub@example.com",
+func (s *stubSessionManager) Create(context.Context, auth.AdminPrincipal) (*model.AdminSession, error) {
+	return &model.AdminSession{
+		ID:        "admin-session-stub",
+		TokenHash: "hash",
+		Email:     "admin@example.com",
 		Roles:     []string{"admin"},
 		ExpiresAt: time.Now().Add(time.Hour),
 	}, nil
+}
+
+func (s *stubSessionManager) Validate(context.Context, string) (*model.AdminSession, error) {
+	return &model.AdminSession{
+		ID:        "admin-session-stub",
+		TokenHash: "hash",
+		Email:     "admin@example.com",
+		Roles:     []string{"admin"},
+		ExpiresAt: time.Now().Add(time.Hour),
+	}, nil
+}
+
+func (s *stubSessionManager) Refresh(context.Context, string) (*model.AdminSession, error) {
+	return &model.AdminSession{
+		ID:        "admin-session-stub",
+		TokenHash: "hash",
+		Email:     "admin@example.com",
+		Roles:     []string{"admin"},
+		ExpiresAt: time.Now().Add(2 * time.Hour),
+	}, nil
+}
+
+func (s *stubSessionManager) Revoke(context.Context, string) error {
+	return nil
 }
 
 type stubAvailabilityService struct {

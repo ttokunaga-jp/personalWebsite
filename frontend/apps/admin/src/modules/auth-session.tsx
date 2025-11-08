@@ -4,6 +4,7 @@ import {
 } from "@shared/lib/api-client";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -11,101 +12,43 @@ import {
   type ReactNode,
 } from "react";
 
-const TOKEN_STORAGE_KEY = "admin.jwt";
-
-type AuthTokenListener = (token: string | null) => void;
-
-const listeners = new Set<AuthTokenListener>();
-
-let cachedToken: string | null = null;
-let initialized = false;
-
-function readToken(): string | null {
-  if (!initialized) {
-    initialized = true;
-    if (typeof window !== "undefined") {
-      cachedToken = window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
-    } else {
-      cachedToken = null;
-    }
-  }
-  return cachedToken;
-}
-
-function persistToken(next: string | null): void {
-  cachedToken = next;
-  if (typeof window !== "undefined") {
-    if (next) {
-      window.sessionStorage.setItem(TOKEN_STORAGE_KEY, next);
-    } else {
-      window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-    }
-  }
-  listeners.forEach((listener) => listener(cachedToken));
-}
-
-function subscribe(listener: AuthTokenListener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-export function getToken(): string | null {
-  return readToken();
-}
-
-export function setToken(token: string): void {
-  persistToken(token.trim().length > 0 ? token : null);
-}
-
-export function clearToken(): void {
-  persistToken(null);
-}
-
-export function extractTokenFromHash(hash: string): string | null {
-  if (typeof hash !== "string" || hash.length === 0 || hash === "#") {
-    return null;
-  }
-
-  let trimmed = hash;
-  while (trimmed.startsWith("#")) {
-    trimmed = trimmed.slice(1);
-  }
-  const params = new URLSearchParams(trimmed);
-  const token = params.get("token");
-  if (!token) {
-    return null;
-  }
-
-  const normalized = token.trim();
-  return normalized.length > 0 ? normalized : null;
-}
+export type AdminSessionInfo = {
+  active: boolean;
+  email?: string;
+  roles?: string[];
+  expiresAt?: number;
+  source?: string;
+  refreshed?: boolean;
+};
 
 type AuthSessionContextValue = {
-  token: string | null;
-  setToken: (token: string) => void;
-  clearToken: () => void;
+  session: AdminSessionInfo | null;
+  setSession: (info: AdminSessionInfo | null) => void;
+  clearSession: () => void;
 };
 
 const AuthSessionContext = createContext<AuthSessionContextValue | undefined>(
   undefined,
 );
 
+let currentSession: AdminSessionInfo | null = null;
+
+export function getSession(): AdminSessionInfo | null {
+  return currentSession;
+}
+
 export function AuthSessionProvider({
   children,
 }: {
   readonly children: ReactNode;
 }): JSX.Element {
-  const [token, setTokenState] = useState<string | null>(() => getToken());
+  const [session, setSessionState] = useState<AdminSessionInfo | null>(null);
 
   useEffect(() => {
-    setTokenState(getToken());
-    return subscribe((nextToken) => setTokenState(nextToken));
-  }, []);
-
-  useEffect(() => {
-    registerAuthTokenProvider(() => getToken());
+    registerAuthTokenProvider(() => null);
     registerAuthTokenInvalidator(() => {
-      clearToken();
+      setSessionState(null);
+      currentSession = null;
     });
     return () => {
       registerAuthTokenProvider(null);
@@ -113,13 +56,23 @@ export function AuthSessionProvider({
     };
   }, []);
 
+  const setSession = useCallback((info: AdminSessionInfo | null) => {
+    currentSession = info;
+    setSessionState(info);
+  }, []);
+
+  const clearSession = useCallback(() => {
+    currentSession = null;
+    setSessionState(null);
+  }, []);
+
   const value = useMemo<AuthSessionContextValue>(
     () => ({
-      token,
-      setToken,
-      clearToken,
+      session,
+      setSession,
+      clearSession,
     }),
-    [token],
+    [session, setSession, clearSession],
   );
 
   return (

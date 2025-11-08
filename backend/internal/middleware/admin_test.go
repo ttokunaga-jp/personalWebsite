@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 
-	"github.com/takumi/personal-website/internal/service/auth"
+	"github.com/takumi/personal-website/internal/model"
 )
 
 func TestAdminGuardRequireAdmin(t *testing.T) {
@@ -18,7 +18,7 @@ func TestAdminGuardRequireAdmin(t *testing.T) {
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set(ContextClaimsKey, &auth.Claims{Roles: []string{"admin"}})
+		c.Set(ContextSessionKey, &model.AdminSession{Roles: []string{"admin"}})
 	})
 	router.Use(guard.RequireAdmin())
 	router.GET("/secure", func(c *gin.Context) {
@@ -39,7 +39,7 @@ func TestAdminGuardRequireAdminForbidden(t *testing.T) {
 	guard := NewAdminGuard()
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set(ContextClaimsKey, &auth.Claims{Roles: []string{"viewer"}})
+		c.Set(ContextSessionKey, &model.AdminSession{Roles: []string{"viewer"}})
 	})
 	router.Use(guard.RequireAdmin())
 	router.GET("/secure", func(c *gin.Context) {

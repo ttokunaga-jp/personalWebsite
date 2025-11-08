@@ -299,3 +299,21 @@ CREATE TABLE IF NOT EXISTS schedule_blackouts (
   end_time DATETIME(3) NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 管理者セッション
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  session_id_hash CHAR(64) NOT NULL UNIQUE,
+  subject VARCHAR(255) NOT NULL,
+  email VARCHAR(320) NOT NULL,
+  roles JSON NOT NULL,
+  user_agent VARCHAR(512) NULL,
+  ip_address VARCHAR(45) NULL,
+  expires_at DATETIME(3) NOT NULL,
+  last_accessed_at DATETIME(3) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  revoked_at DATETIME(3) NULL,
+  INDEX idx_admin_sessions_expires (expires_at),
+  INDEX idx_admin_sessions_last_accessed (last_accessed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

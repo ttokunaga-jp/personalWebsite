@@ -115,6 +115,28 @@ export type ContactMessage = {
   updatedAt: string;
 };
 
+export type ContactTopic = {
+  id: string;
+  label: LocalizedText;
+  description: LocalizedText;
+};
+
+export type ContactFormSettings = {
+  id: number;
+  heroTitle: LocalizedText;
+  heroDescription: LocalizedText;
+  topics: ContactTopic[];
+  consentText: LocalizedText;
+  minimumLeadHours: number;
+  recaptchaSiteKey: string;
+  supportEmail: string;
+  calendarTimezone: string;
+  googleCalendarId: string;
+  bookingWindowDays: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type BlacklistEntry = {
   id: number;
   email: string;

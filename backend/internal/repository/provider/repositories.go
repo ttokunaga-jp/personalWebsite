@@ -87,6 +87,14 @@ func NewContactFormSettingsRepository(db *sqlx.DB, client *firestore.Client, cfg
 	}
 }
 
+// NewAdminContactFormSettingsRepository exposes administrative operations for contact settings.
+func NewAdminContactFormSettingsRepository(repo repository.ContactFormSettingsRepository) repository.AdminContactSettingsRepository {
+	if adminRepo, ok := repo.(repository.AdminContactSettingsRepository); ok {
+		return adminRepo
+	}
+	panic("contact form settings repository does not implement admin interface")
+}
+
 // NewHomePageConfigRepository loads home page configuration aggregates.
 func NewHomePageConfigRepository(db *sqlx.DB, client *firestore.Client, cfg *config.AppConfig) repository.HomePageConfigRepository {
 	switch {

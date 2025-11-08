@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/takumi/personal-website/internal/errs"
 	"github.com/takumi/personal-website/internal/model"
 	"github.com/takumi/personal-website/internal/repository"
+	"github.com/takumi/personal-website/internal/service/support"
 )
 
 // Service exposes administrative operations across content domains.
@@ -34,6 +36,9 @@ type Service interface {
 	UpdateContactMessage(ctx context.Context, id string, input ContactUpdateInput) (*model.ContactMessage, error)
 	DeleteContactMessage(ctx context.Context, id string) error
 
+	GetContactSettings(ctx context.Context) (*model.ContactFormSettingsV2, error)
+	UpdateContactSettings(ctx context.Context, input ContactSettingsInput) (*model.ContactFormSettingsV2, error)
+
 	ListBlacklist(ctx context.Context) ([]model.BlacklistEntry, error)
 	AddBlacklistEntry(ctx context.Context, input BlacklistInput) (*model.BlacklistEntry, error)
 	UpdateBlacklistEntry(ctx context.Context, id int64, input BlacklistInput) (*model.BlacklistEntry, error)
@@ -50,6 +55,7 @@ type service struct {
 	projects    repository.AdminProjectRepository
 	research    repository.AdminResearchRepository
 	contacts    repository.AdminContactRepository
+	contactCfg  repository.AdminContactSettingsRepository
 	blacklist   repository.BlacklistRepository
 	techCatalog repository.TechCatalogRepository
 }
@@ -60,10 +66,11 @@ func NewService(
 	projects repository.AdminProjectRepository,
 	research repository.AdminResearchRepository,
 	contacts repository.AdminContactRepository,
+	contactCfg repository.AdminContactSettingsRepository,
 	blacklist repository.BlacklistRepository,
 	techCatalog repository.TechCatalogRepository,
 ) (Service, error) {
-	if profile == nil || projects == nil || research == nil || contacts == nil || blacklist == nil || techCatalog == nil {
+	if profile == nil || projects == nil || research == nil || contacts == nil || contactCfg == nil || blacklist == nil || techCatalog == nil {
 		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "admin service: missing dependencies", nil)
 	}
 
@@ -72,6 +79,7 @@ func NewService(
 		projects:    projects,
 		research:    research,
 		contacts:    contacts,
+		contactCfg:  contactCfg,
 		blacklist:   blacklist,
 		techCatalog: techCatalog,
 	}, nil
@@ -339,6 +347,28 @@ func normalizeResearchTech(entryID uint64, inputs []ResearchTechInput) []model.T
 	return result
 }
 
+func normalizeContactTopics(inputs []ContactTopicInput) []model.ContactTopicV2 {
+	if len(inputs) == 0 {
+		return nil
+	}
+	result := make([]model.ContactTopicV2, 0, len(inputs))
+	for _, item := range inputs {
+		id := strings.TrimSpace(item.ID)
+		if id == "" {
+			continue
+		}
+		result = append(result, model.ContactTopicV2{
+			ID:          id,
+			Label:       normalizeLocalized(item.Label),
+			Description: normalizeLocalized(item.Description),
+		})
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
 func isValidResearchKind(kind model.ResearchKind) bool {
 	switch kind {
 	case model.ResearchKindResearch, model.ResearchKindBlog:
@@ -465,6 +495,29 @@ type ContactUpdateInput struct {
 	AdminNote string
 }
 
+// ContactSettingsInput captures administrator-provided contact configuration data.
+type ContactSettingsInput struct {
+	ID                uint64
+	HeroTitle         model.LocalizedText
+	HeroDescription   model.LocalizedText
+	Topics            []ContactTopicInput
+	ConsentText       model.LocalizedText
+	MinimumLeadHours  int
+	RecaptchaSiteKey  string
+	SupportEmail      string
+	CalendarTimezone  string
+	GoogleCalendarID  string
+	BookingWindowDays int
+	ExpectedUpdatedAt time.Time
+}
+
+// ContactTopicInput represents a configurable contact topic row.
+type ContactTopicInput struct {
+	ID          string
+	Label       model.LocalizedText
+	Description model.LocalizedText
+}
+
 func (s *service) ListContactMessages(ctx context.Context) ([]model.ContactMessage, error) {
 	return s.contacts.ListContactMessages(ctx)
 }
@@ -490,6 +543,40 @@ func (s *service) UpdateContactMessage(ctx context.Context, id string, input Con
 
 func (s *service) DeleteContactMessage(ctx context.Context, id string) error {
 	return s.contacts.DeleteContactMessage(ctx, strings.TrimSpace(id))
+}
+
+func (s *service) GetContactSettings(ctx context.Context) (*model.ContactFormSettingsV2, error) {
+	settings, err := s.contactCfg.GetContactFormSettings(ctx)
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "contact settings")
+	}
+	return settings, nil
+}
+
+func (s *service) UpdateContactSettings(ctx context.Context, input ContactSettingsInput) (*model.ContactFormSettingsV2, error) {
+	if err := validateContactSettingsInput(input); err != nil {
+		return nil, err
+	}
+
+	document := &model.ContactFormSettingsV2{
+		ID:                input.ID,
+		HeroTitle:         normalizeLocalized(input.HeroTitle),
+		HeroDescription:   normalizeLocalized(input.HeroDescription),
+		Topics:            normalizeContactTopics(input.Topics),
+		ConsentText:       normalizeLocalized(input.ConsentText),
+		MinimumLeadHours:  input.MinimumLeadHours,
+		RecaptchaSiteKey:  strings.TrimSpace(input.RecaptchaSiteKey),
+		SupportEmail:      strings.TrimSpace(input.SupportEmail),
+		CalendarTimezone:  strings.TrimSpace(input.CalendarTimezone),
+		GoogleCalendarID:  strings.TrimSpace(input.GoogleCalendarID),
+		BookingWindowDays: input.BookingWindowDays,
+	}
+
+	updated, err := s.contactCfg.UpdateContactFormSettings(ctx, document, input.ExpectedUpdatedAt.UTC())
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "contact settings")
+	}
+	return updated, nil
 }
 
 // BlacklistInput captures email blocking requests.
@@ -721,6 +808,57 @@ func validateContactUpdateInput(input ContactUpdateInput) error {
 		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "contact status is required", nil)
 	default:
 		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid contact status", nil)
+	}
+	return nil
+}
+
+func validateContactSettingsInput(input ContactSettingsInput) error {
+	if input.ID == 0 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "contact settings id is required", nil)
+	}
+	if input.ExpectedUpdatedAt.IsZero() {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "updatedAt is required", nil)
+	}
+	hero := normalizeLocalized(input.HeroTitle)
+	if strings.TrimSpace(hero.Ja) == "" && strings.TrimSpace(hero.En) == "" {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "hero title is required", nil)
+	}
+	consent := normalizeLocalized(input.ConsentText)
+	if strings.TrimSpace(consent.Ja) == "" && strings.TrimSpace(consent.En) == "" {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "consent text is required", nil)
+	}
+	if input.MinimumLeadHours < 0 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "minimumLeadHours must be zero or greater", nil)
+	}
+	if input.BookingWindowDays < 1 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "bookingWindowDays must be at least 1", nil)
+	}
+	if strings.TrimSpace(input.SupportEmail) == "" {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "supportEmail is required", nil)
+	}
+	if strings.TrimSpace(input.CalendarTimezone) == "" {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "calendarTimezone is required", nil)
+	}
+	if len(input.Topics) == 0 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "at least one topic is required", nil)
+	}
+	seen := make(map[string]struct{}, len(input.Topics))
+	for _, topic := range input.Topics {
+		id := strings.TrimSpace(topic.ID)
+		if id == "" {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "topic id is required", nil)
+		}
+		if utf8.RuneCountInString(id) > 32 {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "topic id must be 32 characters or fewer", nil)
+		}
+		if _, exists := seen[id]; exists {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "topic ids must be unique", nil)
+		}
+		seen[id] = struct{}{}
+		label := normalizeLocalized(topic.Label)
+		if strings.TrimSpace(label.Ja) == "" && strings.TrimSpace(label.En) == "" {
+			return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "topic label is required in at least one language", nil)
+		}
 	}
 	return nil
 }

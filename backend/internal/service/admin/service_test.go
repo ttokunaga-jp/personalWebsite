@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/takumi/personal-website/internal/errs"
 	"github.com/takumi/personal-website/internal/model"
 	"github.com/takumi/personal-website/internal/repository"
 	"github.com/takumi/personal-website/internal/repository/inmemory"
@@ -119,6 +120,57 @@ func TestService_UpdateContactMessageInvalidStatus(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestService_UpdateContactSettings(t *testing.T) {
+	t.Parallel()
+
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	current, err := svc.GetContactSettings(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, current)
+
+	topics := make([]ContactTopicInput, 0, len(current.Topics))
+	if len(current.Topics) == 0 {
+		topics = append(topics, ContactTopicInput{
+			ID:    "general",
+			Label: model.NewLocalizedText("一般", "General"),
+		})
+	} else {
+		first := current.Topics[0]
+		topics = append(topics, ContactTopicInput{
+			ID:          first.ID,
+			Label:       first.Label,
+			Description: first.Description,
+		})
+	}
+
+	input := ContactSettingsInput{
+		ID:                current.ID,
+		HeroTitle:         model.NewLocalizedText("更新後タイトル", "Updated Title"),
+		HeroDescription:   current.HeroDescription,
+		Topics:            topics,
+		ConsentText:       current.ConsentText,
+		MinimumLeadHours:  current.MinimumLeadHours + 1,
+		RecaptchaSiteKey:  current.RecaptchaSiteKey,
+		SupportEmail:      current.SupportEmail,
+		CalendarTimezone:  current.CalendarTimezone,
+		GoogleCalendarID:  current.GoogleCalendarID,
+		BookingWindowDays: current.BookingWindowDays,
+		ExpectedUpdatedAt: current.UpdatedAt,
+	}
+
+	updated, err := svc.UpdateContactSettings(ctx, input)
+	require.NoError(t, err)
+	require.Equal(t, "更新後タイトル", updated.HeroTitle.Ja)
+	require.NotEqual(t, current.UpdatedAt, updated.UpdatedAt)
+
+	_, err = svc.UpdateContactSettings(ctx, input)
+	require.Error(t, err)
+	appErr := errs.From(err)
+	require.Equal(t, errs.CodeConflict, appErr.Code)
+}
+
 func newTestService(t *testing.T) Service {
 	profileRepo := inmemory.NewProfileRepository()
 	adminProfileRepo, ok := profileRepo.(repository.AdminProfileRepository)
@@ -144,10 +196,24 @@ func newTestService(t *testing.T) Service {
 		t.Fatalf("contact repository missing admin interface")
 	}
 
+	contactSettingsRepo := inmemory.NewContactFormSettingsRepository()
+	adminContactSettingsRepo, ok := contactSettingsRepo.(repository.AdminContactSettingsRepository)
+	if !ok {
+		t.Fatalf("contact settings repository missing admin interface")
+	}
+
 	bl := inmemory.NewBlacklistRepository()
 	techCatalog := inmemory.NewTechCatalogRepository()
 
-	svc, err := NewService(adminProfileRepo, adminProjectRepo, adminResearchRepo, adminContactRepo, bl, techCatalog)
+	svc, err := NewService(
+		adminProfileRepo,
+		adminProjectRepo,
+		adminResearchRepo,
+		adminContactRepo,
+		adminContactSettingsRepo,
+		bl,
+		techCatalog,
+	)
 	require.NoError(t, err)
 
 	return svc

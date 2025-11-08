@@ -71,6 +71,12 @@ type AdminContactRepository interface {
 	DeleteContactMessage(ctx context.Context, id string) error
 }
 
+// AdminContactSettingsRepository exposes CRUD operations for contact form configuration.
+type AdminContactSettingsRepository interface {
+	GetContactFormSettings(ctx context.Context) (*model.ContactFormSettingsV2, error)
+	UpdateContactFormSettings(ctx context.Context, settings *model.ContactFormSettingsV2, expectedUpdatedAt time.Time) (*model.ContactFormSettingsV2, error)
+}
+
 // BlacklistRepository persists blacklisted emails for booking exclusion.
 type BlacklistRepository interface {
 	ListBlacklistEntries(ctx context.Context) ([]model.BlacklistEntry, error)

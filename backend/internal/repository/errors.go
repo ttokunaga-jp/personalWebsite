@@ -9,4 +9,6 @@ var (
 	ErrInvalidInput = errors.New("repository: invalid input")
 	// ErrDuplicate indicates the entity violates unique constraints.
 	ErrDuplicate = errors.New("repository: duplicate")
+	// ErrConflict indicates a concurrent modification or stale data was supplied.
+	ErrConflict = errors.New("repository: conflict")
 )

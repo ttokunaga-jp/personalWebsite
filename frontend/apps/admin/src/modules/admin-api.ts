@@ -7,6 +7,7 @@ import type {
   AdminResearch,
   AdminSummary,
   BlacklistEntry,
+  ContactFormSettings,
   ContactMessage,
   LocalizedText,
   ResearchKind,
@@ -88,6 +89,25 @@ type BlacklistPayload = {
   reason: string;
 };
 
+type ContactSettingsPayload = {
+  id: number;
+  heroTitle: LocalizedText;
+  heroDescription: LocalizedText;
+  topics: {
+    id: string;
+    label: LocalizedText;
+    description: LocalizedText;
+  }[];
+  consentText: LocalizedText;
+  minimumLeadHours: number;
+  recaptchaSiteKey: string;
+  supportEmail: string;
+  calendarTimezone: string;
+  googleCalendarId: string;
+  bookingWindowDays: number;
+  updatedAt: string;
+};
+
 export class DomainError extends Error {
   readonly status: number;
 
@@ -144,6 +164,10 @@ type AdminApi = {
     payload: ContactUpdatePayload,
   ) => ApiResult<ContactMessage>;
   deleteContact: (id: string) => ApiResult<void>;
+  getContactSettings: () => ApiResult<ContactFormSettings>;
+  updateContactSettings: (
+    payload: ContactSettingsPayload,
+  ) => ApiResult<ContactFormSettings>;
 
   listBlacklist: () => ApiResult<BlacklistEntry[]>;
   createBlacklist: (
@@ -198,6 +222,12 @@ export const adminApi: AdminApi = {
     unwrap(apiClient.put<ContactMessage>(`/admin/contacts/${id}`, payload)),
   deleteContact: (id: string) =>
     unwrap(apiClient.delete<void>(`/admin/contacts/${id}`)),
+  getContactSettings: () =>
+    unwrap(apiClient.get<ContactFormSettings>("/admin/contact-settings")),
+  updateContactSettings: (payload: ContactSettingsPayload) =>
+    unwrap(
+      apiClient.put<ContactFormSettings>("/admin/contact-settings", payload),
+    ),
 
   listBlacklist: () => unwrap(apiClient.get<BlacklistEntry[]>("/admin/blacklist")),
   createBlacklist: (payload: BlacklistPayload) =>

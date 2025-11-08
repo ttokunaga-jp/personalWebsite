@@ -9,6 +9,7 @@ import type {
   AdminResearch,
   AdminSummary,
   BlacklistEntry,
+  ContactFormSettings,
   ContactMessage,
   ContactStatus,
   LocalizedText,
@@ -132,10 +133,90 @@ type ContactEditState = {
   adminNote: string;
 };
 
+type ContactTopicForm = {
+  id: string;
+  labelJa: string;
+  labelEn: string;
+  descriptionJa: string;
+  descriptionEn: string;
+};
+
+type ContactSettingsFormState = {
+  heroTitleJa: string;
+  heroTitleEn: string;
+  heroDescriptionJa: string;
+  heroDescriptionEn: string;
+  consentTextJa: string;
+  consentTextEn: string;
+  minimumLeadHours: string;
+  recaptchaSiteKey: string;
+  supportEmail: string;
+  calendarTimezone: string;
+  googleCalendarId: string;
+  bookingWindowDays: string;
+  topics: ContactTopicForm[];
+};
+
+type NormalizedLocalizedText = {
+  ja: string;
+  en: string;
+};
+
+type ContactSettingsNormalized = {
+  heroTitle: NormalizedLocalizedText;
+  heroDescription: NormalizedLocalizedText;
+  consentText: NormalizedLocalizedText;
+  topics: {
+    id: string;
+    label: NormalizedLocalizedText;
+    description: NormalizedLocalizedText;
+  }[];
+  minimumLeadHours: number;
+  recaptchaSiteKey: string;
+  supportEmail: string;
+  calendarTimezone: string;
+  googleCalendarId: string;
+  bookingWindowDays: number;
+};
+
+type ContactSettingsDiffEntry = {
+  key: string;
+  labelKey: string;
+  original: string;
+  updated: string;
+};
+
+type ContactTopicDiffEntry = {
+  id: string;
+  change: "added" | "removed" | "updated";
+  original?: {
+    label: NormalizedLocalizedText;
+    description: NormalizedLocalizedText;
+  };
+  updated?: {
+    label: NormalizedLocalizedText;
+    description: NormalizedLocalizedText;
+  };
+};
+
+type ContactSettingsDiffSummary = {
+  fields: ContactSettingsDiffEntry[];
+  topics: ContactTopicDiffEntry[];
+};
+
 type AuthState = "checking" | "authenticated" | "unauthorized";
 
 const isUnauthorizedError = (error: unknown): boolean =>
   error instanceof DomainError && error.status === 401;
+
+const getHttpStatus = (error: unknown): number | undefined =>
+  (error as { response?: { status?: number } })?.response?.status;
+
+const isNotFoundError = (error: unknown): boolean =>
+  getHttpStatus(error) === 404;
+
+const isConflictError = (error: unknown): boolean =>
+  getHttpStatus(error) === 409;
 
 const createEmptyProfileForm = (): ProfileFormState => ({
   name: { ja: "", en: "" },
@@ -185,6 +266,383 @@ const createEmptyResearchForm = (): ResearchFormState => ({
 const emptyBlacklistForm: BlacklistFormState = {
   email: "",
   reason: "",
+};
+
+const createEmptyContactSettingsForm = (): ContactSettingsFormState => ({
+  heroTitleJa: "",
+  heroTitleEn: "",
+  heroDescriptionJa: "",
+  heroDescriptionEn: "",
+  consentTextJa: "",
+  consentTextEn: "",
+  minimumLeadHours: "",
+  recaptchaSiteKey: "",
+  supportEmail: "",
+  calendarTimezone: "",
+  googleCalendarId: "",
+  bookingWindowDays: "",
+  topics: [],
+});
+
+const contactSettingsToForm = (
+  settings: ContactFormSettings | null,
+): ContactSettingsFormState => {
+  if (!settings) {
+    return createEmptyContactSettingsForm();
+  }
+  return {
+    heroTitleJa: settings.heroTitle.ja ?? "",
+    heroTitleEn: settings.heroTitle.en ?? "",
+    heroDescriptionJa: settings.heroDescription.ja ?? "",
+    heroDescriptionEn: settings.heroDescription.en ?? "",
+    consentTextJa: settings.consentText.ja ?? "",
+    consentTextEn: settings.consentText.en ?? "",
+    minimumLeadHours: String(settings.minimumLeadHours),
+    recaptchaSiteKey: settings.recaptchaSiteKey ?? "",
+    supportEmail: settings.supportEmail ?? "",
+    calendarTimezone: settings.calendarTimezone ?? "",
+    googleCalendarId: settings.googleCalendarId ?? "",
+    bookingWindowDays: String(settings.bookingWindowDays),
+    topics: settings.topics.map((topic) => ({
+      id: topic.id,
+      labelJa: topic.label.ja ?? "",
+      labelEn: topic.label.en ?? "",
+      descriptionJa: topic.description.ja ?? "",
+      descriptionEn: topic.description.en ?? "",
+    })),
+  };
+};
+
+const trimValue = (value?: string | null): string => value?.trim() ?? "";
+
+const normalizeLocalizedField = (
+  value: { ja?: string; en?: string },
+): NormalizedLocalizedText => ({
+  ja: trimValue(value.ja),
+  en: trimValue(value.en),
+});
+
+const parseNumber = (value: string, fallback: number): number => {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+  return fallback;
+};
+
+const normalizeContactSettingsForm = (
+  form: ContactSettingsFormState,
+): ContactSettingsNormalized => ({
+  heroTitle: normalizeLocalizedField({
+    ja: form.heroTitleJa,
+    en: form.heroTitleEn,
+  }),
+  heroDescription: normalizeLocalizedField({
+    ja: form.heroDescriptionJa,
+    en: form.heroDescriptionEn,
+  }),
+  consentText: normalizeLocalizedField({
+    ja: form.consentTextJa,
+    en: form.consentTextEn,
+  }),
+  topics: form.topics.map((topic) => ({
+    id: trimValue(topic.id),
+    label: normalizeLocalizedField({
+      ja: topic.labelJa,
+      en: topic.labelEn,
+    }),
+    description: normalizeLocalizedField({
+      ja: topic.descriptionJa,
+      en: topic.descriptionEn,
+    }),
+  })),
+  minimumLeadHours: parseNumber(form.minimumLeadHours, 0),
+  recaptchaSiteKey: trimValue(form.recaptchaSiteKey),
+  supportEmail: trimValue(form.supportEmail),
+  calendarTimezone: trimValue(form.calendarTimezone),
+  googleCalendarId: trimValue(form.googleCalendarId),
+  bookingWindowDays: parseNumber(form.bookingWindowDays, 0),
+});
+
+const normalizeContactSettingsOriginal = (
+  settings: ContactFormSettings | null,
+): ContactSettingsNormalized | null => {
+  if (!settings) {
+    return null;
+  }
+  return {
+    heroTitle: normalizeLocalizedField(settings.heroTitle),
+    heroDescription: normalizeLocalizedField(settings.heroDescription),
+    consentText: normalizeLocalizedField(settings.consentText),
+    topics: settings.topics.map((topic) => ({
+      id: topic.id,
+      label: normalizeLocalizedField(topic.label),
+      description: normalizeLocalizedField(topic.description),
+    })),
+    minimumLeadHours: settings.minimumLeadHours,
+    recaptchaSiteKey: trimValue(settings.recaptchaSiteKey),
+    supportEmail: trimValue(settings.supportEmail),
+    calendarTimezone: trimValue(settings.calendarTimezone),
+    googleCalendarId: trimValue(settings.googleCalendarId),
+    bookingWindowDays: settings.bookingWindowDays,
+  };
+};
+
+const buildContactSettingsDiff = (
+  original: ContactFormSettings | null,
+  form: ContactSettingsFormState,
+): ContactSettingsDiffSummary => {
+  const normalizedDraft = normalizeContactSettingsForm(form);
+  const normalizedOriginal =
+    normalizeContactSettingsOriginal(original) ??
+    normalizeContactSettingsForm(createEmptyContactSettingsForm());
+
+  const addLocalizedDiff = (
+    entries: ContactSettingsDiffEntry[],
+    keyPrefix: string,
+    labelPrefix: string,
+    originalValue: NormalizedLocalizedText,
+    updatedValue: NormalizedLocalizedText,
+  ) => {
+    if (originalValue.ja !== updatedValue.ja) {
+      entries.push({
+        key: `${keyPrefix}.ja`,
+        labelKey: `${labelPrefix}Ja`,
+        original: originalValue.ja,
+        updated: updatedValue.ja,
+      });
+    }
+    if (originalValue.en !== updatedValue.en) {
+      entries.push({
+        key: `${keyPrefix}.en`,
+        labelKey: `${labelPrefix}En`,
+        original: originalValue.en,
+        updated: updatedValue.en,
+      });
+    }
+  };
+
+  const fieldDiffs: ContactSettingsDiffEntry[] = [];
+  addLocalizedDiff(
+    fieldDiffs,
+    "heroTitle",
+    "contactSettings.fields.heroTitle",
+    normalizedOriginal.heroTitle,
+    normalizedDraft.heroTitle,
+  );
+  addLocalizedDiff(
+    fieldDiffs,
+    "heroDescription",
+    "contactSettings.fields.heroDescription",
+    normalizedOriginal.heroDescription,
+    normalizedDraft.heroDescription,
+  );
+  addLocalizedDiff(
+    fieldDiffs,
+    "consentText",
+    "contactSettings.fields.consentText",
+    normalizedOriginal.consentText,
+    normalizedDraft.consentText,
+  );
+
+  const addSimpleDiff = (
+    key: string,
+    labelKey: string,
+    originalValue: string | number,
+    updatedValue: string | number,
+  ) => {
+    if (`${originalValue}` !== `${updatedValue}`) {
+      fieldDiffs.push({
+        key,
+        labelKey,
+        original: String(originalValue),
+        updated: String(updatedValue),
+      });
+    }
+  };
+
+  addSimpleDiff(
+    "minimumLeadHours",
+    "contactSettings.fields.minimumLeadHours",
+    normalizedOriginal.minimumLeadHours,
+    normalizedDraft.minimumLeadHours,
+  );
+  addSimpleDiff(
+    "bookingWindowDays",
+    "contactSettings.fields.bookingWindowDays",
+    normalizedOriginal.bookingWindowDays,
+    normalizedDraft.bookingWindowDays,
+  );
+  addSimpleDiff(
+    "supportEmail",
+    "contactSettings.fields.supportEmail",
+    normalizedOriginal.supportEmail,
+    normalizedDraft.supportEmail,
+  );
+  addSimpleDiff(
+    "recaptchaSiteKey",
+    "contactSettings.fields.recaptchaSiteKey",
+    normalizedOriginal.recaptchaSiteKey,
+    normalizedDraft.recaptchaSiteKey,
+  );
+  addSimpleDiff(
+    "calendarTimezone",
+    "contactSettings.fields.calendarTimezone",
+    normalizedOriginal.calendarTimezone,
+    normalizedDraft.calendarTimezone,
+  );
+  addSimpleDiff(
+    "googleCalendarId",
+    "contactSettings.fields.googleCalendarId",
+    normalizedOriginal.googleCalendarId,
+    normalizedDraft.googleCalendarId,
+  );
+
+  const topicDiffs: ContactTopicDiffEntry[] = [];
+  const originalTopics = new Map<string, ContactSettingsNormalized["topics"][number]>();
+  normalizedOriginal.topics.forEach((topic) => {
+    originalTopics.set(topic.id, topic);
+  });
+
+  normalizedDraft.topics.forEach((topic) => {
+    const originalTopic = originalTopics.get(topic.id);
+    if (!originalTopic) {
+      topicDiffs.push({
+        id: topic.id,
+        change: "added",
+        updated: {
+          label: topic.label,
+          description: topic.description,
+        },
+      });
+      return;
+    }
+
+    const labelChanged =
+      originalTopic.label.ja !== topic.label.ja ||
+      originalTopic.label.en !== topic.label.en;
+    const descriptionChanged =
+      originalTopic.description.ja !== topic.description.ja ||
+      originalTopic.description.en !== topic.description.en;
+    if (labelChanged || descriptionChanged) {
+      topicDiffs.push({
+        id: topic.id,
+        change: "updated",
+        original: {
+          label: originalTopic.label,
+          description: originalTopic.description,
+        },
+        updated: {
+          label: topic.label,
+          description: topic.description,
+        },
+      });
+    }
+    originalTopics.delete(topic.id);
+  });
+
+  originalTopics.forEach((topic) => {
+    topicDiffs.push({
+      id: topic.id,
+      change: "removed",
+      original: {
+        label: topic.label,
+        description: topic.description,
+      },
+    });
+  });
+
+  return {
+    fields: fieldDiffs,
+    topics: topicDiffs,
+  };
+};
+
+const isValidEmail = (value: string): boolean =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const validateContactSettingsForm = (
+  form: ContactSettingsFormState,
+): string | null => {
+  const heroTitleJa = trimValue(form.heroTitleJa);
+  const heroTitleEn = trimValue(form.heroTitleEn);
+  if (!heroTitleJa && !heroTitleEn) {
+    return "contactSettings.validation.heroTitle";
+  }
+
+  const consentJa = trimValue(form.consentTextJa);
+  const consentEn = trimValue(form.consentTextEn);
+  if (!consentJa && !consentEn) {
+    return "contactSettings.validation.consentText";
+  }
+
+  const minimumLeadHours = parseNumber(form.minimumLeadHours, Number.NaN);
+  if (!Number.isFinite(minimumLeadHours) || minimumLeadHours < 0) {
+    return "contactSettings.validation.minimumLeadHours";
+  }
+
+  const bookingWindowDays = parseNumber(form.bookingWindowDays, Number.NaN);
+  if (!Number.isFinite(bookingWindowDays) || bookingWindowDays < 1) {
+    return "contactSettings.validation.bookingWindowDays";
+  }
+
+  if (!trimValue(form.supportEmail)) {
+    return "contactSettings.validation.supportEmail";
+  }
+  if (!isValidEmail(trimValue(form.supportEmail))) {
+    return "contactSettings.validation.supportEmailFormat";
+  }
+
+  if (!trimValue(form.calendarTimezone)) {
+    return "contactSettings.validation.calendarTimezone";
+  }
+
+  if (form.topics.length === 0) {
+    return "contactSettings.validation.topicsRequired";
+  }
+
+  const seenIds = new Set<string>();
+  for (const topic of form.topics) {
+    const topicId = trimValue(topic.id);
+    if (!topicId) {
+      return "contactSettings.validation.topicId";
+    }
+    if (seenIds.has(topicId)) {
+      return "contactSettings.validation.topicIdUnique";
+    }
+    seenIds.add(topicId);
+    const labelJa = trimValue(topic.labelJa);
+    const labelEn = trimValue(topic.labelEn);
+    if (!labelJa && !labelEn) {
+      return "contactSettings.validation.topicLabel";
+    }
+  }
+
+  return null;
+};
+
+const buildContactSettingsPayload = (
+  form: ContactSettingsFormState,
+  original: ContactFormSettings,
+) => {
+  const normalized = normalizeContactSettingsForm(form);
+  const payload: Parameters<
+    typeof adminApi.updateContactSettings
+  >[0] = {
+    id: original.id,
+    heroTitle: normalized.heroTitle,
+    heroDescription: normalized.heroDescription,
+    topics: normalized.topics,
+    consentText: normalized.consentText,
+    minimumLeadHours: normalized.minimumLeadHours,
+    recaptchaSiteKey: normalized.recaptchaSiteKey,
+    supportEmail: normalized.supportEmail,
+    calendarTimezone: normalized.calendarTimezone,
+    googleCalendarId: normalized.googleCalendarId,
+    bookingWindowDays: normalized.bookingWindowDays,
+    updatedAt: original.updatedAt,
+  };
+  return payload;
 };
 
 function profileToForm(profile: AdminProfile | null): ProfileFormState {
@@ -450,6 +908,21 @@ function App() {
   const [contactEdits, setContactEdits] = useState<
     Record<string, ContactEditState>
   >({});
+  const [contactSettings, setContactSettings] =
+    useState<ContactFormSettings | null>(null);
+  const [contactSettingsForm, setContactSettingsForm] =
+    useState<ContactSettingsFormState>(createEmptyContactSettingsForm());
+  const [contactSettingsError, setContactSettingsError] = useState<string | null>(
+    null,
+  );
+  const [contactSettingsNotice, setContactSettingsNotice] = useState<
+    string | null
+  >(null);
+  const [contactSettingsSaving, setContactSettingsSaving] = useState(false);
+  const [showContactSettingsDiff, setShowContactSettingsDiff] = useState(false);
+  const [contactPreviewLocale, setContactPreviewLocale] = useState<"ja" | "en">(
+    "ja",
+  );
 
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
   const [editingResearchId, setEditingResearchId] = useState<number | null>(
@@ -486,6 +959,63 @@ function App() {
     return matches.slice(0, 10);
   }, [projectTechSearch, techCatalog, selectedProjectTechIds]);
 
+  const contactSettingsDiffSummary = useMemo(
+    () => buildContactSettingsDiff(contactSettings, contactSettingsForm),
+    [contactSettings, contactSettingsForm],
+  );
+
+  const hasContactSettingsChanges =
+    contactSettingsDiffSummary.fields.length > 0 ||
+    contactSettingsDiffSummary.topics.length > 0;
+
+  const selectLocalizedValue = useCallback(
+    (ja: string, en: string) =>
+      contactPreviewLocale === "ja"
+        ? trimValue(ja) || trimValue(en)
+        : trimValue(en) || trimValue(ja),
+    [contactPreviewLocale],
+  );
+
+  const previewHeroTitle = selectLocalizedValue(
+    contactSettingsForm.heroTitleJa,
+    contactSettingsForm.heroTitleEn,
+  );
+  const previewHeroDescription = selectLocalizedValue(
+    contactSettingsForm.heroDescriptionJa,
+    contactSettingsForm.heroDescriptionEn,
+  );
+  const previewConsent = selectLocalizedValue(
+    contactSettingsForm.consentTextJa,
+    contactSettingsForm.consentTextEn,
+  );
+  const previewTopics = useMemo(
+    () =>
+      contactSettingsForm.topics.map((topic) => ({
+        id: trimValue(topic.id),
+        label: selectLocalizedValue(topic.labelJa, topic.labelEn),
+        description: selectLocalizedValue(
+          topic.descriptionJa,
+          topic.descriptionEn,
+        ),
+      })),
+    [contactSettingsForm.topics, selectLocalizedValue],
+  );
+  const previewSupportEmail = trimValue(contactSettingsForm.supportEmail);
+  const previewCalendarTimezone = trimValue(
+    contactSettingsForm.calendarTimezone,
+  );
+  const previewRecaptchaSiteKey = trimValue(
+    contactSettingsForm.recaptchaSiteKey,
+  );
+  const previewMinimumLeadHours = parseNumber(
+    contactSettingsForm.minimumLeadHours,
+    0,
+  );
+  const previewBookingWindowDays = parseNumber(
+    contactSettingsForm.bookingWindowDays,
+    0,
+  );
+
   const handleUnauthorized = useCallback(() => {
     clearSession();
     setAuthState("unauthorized");
@@ -496,6 +1026,13 @@ function App() {
     setContacts([]);
     setBlacklist([]);
     setContactEdits({});
+    setContactSettings(null);
+    setContactSettingsForm(createEmptyContactSettingsForm());
+    setContactSettingsError(null);
+    setContactSettingsNotice(null);
+    setContactSettingsSaving(false);
+    setShowContactSettingsDiff(false);
+    setContactPreviewLocale("ja");
     setProfileForm(createEmptyProfileForm());
     setProjectForm({ ...emptyProjectForm });
     setProjectTechSearch("");
@@ -507,6 +1044,148 @@ function App() {
     setEditingBlacklistId(null);
     setError(null);
   }, [clearSession]);
+
+  const handleContactSettingsFieldChange = useCallback(
+    (
+      field: Exclude<keyof ContactSettingsFormState, "topics">,
+      value: string,
+    ) => {
+      setContactSettingsForm((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+      setContactSettingsError(null);
+      setContactSettingsNotice(null);
+    },
+    [],
+  );
+
+  const handleContactTopicChange = useCallback(
+    (index: number, field: keyof ContactTopicForm, value: string) => {
+      setContactSettingsForm((prev) => {
+        const nextTopics = [...prev.topics];
+        nextTopics[index] = {
+          ...nextTopics[index],
+          [field]: value,
+        };
+        return {
+          ...prev,
+          topics: nextTopics,
+        };
+      });
+      setContactSettingsError(null);
+      setContactSettingsNotice(null);
+    },
+    [],
+  );
+
+  const handleAddContactTopic = useCallback(() => {
+    setContactSettingsForm((prev) => ({
+      ...prev,
+      topics: [
+        ...prev.topics,
+        {
+          id: `topic-${Math.random().toString(36).slice(2, 8)}`,
+          labelJa: "",
+          labelEn: "",
+          descriptionJa: "",
+          descriptionEn: "",
+        },
+      ],
+    }));
+    setContactSettingsError(null);
+    setContactSettingsNotice(null);
+  }, []);
+
+  const handleRemoveContactTopic = useCallback((index: number) => {
+    setContactSettingsForm((prev) => {
+      const nextTopics = prev.topics.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        topics: nextTopics,
+      };
+    });
+    setContactSettingsError(null);
+    setContactSettingsNotice(null);
+  }, []);
+
+  const handleResetContactSettings = useCallback(() => {
+    setContactSettingsForm(contactSettingsToForm(contactSettings));
+    setContactSettingsError(null);
+    setContactSettingsNotice(null);
+    setShowContactSettingsDiff(false);
+  }, [contactSettings]);
+
+  const handleSaveContactSettings = useCallback(async () => {
+    if (!contactSettings) {
+      setContactSettingsError("contactSettings.validation.missingRecord");
+      return;
+    }
+    const validationError = validateContactSettingsForm(contactSettingsForm);
+    if (validationError) {
+      setContactSettingsError(validationError);
+      return;
+    }
+    if (!hasContactSettingsChanges) {
+      setContactSettingsNotice("contactSettings.noChanges");
+      return;
+    }
+    setContactSettingsSaving(true);
+    setContactSettingsError(null);
+    setContactSettingsNotice(null);
+    try {
+      const payload = buildContactSettingsPayload(
+        contactSettingsForm,
+        contactSettings,
+      );
+      const response = await adminApi.updateContactSettings(payload);
+      setContactSettings(response.data);
+      setContactSettingsForm(contactSettingsToForm(response.data));
+      setContactSettingsNotice("contactSettings.saveSuccess");
+      setShowContactSettingsDiff(false);
+    } catch (err) {
+      if (isUnauthorizedError(err)) {
+        handleUnauthorized();
+      } else if (isConflictError(err)) {
+        try {
+          const latest = await adminApi.getContactSettings();
+          setContactSettings(latest.data);
+        } catch (refreshErr) {
+          if (isUnauthorizedError(refreshErr)) {
+            handleUnauthorized();
+          } else if (isNotFoundError(refreshErr)) {
+            setContactSettings(null);
+          } else {
+            console.error(refreshErr);
+            setContactSettingsError("contactSettings.saveError");
+          }
+        }
+        setContactSettingsNotice(null);
+        setContactSettingsError("contactSettings.conflict");
+        setShowContactSettingsDiff(true);
+      } else {
+        console.error(err);
+        setContactSettingsError("contactSettings.saveError");
+      }
+    } finally {
+      setContactSettingsSaving(false);
+    }
+  }, [
+    contactSettings,
+    contactSettingsForm,
+    hasContactSettingsChanges,
+    handleUnauthorized,
+  ]);
+
+  const handleReviewContactSettingsDiff = useCallback(() => {
+    setShowContactSettingsDiff(true);
+    setContactSettingsError(null);
+    setContactSettingsNotice(null);
+  }, []);
+
+  const handleContactPreviewLocaleChange = useCallback((locale: "ja" | "en") => {
+    setContactPreviewLocale(locale);
+  }, []);
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
@@ -544,6 +1223,19 @@ function App() {
         adminApi.listTechCatalog({ includeInactive: false }),
       ]);
 
+      let contactSettingsData: ContactFormSettings | null = null;
+      try {
+        const contactSettingsRes = await adminApi.getContactSettings();
+        contactSettingsData = contactSettingsRes.data;
+      } catch (err) {
+        if (isUnauthorizedError(err)) {
+          throw err;
+        }
+        if (!isNotFoundError(err)) {
+          throw err;
+        }
+      }
+
       setSummary(summaryRes.data);
       setProfileForm(profileToForm(profileRes.data));
       setProjects(projectRes.data);
@@ -552,6 +1244,13 @@ function App() {
       setContactEdits(buildContactEditMap(contactRes.data));
       setBlacklist(blacklistRes.data);
       setTechCatalog(techCatalogRes.data);
+      setContactSettings(contactSettingsData);
+      setContactSettingsForm(contactSettingsToForm(contactSettingsData));
+      setContactSettingsError(null);
+      setContactSettingsNotice(null);
+      setContactSettingsSaving(false);
+      setShowContactSettingsDiff(false);
+      setContactPreviewLocale("ja");
       setError(null);
     } catch (err) {
       if (isUnauthorizedError(err)) {
@@ -571,18 +1270,23 @@ function App() {
     }
 
     let cancelled = false;
-    const resumeSession = async () => {
-      try {
-        const sessionRes = await adminApi.session();
-        if (cancelled) {
-          return;
-        }
-        if (sessionRes.data.active) {
-          setSession(sessionRes.data);
-          setAuthState("authenticated");
-          void refreshAll();
-        } else {
-          handleUnauthorized();
+  const resumeSession = async () => {
+    try {
+      const sessionRes = await adminApi.session();
+      if (cancelled) {
+        return;
+      }
+      if (!sessionRes?.data) {
+        console.error("session response missing data");
+        handleUnauthorized();
+        return;
+      }
+      if (sessionRes.data.active) {
+        setSession(sessionRes.data);
+        setAuthState("authenticated");
+        void refreshAll();
+      } else {
+        handleUnauthorized();
         }
       } catch (err) {
         if (cancelled) {
@@ -613,14 +1317,17 @@ function App() {
       return;
     }
 
-    const poll = async () => {
-      try {
-        const sessionRes = await adminApi.session();
-        if (sessionRes.data.active) {
-          setSession(sessionRes.data);
-        } else {
-          handleUnauthorized();
-        }
+  const poll = async () => {
+    try {
+      const sessionRes = await adminApi.session();
+      if (!sessionRes?.data) {
+        return;
+      }
+      if (sessionRes.data.active) {
+        setSession(sessionRes.data);
+      } else {
+        handleUnauthorized();
+      }
       } catch (err) {
         if (isUnauthorizedError(err)) {
           handleUnauthorized();
@@ -1194,6 +1901,506 @@ const resetProjectForm = () => {
         </div>
       </header>
       <main className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">
+                {t("contactSettings.title")}
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {t("contactSettings.description")}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleReviewContactSettingsDiff}
+                disabled={!hasContactSettingsChanges}
+              >
+                {t("contactSettings.reviewDiff")}
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleResetContactSettings}
+                disabled={!hasContactSettingsChanges}
+              >
+                {t("actions.reset")}
+              </button>
+            </div>
+          </div>
+          {contactSettingsError && (
+            <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {t(contactSettingsError)}
+            </p>
+          )}
+          {contactSettingsNotice && (
+            <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+              {t(contactSettingsNotice)}
+            </p>
+          )}
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.heroTitleJa")}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={contactSettingsForm.heroTitleJa}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "heroTitleJa",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.heroTitleEn")}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={contactSettingsForm.heroTitleEn}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "heroTitleEn",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.heroDescriptionJa")}
+              </label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                rows={3}
+                value={contactSettingsForm.heroDescriptionJa}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "heroDescriptionJa",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.heroDescriptionEn")}
+              </label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                rows={3}
+                value={contactSettingsForm.heroDescriptionEn}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "heroDescriptionEn",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.consentTextJa")}
+              </label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                rows={3}
+                value={contactSettingsForm.consentTextJa}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "consentTextJa",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.consentTextEn")}
+              </label>
+              <textarea
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                rows={3}
+                value={contactSettingsForm.consentTextEn}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "consentTextEn",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.minimumLeadHours")}
+              </label>
+              <input
+                type="number"
+                min={0}
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                placeholder="24"
+                value={contactSettingsForm.minimumLeadHours}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "minimumLeadHours",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.bookingWindowDays")}
+              </label>
+              <input
+                type="number"
+                min={1}
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                placeholder="30"
+                value={contactSettingsForm.bookingWindowDays}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "bookingWindowDays",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.supportEmail")}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={contactSettingsForm.supportEmail}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "supportEmail",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.recaptchaSiteKey")}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={contactSettingsForm.recaptchaSiteKey}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "recaptchaSiteKey",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.calendarTimezone")}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                placeholder="Asia/Tokyo"
+                value={contactSettingsForm.calendarTimezone}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "calendarTimezone",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">
+                {t("contactSettings.fields.googleCalendarId")}
+              </label>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                value={contactSettingsForm.googleCalendarId}
+                onChange={(event) =>
+                  handleContactSettingsFieldChange(
+                    "googleCalendarId",
+                    event.target.value,
+                  )
+                }
+              />
+            </div>
+          </div>
+          <div className="mt-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-base font-semibold text-slate-800">
+                {t("contactSettings.topics.title")}
+              </h3>
+              <button
+                type="button"
+                className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-100"
+                onClick={handleAddContactTopic}
+              >
+                {t("contactSettings.addTopic")}
+              </button>
+            </div>
+            <div className="mt-3 space-y-4">
+              {contactSettingsForm.topics.map((topic, index) => (
+                <div
+                  key={`${topic.id}-${index}`}
+                  className="rounded-md border border-slate-200 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-sm font-semibold text-slate-800">
+                      {topic.id || t("contactSettings.topics.placeholderId")}
+                    </h4>
+                    <button
+                      type="button"
+                      className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600 transition hover:bg-red-50"
+                      onClick={() => handleRemoveContactTopic(index)}
+                    >
+                      {t("contactSettings.removeTopic")}
+                    </button>
+                  </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600">
+                        {t("contactSettings.fields.topicId")}
+                      </label>
+                      <input
+                        className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        value={topic.id}
+                        onChange={(event) =>
+                          handleContactTopicChange(
+                            index,
+                            "id",
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600">
+                        {t("contactSettings.fields.topicLabelJa")}
+                      </label>
+                      <input
+                        className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        value={topic.labelJa}
+                        onChange={(event) =>
+                          handleContactTopicChange(
+                            index,
+                            "labelJa",
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600">
+                        {t("contactSettings.fields.topicLabelEn")}
+                      </label>
+                      <input
+                        className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        value={topic.labelEn}
+                        onChange={(event) =>
+                          handleContactTopicChange(
+                            index,
+                            "labelEn",
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600">
+                        {t("contactSettings.fields.topicDescriptionJa")}
+                      </label>
+                      <textarea
+                        className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        rows={2}
+                        value={topic.descriptionJa}
+                        onChange={(event) =>
+                          handleContactTopicChange(
+                            index,
+                            "descriptionJa",
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600">
+                        {t("contactSettings.fields.topicDescriptionEn")}
+                      </label>
+                      <textarea
+                        className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        rows={2}
+                        value={topic.descriptionEn}
+                        onChange={(event) =>
+                          handleContactTopicChange(
+                            index,
+                            "descriptionEn",
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {contactSettingsForm.topics.length === 0 && (
+                <p className="text-sm text-slate-500">
+                  {t("contactSettings.topics.empty")}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="mt-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-base font-semibold text-slate-800">
+                {t("contactSettings.preview.title")}
+              </h3>
+              <div className="inline-flex overflow-hidden rounded-md border border-slate-200">
+                <button
+                  type="button"
+                  className={`px-3 py-1 text-xs font-medium ${
+                    contactPreviewLocale === "ja"
+                      ? "bg-slate-900 text-white"
+                      : "bg-white text-slate-700"
+                  }`}
+                  onClick={() => handleContactPreviewLocaleChange("ja")}
+                >
+                  JA
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1 text-xs font-medium ${
+                    contactPreviewLocale === "en"
+                      ? "bg-slate-900 text-white"
+                      : "bg-white text-slate-700"
+                  }`}
+                  onClick={() => handleContactPreviewLocaleChange("en")}
+                >
+                  EN
+                </button>
+              </div>
+            </div>
+            <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+              <div className="bg-slate-900 px-6 py-6 text-white">
+                <h4 className="text-xl font-semibold">
+                  {previewHeroTitle || t("contactSettings.preview.emptyTitle")}
+                </h4>
+                <p className="mt-2 text-sm opacity-90">
+                  {previewHeroDescription ||
+                    t("contactSettings.preview.emptyDescription")}
+                </p>
+              </div>
+              <div className="space-y-4 px-6 py-6">
+                <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+                  <span>
+                    {t("contactSettings.preview.minimumLeadHours", {
+                      count: previewMinimumLeadHours,
+                    })}
+                  </span>
+                  <span>
+                    {t("contactSettings.preview.bookingWindowDays", {
+                      count: previewBookingWindowDays,
+                    })}
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-700">
+                    {t("contactSettings.preview.topicsHeading")}
+                  </h4>
+                  <div className="mt-2 space-y-3">
+                    {previewTopics.length > 0 ? (
+                      previewTopics.map((topic) => (
+                        <div
+                          key={`${topic.id}-${topic.label}`}
+                          className="rounded-md border border-slate-200 p-3"
+                        >
+                          <p className="text-sm font-medium text-slate-800">
+                            {topic.label ||
+                              t("contactSettings.preview.topicPlaceholder")}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {topic.description ||
+                              t(
+                                "contactSettings.preview.topicDescriptionPlaceholder",
+                              )}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500">
+                        {t("contactSettings.preview.topicsEmpty")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      {t("contactSettings.fields.supportEmail")}
+                    </p>
+                    <p className="text-sm text-slate-700">
+                      {previewSupportEmail ||
+                        t("contactSettings.preview.supportEmailPlaceholder")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      {t("contactSettings.fields.calendarTimezone")}
+                    </p>
+                    <p className="text-sm text-slate-700">
+                      {previewCalendarTimezone ||
+                        t(
+                          "contactSettings.preview.calendarTimezonePlaceholder",
+                        )}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">
+                    {t("contactSettings.fields.consentText")}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {previewConsent ||
+                      t("contactSettings.preview.consentPlaceholder")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">
+                    {t("contactSettings.fields.recaptchaSiteKey")}
+                  </p>
+                  <p className="text-sm text-slate-700">
+                    {previewRecaptchaSiteKey ||
+                      t("contactSettings.preview.recaptchaPlaceholder")}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-white/80"
+              onClick={handleSaveContactSettings}
+              disabled={
+                contactSettingsSaving ||
+                !contactSettings ||
+                !hasContactSettingsChanges
+              }
+            >
+              {contactSettingsSaving
+                ? t("contactSettings.saving")
+                : t("actions.save")}
+            </button>
+          </div>
+        </section>
+
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-800">
             {t("dashboard.systemStatus")}
@@ -2840,6 +4047,167 @@ const resetProjectForm = () => {
           </div>
         </section>
       </main>
+
+      {showContactSettingsDiff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="max-h-full w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <h3 className="text-lg font-semibold text-slate-900">
+                {t("contactSettings.diff.title")}
+              </h3>
+              <button
+                type="button"
+                className="rounded-md border border-slate-200 px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-100"
+                onClick={() => setShowContactSettingsDiff(false)}
+              >
+                {t("actions.close")}
+              </button>
+            </div>
+            {contactSettingsDiffSummary.fields.length === 0 &&
+            contactSettingsDiffSummary.topics.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-600">
+                {t("contactSettings.diff.noChanges")}
+              </p>
+            ) : (
+              <div className="mt-4 space-y-6">
+                {contactSettingsDiffSummary.fields.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-700">
+                      {t("contactSettings.diff.section.fields")}
+                    </h4>
+                    <div className="mt-3 divide-y rounded-md border border-slate-200">
+                      {contactSettingsDiffSummary.fields.map((entry) => (
+                        <div
+                          key={entry.key}
+                          className="grid gap-4 px-4 py-3 md:grid-cols-2"
+                        >
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-slate-500">
+                              {t(entry.labelKey)}
+                            </p>
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
+                              {entry.original ||
+                                t("contactSettings.diff.emptyValue")}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-slate-500">
+                              {t("contactSettings.diff.updated")}
+                            </p>
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">
+                              {entry.updated ||
+                                t("contactSettings.diff.emptyValue")}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {contactSettingsDiffSummary.topics.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-700">
+                      {t("contactSettings.diff.section.topics")}
+                    </h4>
+                    <div className="mt-3 space-y-4">
+                      {contactSettingsDiffSummary.topics.map((topic) => (
+                        <div
+                          key={`${topic.change}-${topic.id}`}
+                          className="rounded-md border border-slate-200 p-4"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-slate-800">
+                              {topic.id ||
+                                t("contactSettings.topics.placeholderId")}
+                            </span>
+                            <span
+                              className={`rounded-full px-2 py-1 text-xs font-medium ${
+                                topic.change === "added"
+                                  ? "bg-emerald-50 text-emerald-600"
+                                  : topic.change === "removed"
+                                    ? "bg-rose-50 text-rose-600"
+                                    : "bg-amber-50 text-amber-600"
+                              }`}
+                            >
+                              {t(
+                                `contactSettings.diff.topic.${topic.change}` as const,
+                              )}
+                            </span>
+                          </div>
+                          {topic.original && (
+                            <div className="mt-3 grid gap-2 md:grid-cols-2">
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-slate-500">
+                                  {t("contactSettings.diff.previousLabel")}
+                                </p>
+                                <p className="text-sm text-slate-700">
+                                  {topic.original.label.ja ||
+                                    t("contactSettings.diff.emptyValue")}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  EN:{" "}
+                                  {topic.original.label.en ||
+                                    t("contactSettings.diff.emptyValue")}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-slate-500">
+                                  {t("contactSettings.diff.previousDescription")}
+                                </p>
+                                <p className="text-sm text-slate-700">
+                                  {topic.original.description.ja ||
+                                    t("contactSettings.diff.emptyValue")}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  EN:{" "}
+                                  {topic.original.description.en ||
+                                    t("contactSettings.diff.emptyValue")}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          {topic.updated && (
+                            <div className="mt-3 grid gap-2 md:grid-cols-2">
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-slate-500">
+                                  {t("contactSettings.diff.updatedLabel")}
+                                </p>
+                                <p className="text-sm text-slate-700">
+                                  {topic.updated.label.ja ||
+                                    t("contactSettings.diff.emptyValue")}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  EN:{" "}
+                                  {topic.updated.label.en ||
+                                    t("contactSettings.diff.emptyValue")}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-slate-500">
+                                  {t("contactSettings.diff.updatedDescription")}
+                                </p>
+                                <p className="text-sm text-slate-700">
+                                  {topic.updated.description.ja ||
+                                    t("contactSettings.diff.emptyValue")}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  EN:{" "}
+                                  {topic.updated.description.en ||
+                                    t("contactSettings.diff.emptyValue")}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

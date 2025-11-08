@@ -82,6 +82,9 @@ func registerRoutes(
 		admin.PUT("/research/:id", adminHandler.UpdateResearch)
 		admin.DELETE("/research/:id", adminHandler.DeleteResearch)
 
+		admin.GET("/contact-settings", adminHandler.GetContactSettings)
+		admin.PUT("/contact-settings", adminHandler.UpdateContactSettings)
+
 		admin.GET("/contacts", adminHandler.ListContacts)
 		admin.GET("/contacts/:id", adminHandler.GetContact)
 		admin.PUT("/contacts/:id", adminHandler.UpdateContact)

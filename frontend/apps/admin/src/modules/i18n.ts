@@ -46,6 +46,97 @@ const resources = {
       "contacts.status.archived": "Archived",
       "contacts.empty": "No contact messages found.",
 
+      "contactSettings.title": "Contact form settings",
+      "contactSettings.description":
+        "Configure hero content, topics, and metadata for the public contact form.",
+      "contactSettings.reviewDiff": "Review changes",
+      "contactSettings.addTopic": "Add topic",
+      "contactSettings.removeTopic": "Remove",
+      "contactSettings.topics.title": "Topics",
+      "contactSettings.topics.placeholderId": "topic-id",
+      "contactSettings.topics.empty": "No topics configured.",
+      "contactSettings.preview.title": "Preview",
+      "contactSettings.preview.topicsHeading": "Topics",
+      "contactSettings.preview.topicPlaceholder": "Untitled topic",
+      "contactSettings.preview.topicDescriptionPlaceholder":
+        "No description provided.",
+      "contactSettings.preview.topicsEmpty": "Topics will appear here.",
+      "contactSettings.preview.supportEmailPlaceholder":
+        "support@example.com",
+      "contactSettings.preview.calendarTimezonePlaceholder":
+        "Timezone is not set.",
+      "contactSettings.preview.consentPlaceholder":
+        "Consent text will appear here.",
+      "contactSettings.preview.recaptchaPlaceholder":
+        "reCAPTCHA site key not configured.",
+      "contactSettings.preview.emptyTitle": "Contact & Scheduling",
+      "contactSettings.preview.emptyDescription":
+        "Hero description will appear here.",
+      "contactSettings.preview.minimumLeadHours":
+        "Minimum lead time: {{count}}h",
+      "contactSettings.preview.bookingWindowDays":
+        "Booking window: {{count}} days",
+      "contactSettings.saving": "Saving…",
+      "contactSettings.saveSuccess": "Contact settings saved.",
+      "contactSettings.saveError": "Failed to save contact settings.",
+      "contactSettings.conflict":
+        "Settings changed elsewhere. Review differences and try again.",
+      "contactSettings.noChanges": "No changes to save.",
+      "contactSettings.validation.heroTitle":
+        "Enter the hero title in at least one language.",
+      "contactSettings.validation.consentText":
+        "Enter the consent text in at least one language.",
+      "contactSettings.validation.minimumLeadHours":
+        "Minimum lead time must be zero or greater.",
+      "contactSettings.validation.bookingWindowDays":
+        "Booking window must be 1 day or longer.",
+      "contactSettings.validation.supportEmail": "Support email is required.",
+      "contactSettings.validation.supportEmailFormat":
+        "Enter a valid support email address.",
+      "contactSettings.validation.calendarTimezone":
+        "Calendar time zone is required.",
+      "contactSettings.validation.topicsRequired":
+        "Add at least one topic.",
+      "contactSettings.validation.topicId": "Topic ID is required.",
+      "contactSettings.validation.topicIdUnique":
+        "Topic IDs must be unique.",
+      "contactSettings.validation.topicLabel":
+        "Topic label is required in at least one language.",
+      "contactSettings.validation.missingRecord":
+        "Contact settings are not ready yet. Refresh and try again.",
+      "contactSettings.fields.heroTitleJa": "Hero title (ja)",
+      "contactSettings.fields.heroTitleEn": "Hero title (en)",
+      "contactSettings.fields.heroDescriptionJa": "Hero description (ja)",
+      "contactSettings.fields.heroDescriptionEn": "Hero description (en)",
+      "contactSettings.fields.consentTextJa": "Consent text (ja)",
+      "contactSettings.fields.consentTextEn": "Consent text (en)",
+      "contactSettings.fields.consentText": "Consent text",
+      "contactSettings.fields.minimumLeadHours": "Minimum lead time (hours)",
+      "contactSettings.fields.bookingWindowDays": "Booking window (days)",
+      "contactSettings.fields.supportEmail": "Support email",
+      "contactSettings.fields.recaptchaSiteKey": "reCAPTCHA site key",
+      "contactSettings.fields.calendarTimezone": "Calendar time zone",
+      "contactSettings.fields.googleCalendarId": "Google Calendar ID",
+      "contactSettings.fields.topicId": "Topic ID",
+      "contactSettings.fields.topicLabelJa": "Topic label (ja)",
+      "contactSettings.fields.topicLabelEn": "Topic label (en)",
+      "contactSettings.fields.topicDescriptionJa": "Description (ja)",
+      "contactSettings.fields.topicDescriptionEn": "Description (en)",
+      "contactSettings.diff.title": "Contact settings differences",
+      "contactSettings.diff.noChanges": "No differences detected.",
+      "contactSettings.diff.section.fields": "Field changes",
+      "contactSettings.diff.section.topics": "Topic changes",
+      "contactSettings.diff.emptyValue": "—",
+      "contactSettings.diff.updated": "Updated value",
+      "contactSettings.diff.topic.added": "Added",
+      "contactSettings.diff.topic.updated": "Updated",
+      "contactSettings.diff.topic.removed": "Removed",
+      "contactSettings.diff.previousLabel": "Previous label (ja)",
+      "contactSettings.diff.previousDescription": "Previous description (ja)",
+      "contactSettings.diff.updatedLabel": "Updated label (ja)",
+      "contactSettings.diff.updatedDescription":
+        "Updated description (ja)",
+
       "blacklist.title": "Blacklist management",
       "blacklist.description": "Block malicious or unwanted email addresses.",
       "blacklist.empty": "No blacklist entries added yet.",
@@ -98,6 +189,7 @@ const resources = {
       "actions.unpublish": "Unpublish",
       "actions.edit": "Edit",
       "actions.reset": "Reset",
+      "actions.close": "Close",
       "actions.runPreview": "Run preview",
       "actions.hidePreview": "Hide preview",
 
@@ -159,6 +251,89 @@ const resources = {
       "contacts.status.archived": "保留",
       "contacts.empty": "お問い合わせはまだありません。",
 
+      "contactSettings.title": "お問い合わせフォーム設定",
+      "contactSettings.description":
+        "公開フォームに表示されるヒーロー文言・トピック・メタ情報を編集します。",
+      "contactSettings.reviewDiff": "差分を確認",
+      "contactSettings.addTopic": "トピックを追加",
+      "contactSettings.removeTopic": "削除",
+      "contactSettings.topics.title": "トピック",
+      "contactSettings.topics.placeholderId": "topic-id",
+      "contactSettings.topics.empty": "トピックがまだ設定されていません。",
+      "contactSettings.preview.title": "プレビュー",
+      "contactSettings.preview.topicsHeading": "トピック",
+      "contactSettings.preview.topicPlaceholder": "タイトル未設定",
+      "contactSettings.preview.topicDescriptionPlaceholder": "説明は未入力です。",
+      "contactSettings.preview.topicsEmpty": "ここにトピックが表示されます。",
+      "contactSettings.preview.supportEmailPlaceholder": "support@example.com",
+      "contactSettings.preview.calendarTimezonePlaceholder": "タイムゾーンが未設定です。",
+      "contactSettings.preview.consentPlaceholder": "同意文がここに表示されます。",
+      "contactSettings.preview.recaptchaPlaceholder": "reCAPTCHA サイトキーが未設定です。",
+      "contactSettings.preview.emptyTitle": "お問い合わせ・ご予約",
+      "contactSettings.preview.emptyDescription": "ヒーロー文言がここに表示されます。",
+      "contactSettings.preview.minimumLeadHours": "最短リードタイム: {{count}} 時間",
+      "contactSettings.preview.bookingWindowDays": "予約可能期間: {{count}} 日",
+      "contactSettings.saving": "保存中…",
+      "contactSettings.saveSuccess": "お問い合わせ設定を保存しました。",
+      "contactSettings.saveError": "お問い合わせ設定の保存に失敗しました。",
+      "contactSettings.conflict":
+        "他のユーザーが設定を更新しました。差分を確認して再度保存してください。",
+      "contactSettings.noChanges": "保存する変更はありません。",
+      "contactSettings.validation.heroTitle":
+        "ヒーロータイトルをいずれかの言語で入力してください。",
+      "contactSettings.validation.consentText":
+        "同意文をいずれかの言語で入力してください。",
+      "contactSettings.validation.minimumLeadHours":
+        "最短リードタイムは 0 以上で入力してください。",
+      "contactSettings.validation.bookingWindowDays":
+        "予約可能期間は 1 日以上で入力してください。",
+      "contactSettings.validation.supportEmail":
+        "サポート用メールアドレスを入力してください。",
+      "contactSettings.validation.supportEmailFormat":
+        "正しいメールアドレス形式で入力してください。",
+      "contactSettings.validation.calendarTimezone":
+        "カレンダーのタイムゾーンを入力してください。",
+      "contactSettings.validation.topicsRequired":
+        "少なくとも 1 件のトピックを追加してください。",
+      "contactSettings.validation.topicId": "トピック ID を入力してください。",
+      "contactSettings.validation.topicIdUnique":
+        "トピック ID は一意である必要があります。",
+      "contactSettings.validation.topicLabel":
+        "トピック名をいずれかの言語で入力してください。",
+      "contactSettings.validation.missingRecord":
+        "お問い合わせ設定の読み込みが完了していません。再読み込み後にお試しください。",
+      "contactSettings.fields.heroTitleJa": "ヒーロータイトル（ja）",
+      "contactSettings.fields.heroTitleEn": "ヒーロータイトル（en）",
+      "contactSettings.fields.heroDescriptionJa": "ヒーロー説明（ja）",
+      "contactSettings.fields.heroDescriptionEn": "ヒーロー説明（en）",
+      "contactSettings.fields.consentTextJa": "同意文（ja）",
+      "contactSettings.fields.consentTextEn": "同意文（en）",
+      "contactSettings.fields.consentText": "同意文",
+      "contactSettings.fields.minimumLeadHours": "最短リードタイム（時間）",
+      "contactSettings.fields.bookingWindowDays": "予約可能期間（日）",
+      "contactSettings.fields.supportEmail": "サポートメール",
+      "contactSettings.fields.recaptchaSiteKey": "reCAPTCHA サイトキー",
+      "contactSettings.fields.calendarTimezone": "カレンダーのタイムゾーン",
+      "contactSettings.fields.googleCalendarId": "Google カレンダー ID",
+      "contactSettings.fields.topicId": "トピック ID",
+      "contactSettings.fields.topicLabelJa": "トピック名（ja）",
+      "contactSettings.fields.topicLabelEn": "トピック名（en）",
+      "contactSettings.fields.topicDescriptionJa": "説明（ja）",
+      "contactSettings.fields.topicDescriptionEn": "説明（en）",
+      "contactSettings.diff.title": "お問い合わせ設定の差分",
+      "contactSettings.diff.noChanges": "差分はありません。",
+      "contactSettings.diff.section.fields": "フィールドの変更",
+      "contactSettings.diff.section.topics": "トピックの変更",
+      "contactSettings.diff.emptyValue": "―",
+      "contactSettings.diff.updated": "更新後の値",
+      "contactSettings.diff.topic.added": "追加",
+      "contactSettings.diff.topic.updated": "更新",
+      "contactSettings.diff.topic.removed": "削除",
+      "contactSettings.diff.previousLabel": "変更前のラベル（ja）",
+      "contactSettings.diff.previousDescription": "変更前の説明（ja）",
+      "contactSettings.diff.updatedLabel": "変更後のラベル（ja）",
+      "contactSettings.diff.updatedDescription": "変更後の説明（ja）",
+
       "blacklist.title": "ブラックリスト管理",
       "blacklist.description": "不正なメールアドレスを登録してブロックします。",
       "blacklist.empty": "ブラックリストは空です。",
@@ -211,6 +386,7 @@ const resources = {
       "actions.unpublish": "非公開",
       "actions.edit": "編集",
       "actions.reset": "リセット",
+      "actions.close": "閉じる",
       "actions.runPreview": "プレビューを表示",
       "actions.hidePreview": "プレビューを閉じる",
 

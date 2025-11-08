@@ -13,6 +13,8 @@ const apiMocks = vi.hoisted(() => ({
   listProjects: vi.fn(),
   listResearch: vi.fn(),
   listContacts: vi.fn(),
+  getContactSettings: vi.fn(),
+  updateContactSettings: vi.fn(),
   listBlacklist: vi.fn(),
   session: vi.fn(),
 }));
@@ -33,6 +35,8 @@ const {
   listProjects: projectsMock,
   listResearch: researchMock,
   listContacts: contactsMock,
+  getContactSettings: contactSettingsMock,
+  updateContactSettings: updateContactSettingsMock,
   listBlacklist: blacklistMock,
   session: sessionMock,
 } = apiMocks;
@@ -64,6 +68,40 @@ describe("Admin App", () => {
         focusAreas: [],
         updatedAt: new Date().toISOString(),
       },
+    });
+    const contactSettingsResponse = {
+      id: 1,
+      heroTitle: { ja: "お問い合わせ", en: "Contact" },
+      heroDescription: {
+        ja: "研究や講演のご相談を受け付けています。",
+        en: "Reach out for collaborations or speaking engagements.",
+      },
+      topics: [
+        {
+          id: "general",
+          label: { ja: "一般", en: "General" },
+          description: {
+            ja: "一般的なお問い合わせはこちら。",
+            en: "General inquiries.",
+          },
+        },
+      ],
+      consentText: {
+        ja: "送信によりプライバシーポリシーに同意したものとみなします。",
+        en: "By submitting you agree to the privacy policy.",
+      },
+      minimumLeadHours: 24,
+      recaptchaSiteKey: "site-key",
+      supportEmail: "support@example.com",
+      calendarTimezone: "Asia/Tokyo",
+      googleCalendarId: "primary",
+      bookingWindowDays: 30,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    contactSettingsMock.mockResolvedValue({ data: contactSettingsResponse });
+    updateContactSettingsMock.mockResolvedValue({
+      data: contactSettingsResponse,
     });
     techCatalogMock.mockResolvedValue({
       data: [

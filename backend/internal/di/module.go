@@ -48,6 +48,7 @@ var Module = fx.Module("di",
 		provideProjectDocumentRepository,
 		provideResearchDocumentRepository,
 		provideContactSettingsRepository,
+		provideAdminContactSettingsRepository,
 		provideHomePageConfigRepository,
 		provider.NewAdminProfileRepository,
 		provideProjectRepository,
@@ -268,6 +269,10 @@ func provideContactSettingsRepository(cfg *config.AppConfig, db *sqlx.DB, fs *fi
 		log.Printf("unknown db_driver %q; defaulting to mysql if available", driver)
 		return provider.NewContactFormSettingsRepository(db, fs, cfg)
 	}
+}
+
+func provideAdminContactSettingsRepository(repo repository.ContactFormSettingsRepository) repository.AdminContactSettingsRepository {
+	return provider.NewAdminContactFormSettingsRepository(repo)
 }
 
 func provideContactRepository(cfg *config.AppConfig, db *sqlx.DB, fs *firestore.Client) repository.ContactRepository {

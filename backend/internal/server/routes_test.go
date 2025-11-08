@@ -728,6 +728,57 @@ func (s *stubAdminService) DeleteContactMessage(context.Context, string) error {
 	return nil
 }
 
+func (s *stubAdminService) GetContactSettings(context.Context) (*model.ContactFormSettingsV2, error) {
+	now := time.Now().UTC()
+	return &model.ContactFormSettingsV2{
+		ID:              1,
+		HeroTitle:       model.NewLocalizedText("お問い合わせ", "Contact"),
+		HeroDescription: model.NewLocalizedText("説明", "Description"),
+		Topics: []model.ContactTopicV2{
+			{
+				ID:    "general",
+				Label: model.NewLocalizedText("一般", "General"),
+			},
+		},
+		ConsentText:       model.NewLocalizedText("同意文", "Consent"),
+		MinimumLeadHours:  24,
+		SupportEmail:      "support@example.com",
+		CalendarTimezone:  "Asia/Tokyo",
+		GoogleCalendarID:  "primary",
+		BookingWindowDays: 30,
+		CreatedAt:         now.Add(-time.Hour),
+		UpdatedAt:         now,
+	}, nil
+}
+
+func (s *stubAdminService) UpdateContactSettings(ctx context.Context, input adminsvc.ContactSettingsInput) (*model.ContactFormSettingsV2, error) {
+	_ = ctx
+	now := time.Now().UTC()
+	topics := make([]model.ContactTopicV2, 0, len(input.Topics))
+	for _, topic := range input.Topics {
+		topics = append(topics, model.ContactTopicV2{
+			ID:          topic.ID,
+			Label:       topic.Label,
+			Description: topic.Description,
+		})
+	}
+	return &model.ContactFormSettingsV2{
+		ID:                input.ID,
+		HeroTitle:         input.HeroTitle,
+		HeroDescription:   input.HeroDescription,
+		Topics:            topics,
+		ConsentText:       input.ConsentText,
+		MinimumLeadHours:  input.MinimumLeadHours,
+		RecaptchaSiteKey:  input.RecaptchaSiteKey,
+		SupportEmail:      input.SupportEmail,
+		CalendarTimezone:  input.CalendarTimezone,
+		GoogleCalendarID:  input.GoogleCalendarID,
+		BookingWindowDays: input.BookingWindowDays,
+		CreatedAt:         now.Add(-time.Hour),
+		UpdatedAt:         now,
+	}, nil
+}
+
 func (s *stubAdminService) ListBlacklist(context.Context) ([]model.BlacklistEntry, error) {
 	return nil, nil
 }

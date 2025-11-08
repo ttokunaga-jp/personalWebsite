@@ -224,6 +224,35 @@ func (h *AdminHandler) DeleteResearch(c *gin.Context) {
 
 // Contact management -------------------------------------------------------
 
+func (h *AdminHandler) GetContactSettings(c *gin.Context) {
+	settings, err := h.svc.GetContactSettings(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, settings)
+}
+
+func (h *AdminHandler) UpdateContactSettings(c *gin.Context) {
+	var req contactSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid contact settings payload", err))
+		return
+	}
+	input, err := req.toInput()
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	settings, err := h.svc.UpdateContactSettings(c.Request.Context(), input)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, settings)
+}
+
 func (h *AdminHandler) ListContacts(c *gin.Context) {
 	messages, err := h.svc.ListContactMessages(c.Request.Context())
 	if err != nil {
@@ -558,6 +587,62 @@ func (r contactUpdateRequest) toInput() adminsvc.ContactUpdateInput {
 type blacklistRequest struct {
 	Email  string `json:"email"`
 	Reason string `json:"reason"`
+}
+
+type contactSettingsRequest struct {
+	ID                uint64                `json:"id"`
+	HeroTitle         model.LocalizedText   `json:"heroTitle"`
+	HeroDescription   model.LocalizedText   `json:"heroDescription"`
+	Topics            []contactTopicRequest `json:"topics"`
+	ConsentText       model.LocalizedText   `json:"consentText"`
+	MinimumLeadHours  int                   `json:"minimumLeadHours"`
+	RecaptchaSiteKey  string                `json:"recaptchaSiteKey"`
+	SupportEmail      string                `json:"supportEmail"`
+	CalendarTimezone  string                `json:"calendarTimezone"`
+	GoogleCalendarID  string                `json:"googleCalendarId"`
+	BookingWindowDays int                   `json:"bookingWindowDays"`
+	UpdatedAt         string                `json:"updatedAt"`
+}
+
+type contactTopicRequest struct {
+	ID          string              `json:"id"`
+	Label       model.LocalizedText `json:"label"`
+	Description model.LocalizedText `json:"description"`
+}
+
+func (r contactSettingsRequest) toInput() (adminsvc.ContactSettingsInput, error) {
+	updatedAt := strings.TrimSpace(r.UpdatedAt)
+	if updatedAt == "" {
+		return adminsvc.ContactSettingsInput{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "updatedAt is required", nil)
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, updatedAt)
+	if err != nil {
+		return adminsvc.ContactSettingsInput{}, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "updatedAt must be RFC3339 timestamp", err)
+	}
+
+	topics := make([]adminsvc.ContactTopicInput, 0, len(r.Topics))
+	for _, topic := range r.Topics {
+		topics = append(topics, adminsvc.ContactTopicInput{
+			ID:          topic.ID,
+			Label:       topic.Label,
+			Description: topic.Description,
+		})
+	}
+
+	return adminsvc.ContactSettingsInput{
+		ID:                r.ID,
+		HeroTitle:         r.HeroTitle,
+		HeroDescription:   r.HeroDescription,
+		Topics:            topics,
+		ConsentText:       r.ConsentText,
+		MinimumLeadHours:  r.MinimumLeadHours,
+		RecaptchaSiteKey:  r.RecaptchaSiteKey,
+		SupportEmail:      r.SupportEmail,
+		CalendarTimezone:  r.CalendarTimezone,
+		GoogleCalendarID:  r.GoogleCalendarID,
+		BookingWindowDays: r.BookingWindowDays,
+		ExpectedUpdatedAt: parsed,
+	}, nil
 }
 
 func (r blacklistRequest) toInput() adminsvc.BlacklistInput {

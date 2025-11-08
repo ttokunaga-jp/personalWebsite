@@ -20,6 +20,8 @@ func MapRepositoryError(err error, resource string) *errs.AppError {
 		return errs.New(errs.CodeNotFound, http.StatusNotFound, fmt.Sprintf("%s not found", resource), err)
 	case errors.Is(err, repository.ErrInvalidInput):
 		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("invalid %s input", resource), err)
+	case errors.Is(err, repository.ErrConflict):
+		return errs.New(errs.CodeConflict, http.StatusConflict, fmt.Sprintf("%s conflict", resource), err)
 	case errors.Is(err, repository.ErrDuplicate):
 		return errs.New(errs.CodeConflict, http.StatusConflict, fmt.Sprintf("%s already exists", resource), err)
 	default:

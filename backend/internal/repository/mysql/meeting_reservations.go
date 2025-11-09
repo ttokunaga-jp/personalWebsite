@@ -119,6 +119,27 @@ WHERE status IN ('pending','confirmed')
   AND end_at > ?
 ORDER BY start_at ASC`
 
+const listReservationsBaseQuery = `
+SELECT
+	id,
+	name,
+	email,
+	topic,
+	message,
+	start_at,
+	end_at,
+	duration_minutes,
+	google_event_id,
+	google_calendar_status,
+	status,
+	confirmation_sent_at,
+	last_notification_sent_at,
+	lookup_hash,
+	cancellation_reason,
+	created_at,
+	updated_at
+FROM meeting_reservations`
+
 const markConfirmationQuery = `
 UPDATE meeting_reservations
 SET
@@ -203,6 +224,63 @@ func (r *meetingReservationRepository) FindReservationByLookupHash(ctx context.C
 	return &reservation, nil
 }
 
+func (r *meetingReservationRepository) FindReservationByID(ctx context.Context, id uint64) (*model.MeetingReservation, error) {
+	if id == 0 {
+		return nil, repository.ErrInvalidInput
+	}
+	return r.findByID(ctx, id)
+}
+
+func (r *meetingReservationRepository) ListReservations(ctx context.Context, filter repository.MeetingReservationListFilter) ([]model.MeetingReservation, error) {
+	query := listReservationsBaseQuery
+	var conditions []string
+	var args []any
+
+	if len(filter.Status) > 0 {
+		placeholders := make([]string, 0, len(filter.Status))
+		for _, status := range filter.Status {
+			value := strings.TrimSpace(string(status))
+			if value == "" {
+				continue
+			}
+			placeholders = append(placeholders, "?")
+			args = append(args, value)
+		}
+		if len(placeholders) > 0 {
+			conditions = append(conditions, "status IN ("+strings.Join(placeholders, ",")+")")
+		}
+	}
+
+	if email := strings.ToLower(strings.TrimSpace(filter.Email)); email != "" {
+		conditions = append(conditions, "LOWER(email) = ?")
+		args = append(args, email)
+	}
+
+	if filter.Date != nil {
+		day := filter.Date.UTC()
+		start := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+		end := start.Add(24 * time.Hour)
+		conditions = append(conditions, "start_at >= ? AND start_at < ?")
+		args = append(args, start, end)
+	}
+
+	if len(conditions) > 0 {
+		query = query + "\nWHERE " + strings.Join(conditions, " AND ")
+	}
+	query += "\nORDER BY start_at DESC, id DESC"
+
+	var rows []reservationRow
+	if err := r.db.SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, fmt.Errorf("list meeting_reservations: %w", err)
+	}
+
+	results := make([]model.MeetingReservation, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, mapReservationRow(row))
+	}
+	return results, nil
+}
+
 func (r *meetingReservationRepository) ListConflictingReservations(ctx context.Context, start, end time.Time) ([]model.MeetingReservation, error) {
 	var rows []reservationRow
 	if err := r.db.SelectContext(ctx, &rows, conflictReservationsQuery, end.UTC(), start.UTC()); err != nil {
@@ -237,6 +315,65 @@ func (r *meetingReservationRepository) CancelReservation(ctx context.Context, id
 	_, err := r.db.ExecContext(ctx, cancelReservationQuery, strings.TrimSpace(reason), id)
 	if err != nil {
 		return nil, fmt.Errorf("cancel meeting_reservations id=%d: %w", id, err)
+	}
+
+	return r.findByID(ctx, id)
+}
+
+func (r *meetingReservationRepository) UpdateReservationStatus(ctx context.Context, id uint64, status model.MeetingReservationStatus, reason string) (*model.MeetingReservation, error) {
+	if id == 0 {
+		return nil, repository.ErrInvalidInput
+	}
+
+	statusValue := strings.TrimSpace(string(status))
+	if statusValue == "" {
+		return nil, repository.ErrInvalidInput
+	}
+
+	var (
+		query string
+		args  []any
+	)
+
+	switch status {
+	case model.MeetingReservationStatusCancelled:
+		query = `
+UPDATE meeting_reservations
+SET
+	status = 'cancelled',
+	cancellation_reason = ?,
+	google_calendar_status = 'cancelled',
+	updated_at = NOW(3)
+WHERE id = ?`
+		args = []any{strings.TrimSpace(reason), id}
+	case model.MeetingReservationStatusConfirmed:
+		query = `
+UPDATE meeting_reservations
+SET
+	status = 'confirmed',
+	cancellation_reason = NULL,
+	google_calendar_status = CASE
+		WHEN google_calendar_status IS NULL OR google_calendar_status = '' THEN 'confirmed'
+		ELSE google_calendar_status
+	END,
+	updated_at = NOW(3)
+WHERE id = ?`
+		args = []any{id}
+	case model.MeetingReservationStatusPending:
+		query = `
+UPDATE meeting_reservations
+SET
+	status = 'pending',
+	cancellation_reason = NULL,
+	updated_at = NOW(3)
+WHERE id = ?`
+		args = []any{id}
+	default:
+		return nil, repository.ErrInvalidInput
+	}
+
+	if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
+		return nil, fmt.Errorf("update meeting_reservations status id=%d: %w", id, err)
 	}
 
 	return r.findByID(ctx, id)

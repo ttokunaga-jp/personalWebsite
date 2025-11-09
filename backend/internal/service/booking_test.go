@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -439,6 +440,61 @@ func (s *stubReservationRepository) FindReservationByLookupHash(ctx context.Cont
 	return cloneReservation(s.entries[id]), nil
 }
 
+func (s *stubReservationRepository) FindReservationByID(ctx context.Context, id uint64) (*model.MeetingReservation, error) {
+	entry, ok := s.entries[id]
+	if !ok {
+		return nil, repository.ErrNotFound
+	}
+	return cloneReservation(entry), nil
+}
+
+func (s *stubReservationRepository) ListReservations(ctx context.Context, filter repository.MeetingReservationListFilter) ([]model.MeetingReservation, error) {
+	results := make([]model.MeetingReservation, 0, len(s.entries))
+	statusFilter := make(map[model.MeetingReservationStatus]struct{})
+	for _, status := range filter.Status {
+		if value := strings.TrimSpace(string(status)); value != "" {
+			statusFilter[model.MeetingReservationStatus(value)] = struct{}{}
+		}
+	}
+	email := strings.ToLower(strings.TrimSpace(filter.Email))
+
+	var start *time.Time
+	var end *time.Time
+	if filter.Date != nil {
+		day := filter.Date.UTC()
+		since := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+		until := since.Add(24 * time.Hour)
+		start = &since
+		end = &until
+	}
+
+	for _, entry := range s.entries {
+		if len(statusFilter) > 0 {
+			if _, ok := statusFilter[entry.Status]; !ok {
+				continue
+			}
+		}
+		if email != "" && strings.ToLower(strings.TrimSpace(entry.Email)) != email {
+			continue
+		}
+		if start != nil && end != nil {
+			if entry.StartAt.Before(*start) || !entry.StartAt.Before(*end) {
+				continue
+			}
+		}
+		results = append(results, *cloneReservation(entry))
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].StartAt.Equal(results[j].StartAt) {
+			return results[i].ID > results[j].ID
+		}
+		return results[i].StartAt.After(results[j].StartAt)
+	})
+
+	return results, nil
+}
+
 func (s *stubReservationRepository) ListConflictingReservations(ctx context.Context, start, end time.Time) ([]model.MeetingReservation, error) {
 	conflicts := make([]model.MeetingReservation, len(s.conflicts))
 	copy(conflicts, s.conflicts)
@@ -473,6 +529,33 @@ func (s *stubReservationRepository) CancelReservation(ctx context.Context, id ui
 	entry.Status = model.MeetingReservationStatusCancelled
 	entry.CancellationReason = reason
 	entry.GoogleCalendarStatus = "cancelled"
+	entry.UpdatedAt = time.Now().UTC()
+	s.entries[id] = entry
+	return cloneReservation(entry), nil
+}
+
+func (s *stubReservationRepository) UpdateReservationStatus(ctx context.Context, id uint64, status model.MeetingReservationStatus, reason string) (*model.MeetingReservation, error) {
+	entry, ok := s.entries[id]
+	if !ok {
+		return nil, repository.ErrNotFound
+	}
+	switch status {
+	case model.MeetingReservationStatusCancelled:
+		entry.Status = model.MeetingReservationStatusCancelled
+		entry.CancellationReason = strings.TrimSpace(reason)
+		entry.GoogleCalendarStatus = "cancelled"
+	case model.MeetingReservationStatusConfirmed:
+		entry.Status = model.MeetingReservationStatusConfirmed
+		entry.CancellationReason = ""
+		if strings.TrimSpace(entry.GoogleCalendarStatus) == "" {
+			entry.GoogleCalendarStatus = "confirmed"
+		}
+	case model.MeetingReservationStatusPending:
+		entry.Status = model.MeetingReservationStatusPending
+		entry.CancellationReason = ""
+	default:
+		return nil, repository.ErrInvalidInput
+	}
 	entry.UpdatedAt = time.Now().UTC()
 	s.entries[id] = entry
 	return cloneReservation(entry), nil

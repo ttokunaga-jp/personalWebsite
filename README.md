@@ -27,7 +27,7 @@
 | 領域 | 実装状況 | 補足 |
 | --- | --- | --- |
 | フロントエンド（公開 SPA） | 完了 | Home / Profile / Research / Projects / Contact を実装。i18n、フォーム検証、予約枠表示、reCAPTCHA 連携を含む。|
-| フロントエンド（管理 SPA） | MVP | プロジェクト・研究・ブログ・予約・ブラックリスト CRUD を提供。UI/UX と e2e 自動テストは今後拡充予定。|
+| フロントエンド（管理モード） | MVP | 公開 SPA 内に統合した管理モードを提供。プロジェクト・研究・予約・ブラックリスト CRUD を掲載タブで操作可能。UI/UX と e2e 自動テストは今後拡充予定。|
 | バックエンド API | 完了 | 公開 / 管理エンドポイント、Google OAuth + サーバーサイドセッション、予約（カレンダー・通知）処理、Clean Architecture 風レイヤ分離済み。|
 | 認証・権限 | MVP | Google OAuth、ドメイン/メール許可リスト、HttpOnly 管理セッション、Admin Guard を実装。Secret 管理と本番向け WIF 設定は環境依存。|
 | 予約・外部連携 | MVP | Google Calendar への予定挿入、Gmail API 経由の通知をサポート。トークン更新やバックアップ導線は継続改善対象。|
@@ -52,8 +52,7 @@
 │   ├── scripts               # 補助スクリプト
 │   └── Dockerfile
 ├── frontend/                 # React + Vite ワークスペース
-│   ├── apps/public           # 公開 SPA
-│   ├── apps/admin            # 管理者 SPA
+│   ├── apps/public           # 公開 SPA（管理モードを含む）
 │   ├── packages/shared       # 共有 UI / API クライアント
 │   ├── package.json / pnpm-workspace.yaml
 │   └── Dockerfile
@@ -94,8 +93,8 @@
 | `APP_GOOGLE_REDIRECT_URL` | Google OAuth のリダイレクト URL。Cloud Run 公開 URL の `/api/admin/auth/callback` を指定。CI/CD では `FRONTEND_API_BASE_URL` から自動補完されます。 |
 | `APP_AUTH_ADMIN_ALLOWED_EMAILS` | 管理画面へアクセス可能なメールアドレスのリスト（カンマ区切り）。Secret Manager 経由で注入します。 |
 | `APP_ADMIN_ALLOWED_EMAILS` | `APP_AUTH_ADMIN_ALLOWED_EMAILS` の互換エイリアス。Terraform / Cloud Run で同一シークレットを共有。 |
-| `APP_AUTH_ADMIN_DEFAULT_REDIRECT_URI` | OAuth コールバック後にリダイレクトする管理 SPA のパス。既定は `/admin`。 |
-| `APP_ADMIN_REDIRECT_URI` | 管理 SPA が利用するリダイレクト URI の公開名。Cloud Run URL（例: `https://<service>.run.app/admin`）を設定。 |
+| `APP_AUTH_ADMIN_DEFAULT_REDIRECT_URI` | OAuth コールバック後にリダイレクトする管理モードパス。既定は `/admin`。 |
+| `APP_ADMIN_REDIRECT_URI` | 管理モードで利用するリダイレクト URI の公開名。Cloud Run URL（例: `https://<service>.run.app/admin`）を設定。 |
 | `DB_DRIVER` | `mysql` または `firestore` を指定。データストア切替に使用。 |
 | `DB_USER` | 接続に使用する MySQL ユーザー名（Cloud SQL の IAM DB User など）。 |
 | `DB_PASSWORD` | `DB_USER` に対応するパスワード。Cloud Build / Secret Manager 経由で注入。 |
@@ -136,8 +135,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 
 ## ローカル開発
 - **バックエンドのみ起動**: `cd backend && go run ./cmd/server`
-- **フロントエンド（公開）**: `cd frontend && pnpm --filter @personal-website/public dev`
-- **フロントエンド（管理）**: `cd frontend && pnpm --filter @personal-website/admin dev`
+- **フロントエンド（閲覧/管理モード）**: `cd frontend && pnpm --filter @personal-website/public dev`
 - **フルスタック（Docker Compose）**:
   ```bash
   make up           # フォアグラウンド
@@ -167,7 +165,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 4. **デプロイ後に Cloud Run の URL を確認**  
    `terraform apply` もしくは Cloud Build 経由でデプロイした後、Cloud Run の管理画面で URL を確認し、README の手順に沿って SPA の `VITE_API_BASE_URL` と `APP_ADMIN_REDIRECT_URI` を調整してください。
 
-管理者ログイン時のフローハッシュ解析やセッション維持ロジックは `frontend/apps/admin/src/modules/auth-session.tsx` と `@personal-website/shared` の Axios インターセプタで管理しています。
+管理者ログイン時のセッション維持ロジックは `frontend/apps/public/src/providers/AdminModeProvider.tsx` と `@personal-website/shared` の Axios インターセプタで管理しています。
 
 ## フロントエンド
 
@@ -179,11 +177,11 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 - テスト: `pnpm --filter @personal-website/public test`。React Router の v7 transition 警告は既知（React Router ドキュメント参照）。
 - ビルド: `pnpm --filter @personal-website/public build`。
 
-### 管理 SPA (`frontend/apps/admin`)
-- 認証済み管理者向けの CRUD UI。ダッシュボードサマリ、プロジェクト / 研究 / ブログ / 予約 / ブラックリスト管理を実装。
-- API: `/api/admin/*`。HttpOnly / Secure セッション Cookie で認証。
-- テスト: `pnpm --filter @personal-website/admin test`。現状はユニットレベル中心で、E2E は今後 Playwright 導入予定。
-- スタイル: Tailwind + Headless UI コンポーネントをベース。
+### 管理モード UI（公開 SPA に統合）
+- 認証済み管理者だけがトグルで有効化できる管理モードを提供。ダッシュボードタブから予約 / ブラックリスト / Tech Catalog / SNS / MeetingURL を編集。
+- API: `/api/admin/*`。HttpOnly / Secure セッション Cookie に加えて `mode=admin` クエリを必須化。
+- テスト: `pnpm --filter @personal-website/public test`。Playwright でのモード切替 E2E を今後追加予定。
+- スタイル: Tailwind ベースで公開 UI と統一。
 
 ## バックエンド API
 
@@ -276,7 +274,7 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
     - `FIRESTORE_COLLECTION_PREFIX`（必要な場合のみ）
     - `BACKEND_TRAFFIC_PERCENT`, `FRONTEND_TRAFFIC_PERCENT`（現在の CI は 100% デプロイのみ自動適用。段階的リリースを行う場合はデプロイ後に `gcloud run services update-traffic` で手動調整が必要）
    - ※ `FRONTEND_API_BASE_URL` には Cloud Run の API サービス公開 URL（`https://...run.app` 形式）を指定してください。CI/CD 側で自動的に `/api` を付与し、`API_PROXY_PASS` / `VITE_ADMIN_LOGIN_URL` / `APP_GOOGLE_REDIRECT_URL` を正しく設定します。
-   - ※ `FRONTEND_APP_BASE_URL` には管理 SPA をホストする Cloud Run (frontend) の公開 URL（例: `https://personal-website-frontend-<env>.run.app`）を指定してください。未設定の場合、Cloud Build が失敗し、OAuth コールバック後のリダイレクトが 404 になるため注意してください。
+   - ※ `FRONTEND_APP_BASE_URL` には公開 SPA（管理モードを含む）をホストする Cloud Run (frontend) の公開 URL（例: `https://personal-website-frontend-<env>.run.app`）を指定してください。未設定の場合、Cloud Build が失敗し、OAuth コールバック後のリダイレクトが 404 になるため注意してください。
 2. 同環境の Secrets:
    - `BACKEND_SECRET_JWT`
    - `BACKEND_SECRET_STATE`
@@ -348,4 +346,4 @@ reCAPTCHA を利用する場合は GitHub Actions / Cloud Build 側で `VITE_REC
 2. Terraform に Cloud SQL Backups / Secret Manager / Monitoring リソースを追加し、環境差分を完全 IaC 化する。
 3. Cloud Build 後に自動でライトウェイトな Smoke テスト（`make smoke-backend`）や Lighthouse CI を走らせる。
 4. Cloud Monitoring にダッシュボード・アラートポリシーを定義し、インシデント対応の基盤を整える。
-5. 管理 SPA の UX 改善（並列編集、ドラフト機能）とアクセス制御細分化（ロールベース）を検討する。
+5. 管理モード UI の UX 改善（並列編集、ドラフト機能）とアクセス制御細分化（ロールベース）を検討する。

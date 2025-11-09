@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS profile_work_history (
 CREATE TABLE IF NOT EXISTS profile_social_links (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   profile_id BIGINT UNSIGNED NOT NULL,
-  provider ENUM('github','zenn','linkedin','x','email','other') NOT NULL,
+  provider ENUM('github','zenn','linkedin','x','email','website','other') NOT NULL,
   label_ja VARCHAR(255) NULL,
   label_en VARCHAR(255) NULL,
   url VARCHAR(512) NOT NULL,
@@ -129,6 +129,9 @@ CREATE TABLE IF NOT EXISTS profile_social_links (
   INDEX idx_profile_social_links_profile (profile_id, sort_order),
   CONSTRAINT fk_profile_social_links_profile FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE profile_social_links
+  MODIFY COLUMN provider ENUM('github','zenn','linkedin','x','email','website','other') NOT NULL;
 
 CREATE TABLE IF NOT EXISTS profile_tech_sections (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -294,9 +297,13 @@ CREATE TABLE IF NOT EXISTS contact_form_settings (
   calendar_timezone VARCHAR(64) NOT NULL,
   google_calendar_id VARCHAR(255) NULL,
   booking_window_days INT DEFAULT 30,
+  meeting_url_template TEXT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE contact_form_settings
+  ADD COLUMN meeting_url_template TEXT NULL AFTER booking_window_days;
 
 CREATE TABLE IF NOT EXISTS meeting_reservations (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -344,5 +351,93 @@ CREATE TABLE IF NOT EXISTS schedule_blackouts (
   end_time DATETIME(3) NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO profiles (
+  display_name,
+  headline_ja,
+  headline_en,
+  summary_ja,
+  summary_en,
+  avatar_url,
+  location_ja,
+  location_en,
+  theme_mode,
+  theme_accent_color,
+  lab_name_ja,
+  lab_name_en,
+  lab_advisor_ja,
+  lab_advisor_en,
+  lab_room_ja,
+  lab_room_en,
+  lab_url
+)
+SELECT
+  'Takumi Tokunaga',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  'system',
+  NULL,
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  ''
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM profiles);
+
+INSERT INTO contact_form_settings (
+  hero_title_ja,
+  hero_title_en,
+  hero_description_ja,
+  hero_description_en,
+  topics,
+  consent_text_ja,
+  consent_text_en,
+  minimum_lead_hours,
+  recaptcha_public_key,
+  support_email,
+  calendar_timezone,
+  google_calendar_id,
+  booking_window_days,
+  meeting_url_template
+)
+SELECT
+  '',
+  '',
+  '',
+  '',
+  '[]',
+  '',
+  '',
+  24,
+  '',
+  'support@example.com',
+  'Asia/Tokyo',
+  '',
+  30,
+  ''
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM contact_form_settings);
+
+INSERT INTO home_page_config (
+  profile_id,
+  hero_subtitle_ja,
+  hero_subtitle_en
+)
+SELECT
+  p.id,
+  '',
+  ''
+FROM profiles p
+WHERE NOT EXISTS (SELECT 1 FROM home_page_config)
+ORDER BY p.id
+LIMIT 1;
 
 -- Legacy data can now be migrated into the new structure using the scripts defined under scripts/db/.

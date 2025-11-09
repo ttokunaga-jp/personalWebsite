@@ -100,6 +100,8 @@ apiClient.interceptors.request.use(async (config) => {
     removeHeader(config, "Authorization");
   }
 
+  setHeader(config, "X-Requested-With", "XMLHttpRequest");
+
   const method = (config.method ?? "get").toLowerCase();
   if (!SAFE_METHODS.has(method)) {
     const token = await getCsrfToken();

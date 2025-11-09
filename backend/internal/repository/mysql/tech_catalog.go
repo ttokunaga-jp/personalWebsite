@@ -21,7 +21,7 @@ func NewTechCatalogRepository(db *sqlx.DB) repository.TechCatalogRepository {
 	return &techCatalogRepository{db: db}
 }
 
-const listTechCatalogQuery = `
+const techCatalogSelectBase = `
 SELECT
     id,
     slug,
@@ -33,9 +33,44 @@ SELECT
     is_active,
     created_at,
     updated_at
-FROM tech_catalog
-%s
+FROM tech_catalog`
+
+const listTechCatalogOrderClause = `
 ORDER BY sort_order, id`
+
+const getTechCatalogByIDQuery = techCatalogSelectBase + `
+WHERE id = ?
+LIMIT 1`
+
+const getTechCatalogBySlugQuery = techCatalogSelectBase + `
+WHERE slug = ?
+LIMIT 1`
+
+const insertTechCatalogQuery = `
+INSERT INTO tech_catalog (
+    slug,
+    display_name,
+    category,
+    level,
+    icon,
+    sort_order,
+    is_active,
+    created_at,
+    updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`
+
+const updateTechCatalogQuery = `
+UPDATE tech_catalog
+SET
+    slug = ?,
+    display_name = ?,
+    category = ?,
+    level = ?,
+    icon = ?,
+    sort_order = ?,
+    is_active = ?,
+    updated_at = NOW(3)
+WHERE id = ?`
 
 type techCatalogRow struct {
 	ID          uint64         `db:"id"`
@@ -51,11 +86,13 @@ type techCatalogRow struct {
 }
 
 func (r *techCatalogRepository) ListTechCatalog(ctx context.Context, includeInactive bool) ([]model.TechCatalogEntry, error) {
-	where := ""
+	queryBuilder := strings.Builder{}
+	queryBuilder.WriteString(techCatalogSelectBase)
 	if !includeInactive {
-		where = "WHERE is_active = 1"
+		queryBuilder.WriteString("\nWHERE is_active = 1")
 	}
-	query := fmt.Sprintf(listTechCatalogQuery, where)
+	queryBuilder.WriteString(listTechCatalogOrderClause)
+	query := queryBuilder.String()
 
 	var rows []techCatalogRow
 	if err := r.db.SelectContext(ctx, &rows, query); err != nil {
@@ -64,24 +101,161 @@ func (r *techCatalogRepository) ListTechCatalog(ctx context.Context, includeInac
 
 	results := make([]model.TechCatalogEntry, 0, len(rows))
 	for _, row := range rows {
-		entry := model.TechCatalogEntry{
-			ID:          row.ID,
-			Slug:        strings.TrimSpace(row.Slug),
-			DisplayName: strings.TrimSpace(row.DisplayName),
-			Category:    strings.TrimSpace(row.Category.String),
-			Level:       model.TechLevel(strings.TrimSpace(row.Level)),
-			Icon:        strings.TrimSpace(row.Icon.String),
-			SortOrder:   row.SortOrder,
-			Active:      row.Active,
-		}
-		if row.CreatedAt.Valid {
-			entry.CreatedAt = row.CreatedAt.Time.UTC()
-		}
-		if row.UpdatedAt.Valid {
-			entry.UpdatedAt = row.UpdatedAt.Time.UTC()
-		}
-		results = append(results, entry)
+		results = append(results, mapTechCatalogRow(row))
 	}
 
 	return results, nil
+}
+
+func (r *techCatalogRepository) GetTechCatalogEntry(ctx context.Context, id uint64) (*model.TechCatalogEntry, error) {
+	if id == 0 {
+		return nil, repository.ErrInvalidInput
+	}
+
+	var row techCatalogRow
+	if err := r.db.GetContext(ctx, &row, getTechCatalogByIDQuery, id); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, repository.ErrNotFound
+		}
+		return nil, fmt.Errorf("get tech catalog by id %d: %w", id, err)
+	}
+	entry := mapTechCatalogRow(row)
+	return &entry, nil
+}
+
+func (r *techCatalogRepository) CreateTechCatalogEntry(ctx context.Context, entry *model.TechCatalogEntry) (*model.TechCatalogEntry, error) {
+	if entry == nil {
+		return nil, repository.ErrInvalidInput
+	}
+
+	slug := strings.TrimSpace(entry.Slug)
+	displayName := strings.TrimSpace(entry.DisplayName)
+	category := strings.TrimSpace(entry.Category)
+	icon := strings.TrimSpace(entry.Icon)
+
+	if slug == "" || displayName == "" {
+		return nil, repository.ErrInvalidInput
+	}
+	if !isValidTechLevel(entry.Level) {
+		return nil, repository.ErrInvalidInput
+	}
+
+	if existing, err := r.getTechCatalogBySlug(ctx, slug); err == nil && existing != nil {
+		return nil, repository.ErrDuplicate
+	} else if err != nil && err != repository.ErrNotFound {
+		return nil, err
+	}
+
+	res, err := r.db.ExecContext(ctx, insertTechCatalogQuery,
+		slug,
+		displayName,
+		nullString(category),
+		strings.TrimSpace(string(entry.Level)),
+		nullString(icon),
+		entry.SortOrder,
+		entry.Active,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("insert tech catalog entry: %w", err)
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("tech catalog last insert id: %w", err)
+	}
+
+	return r.GetTechCatalogEntry(ctx, uint64(id))
+}
+
+func (r *techCatalogRepository) UpdateTechCatalogEntry(ctx context.Context, entry *model.TechCatalogEntry) (*model.TechCatalogEntry, error) {
+	if entry == nil {
+		return nil, repository.ErrInvalidInput
+	}
+	if entry.ID == 0 {
+		return nil, repository.ErrInvalidInput
+	}
+
+	if _, err := r.GetTechCatalogEntry(ctx, entry.ID); err != nil {
+		return nil, err
+	}
+
+	slug := strings.TrimSpace(entry.Slug)
+	displayName := strings.TrimSpace(entry.DisplayName)
+	category := strings.TrimSpace(entry.Category)
+	icon := strings.TrimSpace(entry.Icon)
+
+	if slug == "" || displayName == "" {
+		return nil, repository.ErrInvalidInput
+	}
+	if !isValidTechLevel(entry.Level) {
+		return nil, repository.ErrInvalidInput
+	}
+
+	if existing, err := r.getTechCatalogBySlug(ctx, slug); err == nil && existing.ID != entry.ID {
+		return nil, repository.ErrDuplicate
+	} else if err != nil && err != repository.ErrNotFound {
+		return nil, err
+	}
+
+	_, err := r.db.ExecContext(ctx, updateTechCatalogQuery,
+		slug,
+		displayName,
+		nullString(category),
+		strings.TrimSpace(string(entry.Level)),
+		nullString(icon),
+		entry.SortOrder,
+		entry.Active,
+		entry.ID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("update tech catalog entry %d: %w", entry.ID, err)
+	}
+
+	return r.GetTechCatalogEntry(ctx, entry.ID)
+}
+
+func (r *techCatalogRepository) getTechCatalogBySlug(ctx context.Context, slug string) (*model.TechCatalogEntry, error) {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return nil, repository.ErrInvalidInput
+	}
+
+	var row techCatalogRow
+	if err := r.db.GetContext(ctx, &row, getTechCatalogBySlugQuery, slug); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, repository.ErrNotFound
+		}
+		return nil, fmt.Errorf("get tech catalog by slug %s: %w", slug, err)
+	}
+	entry := mapTechCatalogRow(row)
+	return &entry, nil
+}
+
+func mapTechCatalogRow(row techCatalogRow) model.TechCatalogEntry {
+	entry := model.TechCatalogEntry{
+		ID:          row.ID,
+		Slug:        strings.TrimSpace(row.Slug),
+		DisplayName: strings.TrimSpace(row.DisplayName),
+		Category:    strings.TrimSpace(row.Category.String),
+		Level:       model.TechLevel(strings.TrimSpace(row.Level)),
+		Icon:        strings.TrimSpace(row.Icon.String),
+		SortOrder:   row.SortOrder,
+		Active:      row.Active,
+	}
+	if row.CreatedAt.Valid {
+		entry.CreatedAt = row.CreatedAt.Time.UTC()
+	}
+	if row.UpdatedAt.Valid {
+		entry.UpdatedAt = row.UpdatedAt.Time.UTC()
+	}
+	return entry
+}
+
+func isValidTechLevel(level model.TechLevel) bool {
+	switch strings.TrimSpace(string(level)) {
+	case string(model.TechLevelBeginner), string(model.TechLevelIntermediate), string(model.TechLevelAdvanced):
+		return true
+	default:
+		return false
+	}
 }

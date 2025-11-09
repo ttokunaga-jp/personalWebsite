@@ -97,6 +97,13 @@ func NewClient(lc fx.Lifecycle, cfg *config.AppConfig) (*sqlx.DB, error) {
 		},
 	})
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := applySchema(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("mysql client: apply schema: %w", err)
+	}
+
 	return db, nil
 }
 

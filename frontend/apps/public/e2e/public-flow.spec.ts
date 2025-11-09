@@ -67,7 +67,7 @@ test("visitor walks through primary navigation and submits a booking", async ({ 
 
   await expect(
     page.getByRole("heading", {
-      name: profileFixture.headline ?? "",
+      name: profileFixture.displayName,
       exact: false
     })
   ).toBeVisible();
@@ -78,30 +78,49 @@ test("visitor walks through primary navigation and submits a booking", async ({ 
   await expect(page.getByRole("heading", { name: "Project archive" })).toBeVisible();
 
   await page.getByRole("button", { name: "TypeScript" }).click();
-  await expect(page.getByRole("article", { name: projectsFixture[0]?.title ?? "" })).toBeVisible();
-  await expect(
-    page.getByRole("article", { name: projectsFixture[1]?.title ?? "" })
-  ).not.toBeVisible();
+  const firstProjectCard = page
+    .getByRole("article")
+    .filter({ hasText: projectsFixture[0]?.title ?? "" })
+    .first();
+  const secondProjectCard = page
+    .getByRole("article")
+    .filter({ hasText: projectsFixture[1]?.title ?? "" })
+    .first();
+  await expect(firstProjectCard).toBeVisible();
+  await expect(secondProjectCard).not.toBeVisible();
 
   await primaryNavigation.getByRole("link", { name: "Contact" }).click();
-  await expect(page.getByRole("heading", { name: "Get in touch" })).toBeVisible();
-
-  await page.fill('input[name="name"]', "E2E Tester");
-  await page.fill('input[name="email"]', "tester@example.com");
-  await page.selectOption(
-    'select[name="topic"]',
-    contactConfigFixture.topics[0]?.id ?? ""
-  );
-  await page.fill(
-    'textarea[name="message"]',
-    "Exploring possibilities for a robotics research collaboration."
-  );
-
-  await page.selectOption('select[name="slotId"]', contactAvailabilityFixture.days[0]?.slots[0]?.id ?? "");
-
-  await page.getByRole("button", { name: "Request booking" }).click();
-
   await expect(
-    page.getByText(/Your request \(ID: bk-/)
+    page.getByRole("heading", { name: contactConfigFixture.heroTitle }),
   ).toBeVisible();
+
+  const nameField = page.locator('input[name="name"]');
+  const emailField = page.locator('input[name="email"]');
+  const topicField = page.locator('select[name="topic"]');
+  const messageField = page.locator('textarea[name="agenda"]');
+  const firstAvailableSlot = page.getByTestId("availability-slot-available").first();
+  const submitButton = page.getByRole("button", { name: "Request booking" });
+
+  await Promise.all([
+    expect(nameField).toBeVisible(),
+    expect(emailField).toBeVisible(),
+    expect(topicField).toBeVisible(),
+    expect(messageField).toBeVisible(),
+    expect(firstAvailableSlot).toBeVisible(),
+  ]);
+
+  await nameField.fill("E2E Tester");
+  await emailField.fill("tester@example.com");
+  await topicField.selectOption(contactConfigFixture.topics[0]?.id ?? "");
+  await messageField.fill(
+    "Exploring possibilities for a robotics research collaboration.",
+  );
+
+  await firstAvailableSlot.click();
+  await expect(firstAvailableSlot).toHaveClass(/bg-sky-600/);
+
+  await expect(submitButton).toBeEnabled();
+  await submitButton.click();
+
+  await expect(page.getByText(/Your request \(ID: bk-/)).toBeVisible();
 });

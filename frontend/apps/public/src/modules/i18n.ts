@@ -282,6 +282,35 @@ export const resources = {
         loginCta: "Sign in with Google",
         loginHelp:
           "You'll authenticate with Google SSO. Only allow-listed administrator accounts can access the console, and you will be redirected back to the dashboard after signing in.",
+        toggle: {
+          loading: "Checking access…",
+          adminLabel: "Admin mode",
+          viewLabel: "View mode",
+          unsavedNotice: "Unsaved changes will be lost",
+        },
+        modeGuard: {
+          loginRequired:
+            "Sign in to enable admin controls and update public content.",
+          enableAdminMode:
+            "Switch to admin mode using the toggle in the navigation bar to begin editing.",
+          sessionExpired:
+            "Your admin session has expired. Refresh the page or sign in again.",
+          noAccess:
+            "You do not have permission to access the admin console. Contact the owner if you believe this is a mistake.",
+        },
+        console: {
+          tabs: {
+            reservations: "Reservations",
+            blacklist: "Blacklist",
+            techCatalog: "Tech catalog",
+            socialLinks: "Social links",
+            meetingUrl: "Meeting URL",
+          },
+          emptyState:
+            "Select a management view on the left to review and update structured content.",
+          draftWarning:
+            "Remember to save your edits before navigating away—unsaved forms are highlighted.",
+        },
       },
       footer: {
         copyright: "Takumi Tokunaga. All rights reserved.",
@@ -560,6 +589,35 @@ export const resources = {
         loginCta: "Google でサインイン",
         loginHelp:
           "Google SSO を利用し、許可された管理者アカウントのみがアクセスできます。認証後は管理コンソールに自動的に戻ります。",
+        toggle: {
+          loading: "権限を確認しています…",
+          adminLabel: "管理モード",
+          viewLabel: "閲覧モード",
+          unsavedNotice: "未保存の変更が破棄されます",
+        },
+        modeGuard: {
+          loginRequired:
+            "管理モードを利用するにはサインインしてください。",
+          enableAdminMode:
+            "ナビゲーションバーのトグルから管理モードに切り替えると編集が始められます。",
+          sessionExpired:
+            "管理セッションの有効期限が切れました。ページを更新するか、再度サインインしてください。",
+          noAccess:
+            "管理コンソールへのアクセス権限がありません。必要な場合は管理者に問い合わせてください。",
+        },
+        console: {
+          tabs: {
+            reservations: "予約一覧",
+            blacklist: "ブラックリスト",
+            techCatalog: "技術カタログ",
+            socialLinks: "SNS リンク",
+            meetingUrl: "MeetingURL",
+          },
+          emptyState:
+            "左側の管理メニューから対象機能を選択すると詳細が表示されます。",
+          draftWarning:
+            "移動する前に変更を保存してください。未保存のフォームは強調表示されます。",
+        },
       },
       footer: {
         copyright: "Takumi Tokunaga. All rights reserved.",

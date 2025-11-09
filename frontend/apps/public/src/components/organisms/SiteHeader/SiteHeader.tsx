@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { NavLink } from "react-router-dom";
 
 import { navigationItems } from "../../../app/routes/routeConfig";
-import { useAdminSession } from "../../../hooks/useAdminSession";
+import { useAdminMode } from "../../../hooks/useAdminMode";
 import { classNames } from "../../../lib/classNames";
 import { LanguageSwitcher } from "../../molecules/LanguageSwitcher";
 import { ThemeToggle } from "../../molecules/ThemeToggle";
+import { AdminAwareNavLink } from "../../navigation/AdminAwareLink";
+import { AdminModeToggle } from "../../navigation/AdminModeToggle";
 
 export function SiteHeader() {
   const { t } = useTranslation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const { session } = useAdminSession();
+  const { sessionActive } = useAdminMode();
 
   useEffect(() => {
     const handleResize = () => {
@@ -29,11 +30,11 @@ export function SiteHeader() {
   );
 
   const dynamicNavigationItems = useMemo(() => {
-    if (session?.active) {
+    if (sessionActive) {
       return [...navigationItems, adminNavItem];
     }
     return navigationItems;
-  }, [session?.active, adminNavItem]);
+  }, [sessionActive, adminNavItem]);
 
   return (
     <header className="border-b border-slate-200 bg-white/80 backdrop-blur-md transition-colors dark:border-slate-800 dark:bg-slate-950/80">
@@ -68,6 +69,7 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-3 md:hidden">
           <ThemeToggle />
+          <AdminModeToggle />
           <button
             type="button"
             className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 text-slate-600 transition hover:border-sky-400 hover:text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:text-slate-200 dark:hover:border-sky-400 dark:hover:text-sky-300 dark:focus-visible:ring-sky-400"
@@ -88,22 +90,27 @@ export function SiteHeader() {
           className="hidden items-center gap-6 md:flex"
           aria-label={t("navigation.label")}
         >
-          {dynamicNavigationItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                classNames(
-                  "text-sm font-medium text-slate-600 transition hover:text-sky-600 dark:text-slate-300 dark:hover:text-sky-300",
-                  isActive && "text-slate-900 dark:text-white",
-                )
-              }
-            >
-              {t(item.labelKey)}
-            </NavLink>
-          ))}
+          {dynamicNavigationItems.map((item) => {
+            const commonClasses =
+              "text-sm font-medium text-slate-600 transition hover:text-sky-600 dark:text-slate-300 dark:hover:text-sky-300";
+            return (
+              <AdminAwareNavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) =>
+                  classNames(
+                    commonClasses,
+                    isActive && "text-slate-900 dark:text-white",
+                  )
+                }
+              >
+                {t(item.labelKey)}
+              </AdminAwareNavLink>
+            );
+          })}
           <LanguageSwitcher />
           <ThemeToggle />
+          <AdminModeToggle />
         </nav>
       </div>
 
@@ -115,7 +122,7 @@ export function SiteHeader() {
           aria-label={t("navigation.mobileLabel")}
         >
           {dynamicNavigationItems.map((item) => (
-            <NavLink
+            <AdminAwareNavLink
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
@@ -128,11 +135,12 @@ export function SiteHeader() {
               onClick={() => setIsMobileOpen(false)}
             >
               {t(item.labelKey)}
-            </NavLink>
+            </AdminAwareNavLink>
           ))}
           <div className="flex items-center justify-between rounded-lg bg-slate-100 px-3 py-2 dark:bg-slate-800">
             <LanguageSwitcher />
             <ThemeToggle />
+            <AdminModeToggle />
           </div>
         </nav>
       </div>

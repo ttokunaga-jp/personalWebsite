@@ -5,7 +5,7 @@
 # 実装内容
 - **システム全体構成**：Cloud Run 上でフロント SPA と Go API を個別デプロイし、Cloud Firestore と Cloud Storage をバックエンドに据える。Cloudflare で DNS/HTTPS 終端、Terraform で IaC 管理。
 - **モジュール分割（Go API）**：`handler`（HTTP 入出力 & 認証）、`usecase`（アプリケーションロジック）、`repository`（DB・外部 API）、`domain`（エンティティ）、`infrastructure`（DI コンテナ、設定、クライアント管理）。
-- **モジュール分割（React SPA）**：`apps/public` と `apps/admin` をルーティングで分岐し、共通 UI / i18n / API クライアントは `packages/shared` に集約。 `/admin` のビルドは Guard で保護し、通常ナビゲーションから除外。
+- **モジュール分割（React SPA）**：`apps/public` を基点に閲覧モードと管理モードをトグルで切り替える構成。共通 UI / i18n / API クライアントは `packages/shared` に集約し、管理専用コンソールも同一 SPA に内包する。
 - **認証・認可**：Cloudflare で HTTPS 強制。Google OAuth 2.0 を Cloud Run API に設定し、認証成功時に HttpOnly/Secure なサーバーサイドセッションを発行。管理 API はセッション + ロールで保護。公開 API は IP Rate Limiting + ReCAPTCHA で濫用防止。
 - **予約ドメイン**：Contact フローで Google Calendar API と連携。30 分前後のバッファ除外を usecase 層で実装し、DB・Calendar 双方へ整合性書き込み。外部呼び出しは Circuit Breaker & Retry (指数バックオフ) を備える。
 - **非機能対策**：slog による構造化ログ、OpenTelemetry Exporter、Cloud Monitoring Alert。キャッシュ層は Cloud CDN (静的) + API レスポンスの ETag/Conditional Request。DB クエリはインデックス計画と SQLX Prepared Statement。Rate Limiting は Redis 互換 Memorystore で固定窓 + バースト吸収。
@@ -15,8 +15,7 @@
 ```mermaid
 flowchart TD
     subgraph Client["Client Devices"]
-        Browser["SPA<br/>(Public Routes)"]
-        Admin["SPA<br/>(/admin Routes)"]
+        Browser["SPA<br/>(View/Admin Modes)"]
     end
 
     subgraph CDN["Cloudflare CDN + DNS"]
@@ -48,7 +47,6 @@ flowchart TD
     end
 
     Browser -->|HTTPS| TLS --> React
-    Admin -->|HTTPS| TLS --> React
     React -->|REST / JSON| Handler
     Handler --> Usecase --> Domain
     Usecase --> Repo
@@ -91,8 +89,7 @@ sequenceDiagram
 ```mermaid
 graph LR
     subgraph Frontend
-        Public["Public App"]
-        AdminUI["Admin App"]
+        Public["Public App (View/Admin Modes)"]
         Shared["Shared Components & Hooks"]
     end
     subgraph Backend
@@ -109,7 +106,6 @@ graph LR
     end
 
     Public --> Shared
-    AdminUI --> Shared
     Handler --> Usecase
     Usecase --> Repo
     Usecase --> Domain
@@ -125,7 +121,6 @@ graph LR
   ```
   /frontend
     /apps/public
-    /apps/admin
     /packages/shared
   /api
     /cmd/server

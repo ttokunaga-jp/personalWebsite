@@ -51,3 +51,41 @@ func hasAdminRole(roles []string) bool {
 	}
 	return false
 }
+
+// AdminModeContextKey stores the mode associated with the current request.
+const AdminModeContextKey = "admin.mode"
+
+// AdminModeGuard ensures admin endpoints are only invoked when mode=admin is explicitly requested.
+type AdminModeGuard struct {
+	queryKey string
+}
+
+// NewAdminModeGuard constructs a guard enforcing the mode query parameter.
+func NewAdminModeGuard() *AdminModeGuard {
+	return &AdminModeGuard{
+		queryKey: "mode",
+	}
+}
+
+// RequireAdminMode validates that the incoming request is explicitly tagged as admin mode.
+func (g *AdminModeGuard) RequireAdminMode() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if g == nil {
+			c.Next()
+			return
+		}
+
+		mode := strings.ToLower(strings.TrimSpace(c.Query(g.queryKey)))
+		if mode != "admin" {
+			appErr := errs.New(errs.CodeForbidden, http.StatusForbidden, "admin mode required", nil)
+			c.AbortWithStatusJSON(appErr.Status, gin.H{
+				"error":   appErr.Code,
+				"message": appErr.Message,
+			})
+			return
+		}
+
+		c.Set(AdminModeContextKey, mode)
+		c.Next()
+	}
+}

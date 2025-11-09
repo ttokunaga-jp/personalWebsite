@@ -14,6 +14,9 @@ type ContentProfileRepository interface {
 // TechCatalogRepository retrieves canonical technology definitions.
 type TechCatalogRepository interface {
 	ListTechCatalog(ctx context.Context, includeInactive bool) ([]model.TechCatalogEntry, error)
+	GetTechCatalogEntry(ctx context.Context, id uint64) (*model.TechCatalogEntry, error)
+	CreateTechCatalogEntry(ctx context.Context, entry *model.TechCatalogEntry) (*model.TechCatalogEntry, error)
+	UpdateTechCatalogEntry(ctx context.Context, entry *model.TechCatalogEntry) (*model.TechCatalogEntry, error)
 }
 
 // ProjectDocumentRepository retrieves project aggregates compliant with the new schema.

@@ -43,6 +43,11 @@ func (m *CSRFMiddleware) Handler() gin.HandlerFunc {
 			return
 		}
 
+		if !strings.EqualFold(strings.TrimSpace(c.GetHeader("X-Requested-With")), "xmlhttprequest") {
+			m.reject(c, "missing x-requested-with header")
+			return
+		}
+
 		if m.isExemptPath(c.Request.URL.Path) {
 			c.Next()
 			return

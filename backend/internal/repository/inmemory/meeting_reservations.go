@@ -2,6 +2,7 @@ package inmemory
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -64,6 +65,68 @@ func (r *meetingReservationRepository) FindReservationByLookupHash(ctx context.C
 	return nil, repository.ErrNotFound
 }
 
+func (r *meetingReservationRepository) FindReservationByID(ctx context.Context, id uint64) (*model.MeetingReservation, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, entry := range r.reservations {
+		if entry.ID == id {
+			return copyReservationPtr(entry), nil
+		}
+	}
+	return nil, repository.ErrNotFound
+}
+
+func (r *meetingReservationRepository) ListReservations(ctx context.Context, filter repository.MeetingReservationListFilter) ([]model.MeetingReservation, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	statusFilter := make(map[model.MeetingReservationStatus]struct{})
+	for _, status := range filter.Status {
+		if value := strings.TrimSpace(string(status)); value != "" {
+			statusFilter[model.MeetingReservationStatus(value)] = struct{}{}
+		}
+	}
+	email := strings.ToLower(strings.TrimSpace(filter.Email))
+
+	var start *time.Time
+	var end *time.Time
+	if filter.Date != nil {
+		day := filter.Date.UTC()
+		s := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+		e := s.Add(24 * time.Hour)
+		start = &s
+		end = &e
+	}
+
+	results := make([]model.MeetingReservation, 0, len(r.reservations))
+	for _, entry := range r.reservations {
+		if len(statusFilter) > 0 {
+			if _, ok := statusFilter[entry.Status]; !ok {
+				continue
+			}
+		}
+		if email != "" && strings.ToLower(strings.TrimSpace(entry.Email)) != email {
+			continue
+		}
+		if start != nil && end != nil {
+			if entry.StartAt.Before(*start) || !entry.StartAt.Before(*end) {
+				continue
+			}
+		}
+		results = append(results, copyReservation(entry))
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].StartAt.Equal(results[j].StartAt) {
+			return results[i].ID > results[j].ID
+		}
+		return results[i].StartAt.After(results[j].StartAt)
+	})
+
+	return results, nil
+}
+
 func (r *meetingReservationRepository) ListConflictingReservations(ctx context.Context, start, end time.Time) ([]model.MeetingReservation, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -112,6 +175,38 @@ func (r *meetingReservationRepository) CancelReservation(ctx context.Context, id
 		entry.Status = model.MeetingReservationStatusCancelled
 		entry.GoogleCalendarStatus = "cancelled"
 		entry.CancellationReason = strings.TrimSpace(reason)
+		entry.UpdatedAt = time.Now().UTC()
+		r.reservations[index] = entry
+		return copyReservationPtr(entry), nil
+	}
+	return nil, repository.ErrNotFound
+}
+
+func (r *meetingReservationRepository) UpdateReservationStatus(ctx context.Context, id uint64, status model.MeetingReservationStatus, reason string) (*model.MeetingReservation, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for index, entry := range r.reservations {
+		if entry.ID != id {
+			continue
+		}
+		switch status {
+		case model.MeetingReservationStatusCancelled:
+			entry.Status = model.MeetingReservationStatusCancelled
+			entry.GoogleCalendarStatus = "cancelled"
+			entry.CancellationReason = strings.TrimSpace(reason)
+		case model.MeetingReservationStatusConfirmed:
+			entry.Status = model.MeetingReservationStatusConfirmed
+			entry.CancellationReason = ""
+			if strings.TrimSpace(entry.GoogleCalendarStatus) == "" {
+				entry.GoogleCalendarStatus = "confirmed"
+			}
+		case model.MeetingReservationStatusPending:
+			entry.Status = model.MeetingReservationStatusPending
+			entry.CancellationReason = ""
+		default:
+			return nil, repository.ErrInvalidInput
+		}
 		entry.UpdatedAt = time.Now().UTC()
 		r.reservations[index] = entry
 		return copyReservationPtr(entry), nil

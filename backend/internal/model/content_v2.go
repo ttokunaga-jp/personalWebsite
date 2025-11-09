@@ -109,6 +109,7 @@ const (
 	ProfileSocialProviderLinkedIn ProfileSocialProvider = "linkedin"
 	ProfileSocialProviderX        ProfileSocialProvider = "x"
 	ProfileSocialProviderEmail    ProfileSocialProvider = "email"
+	ProfileSocialProviderWebsite  ProfileSocialProvider = "website"
 	ProfileSocialProviderOther    ProfileSocialProvider = "other"
 )
 
@@ -275,19 +276,20 @@ type ContactTopicV2 struct {
 
 // ContactFormSettingsV2 holds the configurable attributes of the contact form/public booking experience.
 type ContactFormSettingsV2 struct {
-	ID                uint64           `json:"id"`
-	HeroTitle         LocalizedText    `json:"heroTitle"`
-	HeroDescription   LocalizedText    `json:"heroDescription"`
-	Topics            []ContactTopicV2 `json:"topics"`
-	ConsentText       LocalizedText    `json:"consentText"`
-	MinimumLeadHours  int              `json:"minimumLeadHours"`
-	RecaptchaSiteKey  string           `json:"recaptchaSiteKey"`
-	SupportEmail      string           `json:"supportEmail"`
-	CalendarTimezone  string           `json:"calendarTimezone"`
-	GoogleCalendarID  string           `json:"googleCalendarId"`
-	BookingWindowDays int              `json:"bookingWindowDays"`
-	CreatedAt         time.Time        `json:"createdAt"`
-	UpdatedAt         time.Time        `json:"updatedAt"`
+	ID                 uint64           `json:"id"`
+	HeroTitle          LocalizedText    `json:"heroTitle"`
+	HeroDescription    LocalizedText    `json:"heroDescription"`
+	Topics             []ContactTopicV2 `json:"topics"`
+	ConsentText        LocalizedText    `json:"consentText"`
+	MinimumLeadHours   int              `json:"minimumLeadHours"`
+	RecaptchaSiteKey   string           `json:"recaptchaSiteKey"`
+	SupportEmail       string           `json:"supportEmail"`
+	CalendarTimezone   string           `json:"calendarTimezone"`
+	GoogleCalendarID   string           `json:"googleCalendarId"`
+	BookingWindowDays  int              `json:"bookingWindowDays"`
+	MeetingURLTemplate string           `json:"meetingUrlTemplate"`
+	CreatedAt          time.Time        `json:"createdAt"`
+	UpdatedAt          time.Time        `json:"updatedAt"`
 }
 
 // HomeQuickLink describes hero quick links on the home screen.

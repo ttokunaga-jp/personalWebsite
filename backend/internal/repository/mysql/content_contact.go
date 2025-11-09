@@ -39,6 +39,7 @@ SELECT
     calendar_timezone,
     google_calendar_id,
     booking_window_days,
+    meeting_url_template,
     created_at,
     updated_at
 FROM contact_form_settings`
@@ -61,7 +62,8 @@ UPDATE contact_form_settings SET
     support_email = ?,
     calendar_timezone = ?,
     google_calendar_id = ?,
-    booking_window_days = ?
+    booking_window_days = ?,
+    meeting_url_template = ?
 WHERE id = ? AND updated_at = ?`
 
 type contactSettingsRow struct {
@@ -79,6 +81,7 @@ type contactSettingsRow struct {
 	CalendarTimezone  sql.NullString `db:"calendar_timezone"`
 	CalendarID        sql.NullString `db:"google_calendar_id"`
 	BookingWindowDays int            `db:"booking_window_days"`
+	MeetingTemplate   sql.NullString `db:"meeting_url_template"`
 	CreatedAt         sql.NullTime   `db:"created_at"`
 	UpdatedAt         sql.NullTime   `db:"updated_at"`
 }
@@ -109,17 +112,18 @@ func (r *contactFormSettingsRepository) GetContactFormSettings(ctx context.Conte
 	}
 
 	settings := &model.ContactFormSettingsV2{
-		ID:                row.ID,
-		HeroTitle:         toLocalizedText(row.HeroTitleJA, row.HeroTitleEN),
-		HeroDescription:   toLocalizedText(row.HeroDescriptionJA, row.HeroDescriptionEN),
-		Topics:            topics,
-		ConsentText:       toLocalizedText(row.ConsentJA, row.ConsentEN),
-		MinimumLeadHours:  row.MinimumLeadHours,
-		RecaptchaSiteKey:  strings.TrimSpace(row.RecaptchaKey.String),
-		SupportEmail:      strings.TrimSpace(row.SupportEmail.String),
-		CalendarTimezone:  strings.TrimSpace(row.CalendarTimezone.String),
-		GoogleCalendarID:  strings.TrimSpace(row.CalendarID.String),
-		BookingWindowDays: row.BookingWindowDays,
+		ID:                 row.ID,
+		HeroTitle:          toLocalizedText(row.HeroTitleJA, row.HeroTitleEN),
+		HeroDescription:    toLocalizedText(row.HeroDescriptionJA, row.HeroDescriptionEN),
+		Topics:             topics,
+		ConsentText:        toLocalizedText(row.ConsentJA, row.ConsentEN),
+		MinimumLeadHours:   row.MinimumLeadHours,
+		RecaptchaSiteKey:   strings.TrimSpace(row.RecaptchaKey.String),
+		SupportEmail:       strings.TrimSpace(row.SupportEmail.String),
+		CalendarTimezone:   strings.TrimSpace(row.CalendarTimezone.String),
+		GoogleCalendarID:   strings.TrimSpace(row.CalendarID.String),
+		BookingWindowDays:  row.BookingWindowDays,
+		MeetingURLTemplate: strings.TrimSpace(row.MeetingTemplate.String),
 	}
 
 	if row.CreatedAt.Valid {
@@ -162,6 +166,7 @@ func (r *contactFormSettingsRepository) UpdateContactFormSettings(ctx context.Co
 		strings.TrimSpace(settings.CalendarTimezone),
 		strings.TrimSpace(settings.GoogleCalendarID),
 		settings.BookingWindowDays,
+		strings.TrimSpace(settings.MeetingURLTemplate),
 		settings.ID,
 		expectedUpdatedAt.UTC(),
 	}

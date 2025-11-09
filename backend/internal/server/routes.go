@@ -20,6 +20,8 @@ func registerRoutes(
 	sessionMiddleware *middleware.AdminSessionMiddleware,
 	adminHandler *handler.AdminHandler,
 	adminGuard *middleware.AdminGuard,
+	adminModeGuard *middleware.AdminModeGuard,
+	adminRateLimiter *middleware.AdminRateLimiter,
 	securityHandler *handler.SecurityHandler,
 ) {
 	api := r.Group("/api")
@@ -61,11 +63,28 @@ func registerRoutes(
 	}
 
 	admin := api.Group("/admin")
-	admin.Use(sessionMiddleware.Handler(), adminGuard.RequireAdmin())
+	adminMiddleware := []gin.HandlerFunc{}
+	if sessionMiddleware != nil {
+		adminMiddleware = append(adminMiddleware, sessionMiddleware.Handler())
+	}
+	if adminGuard != nil {
+		adminMiddleware = append(adminMiddleware, adminGuard.RequireAdmin())
+	}
+	if adminModeGuard != nil {
+		adminMiddleware = append(adminMiddleware, adminModeGuard.RequireAdminMode())
+	}
+	if adminRateLimiter != nil {
+		adminMiddleware = append(adminMiddleware, adminRateLimiter.Handler())
+	}
+	if len(adminMiddleware) > 0 {
+		admin.Use(adminMiddleware...)
+	}
 	{
 		admin.GET("/health", healthHandler.Ping)
 		admin.GET("/summary", adminHandler.Summary)
 		admin.GET("/tech-catalog", adminHandler.ListTechCatalog)
+		admin.POST("/tech-catalog", adminHandler.CreateTechCatalogEntry)
+		admin.PUT("/tech-catalog/:id", adminHandler.UpdateTechCatalogEntry)
 
 		admin.GET("/profile", adminHandler.GetProfile)
 		admin.PUT("/profile", adminHandler.UpdateProfile)
@@ -88,6 +107,12 @@ func registerRoutes(
 		admin.GET("/contact-settings", adminHandler.GetContactSettings)
 		admin.PUT("/contact-settings", adminHandler.UpdateContactSettings)
 
+		admin.GET("/social-links", adminHandler.ListSocialLinks)
+		admin.PUT("/social-links", adminHandler.ReplaceSocialLinks)
+
+		admin.GET("/meeting-url", adminHandler.GetMeetingURLTemplate)
+		admin.PUT("/meeting-url", adminHandler.UpdateMeetingURLTemplate)
+
 		admin.GET("/contacts", adminHandler.ListContacts)
 		admin.GET("/contacts/:id", adminHandler.GetContact)
 		admin.PUT("/contacts/:id", adminHandler.UpdateContact)
@@ -97,5 +122,9 @@ func registerRoutes(
 		admin.POST("/blacklist", adminHandler.CreateBlacklist)
 		admin.PUT("/blacklist/:id", adminHandler.UpdateBlacklist)
 		admin.DELETE("/blacklist/:id", adminHandler.DeleteBlacklist)
+
+		admin.GET("/reservations", adminHandler.ListReservations)
+		admin.PUT("/reservations/:id", adminHandler.UpdateReservationStatus)
+		admin.POST("/reservations/:id/retry", adminHandler.RetryReservationNotification)
 	}
 }

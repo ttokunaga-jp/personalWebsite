@@ -58,9 +58,12 @@ type BlogRepository interface {
 type MeetingReservationRepository interface {
 	CreateReservation(ctx context.Context, reservation *model.MeetingReservation) (*model.MeetingReservation, error)
 	FindReservationByLookupHash(ctx context.Context, lookupHash string) (*model.MeetingReservation, error)
+	FindReservationByID(ctx context.Context, id uint64) (*model.MeetingReservation, error)
+	ListReservations(ctx context.Context, filter MeetingReservationListFilter) ([]model.MeetingReservation, error)
 	ListConflictingReservations(ctx context.Context, start, end time.Time) ([]model.MeetingReservation, error)
 	MarkConfirmationSent(ctx context.Context, id uint64, sentAt time.Time) (*model.MeetingReservation, error)
 	CancelReservation(ctx context.Context, id uint64, reason string) (*model.MeetingReservation, error)
+	UpdateReservationStatus(ctx context.Context, id uint64, status model.MeetingReservationStatus, reason string) (*model.MeetingReservation, error)
 }
 
 // MeetingNotificationRepository records outgoing notifications linked to reservations.
@@ -90,4 +93,11 @@ type BlacklistRepository interface {
 	UpdateBlacklistEntry(ctx context.Context, entry *model.BlacklistEntry) (*model.BlacklistEntry, error)
 	RemoveBlacklistEntry(ctx context.Context, id int64) error
 	FindBlacklistEntryByEmail(ctx context.Context, email string) (*model.BlacklistEntry, error)
+}
+
+// MeetingReservationListFilter captures optional filters when listing reservations.
+type MeetingReservationListFilter struct {
+	Status []model.MeetingReservationStatus
+	Email  string
+	Date   *time.Time
 }

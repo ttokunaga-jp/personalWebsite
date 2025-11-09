@@ -23,23 +23,29 @@ func NewCORSMiddleware(cfg *config.AppConfig) *CORSMiddleware {
 		return &CORSMiddleware{}
 	}
 	security := cfg.Security
-	allowedOrigins := append([]string{}, security.AllowedOrigins...)
-	if adminOrigin := extractOrigin(cfg.Auth.Admin.DefaultRedirectURI); adminOrigin != "" {
-		if !containsString(allowedOrigins, adminOrigin) {
-			allowedOrigins = append(allowedOrigins, adminOrigin)
+	primaryOrigin := normalizeOrigin(security.PrimaryOrigin)
+	if primaryOrigin == "" {
+		for _, candidate := range security.AllowedOrigins {
+			if origin := normalizeOrigin(candidate); origin != "" {
+				primaryOrigin = origin
+				break
+			}
 		}
 	}
-	if len(allowedOrigins) == 0 {
+	if primaryOrigin == "" {
+		primaryOrigin = normalizeOrigin(cfg.Auth.Admin.DefaultRedirectURI)
+	}
+	if primaryOrigin == "" {
 		return &CORSMiddleware{enabled: false}
 	}
 
 	config := cors.Config{
-		AllowOrigins:     allowedOrigins,
+		AllowOrigins:     []string{primaryOrigin},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Authorization", "Content-Type", security.CSRFHeaderName, "X-Request-ID"},
+		AllowHeaders:     []string{"Authorization", "Content-Type", security.CSRFHeaderName, "X-Request-ID", "X-Requested-With"},
 		ExposeHeaders:    []string{"X-Request-ID"},
 		AllowCredentials: security.AllowCredentials,
-		MaxAge:           12 * time.Hour,
+		MaxAge:           10 * time.Minute,
 	}
 
 	return &CORSMiddleware{
@@ -73,14 +79,23 @@ func extractOrigin(raw string) string {
 	return u.Scheme + "://" + u.Host
 }
 
-func containsString(list []string, target string) bool {
-	if target == "" {
-		return false
+func normalizeOrigin(raw string) string {
+	origin := strings.TrimSpace(raw)
+	if origin == "" {
+		return ""
 	}
-	for _, item := range list {
-		if strings.EqualFold(strings.TrimSpace(item), target) {
-			return true
-		}
+	// Allow values with explicit scheme and host.
+	if parsed := extractOrigin(origin); parsed != "" {
+		return parsed
 	}
-	return false
+	// If the value already looks like scheme://host we would have returned above.
+	// Fall back to treating a bare host as https.
+	if strings.HasPrefix(origin, "http://") || strings.HasPrefix(origin, "https://") {
+		return origin
+	}
+	u := &url.URL{
+		Scheme: "https",
+		Host:   origin,
+	}
+	return u.Scheme + "://" + u.Host
 }

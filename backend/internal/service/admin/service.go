@@ -50,19 +50,34 @@ type Service interface {
 	IsEmailBlacklisted(ctx context.Context, email string) (bool, error)
 
 	ListTechCatalog(ctx context.Context, includeInactive bool) ([]model.TechCatalogEntry, error)
+	CreateTechCatalogEntry(ctx context.Context, input TechCatalogInput) (*model.TechCatalogEntry, error)
+	UpdateTechCatalogEntry(ctx context.Context, id uint64, input TechCatalogUpdateInput) (*model.TechCatalogEntry, error)
+
+	ListSocialLinks(ctx context.Context) ([]model.ProfileSocialLink, error)
+	ReplaceSocialLinks(ctx context.Context, links []SocialLinkInput) ([]model.ProfileSocialLink, error)
+
+	GetMeetingURLTemplate(ctx context.Context) (*MeetingURLTemplate, error)
+	UpdateMeetingURLTemplate(ctx context.Context, template string) (*MeetingURLTemplate, error)
+
+	ListReservations(ctx context.Context, filter ReservationFilter) ([]model.MeetingReservation, error)
+	UpdateReservationStatus(ctx context.Context, id uint64, status model.MeetingReservationStatus, reason string) (*model.MeetingReservation, error)
+	ListReservationNotifications(ctx context.Context, reservationID uint64) ([]model.MeetingNotification, error)
+	RetryReservationNotification(ctx context.Context, reservationID uint64) (*model.MeetingReservation, error)
 
 	Summary(ctx context.Context) (*model.AdminSummary, error)
 }
 
 type service struct {
-	profile     repository.AdminProfileRepository
-	projects    repository.AdminProjectRepository
-	research    repository.AdminResearchRepository
-	contacts    repository.AdminContactRepository
-	contactCfg  repository.AdminContactSettingsRepository
-	home        repository.AdminHomePageConfigRepository
-	blacklist   repository.BlacklistRepository
-	techCatalog repository.TechCatalogRepository
+	profile       repository.AdminProfileRepository
+	projects      repository.AdminProjectRepository
+	research      repository.AdminResearchRepository
+	contacts      repository.AdminContactRepository
+	contactCfg    repository.AdminContactSettingsRepository
+	home          repository.AdminHomePageConfigRepository
+	blacklist     repository.BlacklistRepository
+	techCatalog   repository.TechCatalogRepository
+	reservations  repository.MeetingReservationRepository
+	notifications repository.MeetingNotificationRepository
 }
 
 // NewService wires repositories into the admin service.
@@ -75,21 +90,32 @@ func NewService(
 	home repository.AdminHomePageConfigRepository,
 	blacklist repository.BlacklistRepository,
 	techCatalog repository.TechCatalogRepository,
+	reservations repository.MeetingReservationRepository,
+	notifications repository.MeetingNotificationRepository,
 ) (Service, error) {
-	if profile == nil || projects == nil || research == nil || contacts == nil || contactCfg == nil || home == nil || blacklist == nil || techCatalog == nil {
+	if profile == nil || projects == nil || research == nil || contacts == nil || contactCfg == nil || home == nil || blacklist == nil || techCatalog == nil || reservations == nil || notifications == nil {
 		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "admin service: missing dependencies", nil)
 	}
 
 	return &service{
-		profile:     profile,
-		projects:    projects,
-		research:    research,
-		contacts:    contacts,
-		contactCfg:  contactCfg,
-		home:        home,
-		blacklist:   blacklist,
-		techCatalog: techCatalog,
+		profile:       profile,
+		projects:      projects,
+		research:      research,
+		contacts:      contacts,
+		contactCfg:    contactCfg,
+		home:          home,
+		blacklist:     blacklist,
+		techCatalog:   techCatalog,
+		reservations:  reservations,
+		notifications: notifications,
 	}, nil
+}
+
+// ReservationFilter captures optional filters for reservation listing.
+type ReservationFilter struct {
+	Status []model.MeetingReservationStatus
+	Email  string
+	Date   *time.Time
 }
 
 // ProfileInput captures administrator-provided profile data (v2 schema).
@@ -141,6 +167,43 @@ type ProfileWorkHistoryInput struct {
 	EndedAt      *time.Time
 	ExternalURL  string
 	SortOrder    int
+}
+
+// TechCatalogInput represents a request to create a tech catalog entry.
+type TechCatalogInput struct {
+	Slug        string
+	DisplayName string
+	Category    string
+	Level       model.TechLevel
+	Icon        string
+	SortOrder   int
+	Active      bool
+}
+
+// TechCatalogUpdateInput captures partial updates to a tech catalog entry.
+type TechCatalogUpdateInput struct {
+	Slug        *string
+	DisplayName *string
+	Category    *string
+	Level       *model.TechLevel
+	Icon        *string
+	SortOrder   *int
+	Active      *bool
+}
+
+// SocialLinkInput captures an individual social link configuration.
+type SocialLinkInput struct {
+	Provider  model.ProfileSocialProvider
+	Label     model.LocalizedText
+	URL       string
+	IsFooter  bool
+	SortOrder int
+}
+
+// MeetingURLTemplate represents the editable template for meeting confirmations.
+type MeetingURLTemplate struct {
+	Template  string
+	UpdatedAt time.Time
 }
 
 // ProfileSocialLinkInput represents social link rows.
@@ -559,18 +622,19 @@ type ContactUpdateInput struct {
 
 // ContactSettingsInput captures administrator-provided contact configuration data.
 type ContactSettingsInput struct {
-	ID                uint64
-	HeroTitle         model.LocalizedText
-	HeroDescription   model.LocalizedText
-	Topics            []ContactTopicInput
-	ConsentText       model.LocalizedText
-	MinimumLeadHours  int
-	RecaptchaSiteKey  string
-	SupportEmail      string
-	CalendarTimezone  string
-	GoogleCalendarID  string
-	BookingWindowDays int
-	ExpectedUpdatedAt time.Time
+	ID                 uint64
+	HeroTitle          model.LocalizedText
+	HeroDescription    model.LocalizedText
+	Topics             []ContactTopicInput
+	ConsentText        model.LocalizedText
+	MinimumLeadHours   int
+	RecaptchaSiteKey   string
+	SupportEmail       string
+	CalendarTimezone   string
+	GoogleCalendarID   string
+	BookingWindowDays  int
+	MeetingURLTemplate string
+	ExpectedUpdatedAt  time.Time
 }
 
 // ContactTopicInput represents a configurable contact topic row.
@@ -651,17 +715,18 @@ func (s *service) UpdateContactSettings(ctx context.Context, input ContactSettin
 	}
 
 	document := &model.ContactFormSettingsV2{
-		ID:                input.ID,
-		HeroTitle:         normalizeLocalized(input.HeroTitle),
-		HeroDescription:   normalizeLocalized(input.HeroDescription),
-		Topics:            normalizeContactTopics(input.Topics),
-		ConsentText:       normalizeLocalized(input.ConsentText),
-		MinimumLeadHours:  input.MinimumLeadHours,
-		RecaptchaSiteKey:  strings.TrimSpace(input.RecaptchaSiteKey),
-		SupportEmail:      strings.TrimSpace(input.SupportEmail),
-		CalendarTimezone:  strings.TrimSpace(input.CalendarTimezone),
-		GoogleCalendarID:  strings.TrimSpace(input.GoogleCalendarID),
-		BookingWindowDays: input.BookingWindowDays,
+		ID:                 input.ID,
+		HeroTitle:          normalizeLocalized(input.HeroTitle),
+		HeroDescription:    normalizeLocalized(input.HeroDescription),
+		Topics:             normalizeContactTopics(input.Topics),
+		ConsentText:        normalizeLocalized(input.ConsentText),
+		MinimumLeadHours:   input.MinimumLeadHours,
+		RecaptchaSiteKey:   strings.TrimSpace(input.RecaptchaSiteKey),
+		SupportEmail:       strings.TrimSpace(input.SupportEmail),
+		CalendarTimezone:   strings.TrimSpace(input.CalendarTimezone),
+		GoogleCalendarID:   strings.TrimSpace(input.GoogleCalendarID),
+		BookingWindowDays:  input.BookingWindowDays,
+		MeetingURLTemplate: strings.TrimSpace(input.MeetingURLTemplate),
 	}
 
 	updated, err := s.contactCfg.UpdateContactFormSettings(ctx, document, input.ExpectedUpdatedAt.UTC())
@@ -769,6 +834,195 @@ func (s *service) ListTechCatalog(ctx context.Context, includeInactive bool) ([]
 		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to load tech catalog", err)
 	}
 	return entries, nil
+}
+
+func (s *service) CreateTechCatalogEntry(ctx context.Context, input TechCatalogInput) (*model.TechCatalogEntry, error) {
+	entry, appErr := buildTechCatalogEntry(input)
+	if appErr != nil {
+		return nil, appErr
+	}
+
+	created, err := s.techCatalog.CreateTechCatalogEntry(ctx, entry)
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "tech catalog entry")
+	}
+	return created, nil
+}
+
+func (s *service) UpdateTechCatalogEntry(ctx context.Context, id uint64, input TechCatalogUpdateInput) (*model.TechCatalogEntry, error) {
+	if id == 0 {
+		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "tech catalog id is required", nil)
+	}
+
+	current, err := s.techCatalog.GetTechCatalogEntry(ctx, id)
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "tech catalog entry")
+	}
+
+	updated, appErr := mergeTechCatalogUpdate(*current, input)
+	if appErr != nil {
+		return nil, appErr
+	}
+
+	saved, err := s.techCatalog.UpdateTechCatalogEntry(ctx, &updated)
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "tech catalog entry")
+	}
+	return saved, nil
+}
+
+func (s *service) ListSocialLinks(ctx context.Context) ([]model.ProfileSocialLink, error) {
+	profile, err := s.profile.GetAdminProfile(ctx)
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "profile")
+	}
+	result := make([]model.ProfileSocialLink, len(profile.SocialLinks))
+	for i, link := range profile.SocialLinks {
+		result[i] = link
+	}
+	return result, nil
+}
+
+func (s *service) ReplaceSocialLinks(ctx context.Context, links []SocialLinkInput) ([]model.ProfileSocialLink, error) {
+	profile, err := s.profile.GetAdminProfile(ctx)
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "profile")
+	}
+
+	normalized, appErr := normalizeSocialLinks(links)
+	if appErr != nil {
+		return nil, appErr
+	}
+
+	clone := *profile
+	clone.SocialLinks = normalized
+
+	updated, err := s.profile.UpdateAdminProfile(ctx, &clone)
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "profile")
+	}
+
+	result := make([]model.ProfileSocialLink, len(updated.SocialLinks))
+	for i, link := range updated.SocialLinks {
+		result[i] = link
+	}
+	return result, nil
+}
+
+func (s *service) GetMeetingURLTemplate(ctx context.Context) (*MeetingURLTemplate, error) {
+	settings, err := s.contactCfg.GetContactFormSettings(ctx)
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "contact settings")
+	}
+	return &MeetingURLTemplate{
+		Template:  strings.TrimSpace(settings.MeetingURLTemplate),
+		UpdatedAt: settings.UpdatedAt,
+	}, nil
+}
+
+func (s *service) UpdateMeetingURLTemplate(ctx context.Context, template string) (*MeetingURLTemplate, error) {
+	settings, err := s.contactCfg.GetContactFormSettings(ctx)
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "contact settings")
+	}
+
+	trimmed := strings.TrimSpace(template)
+	if len(trimmed) > 4000 {
+		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "template must be 4000 characters or fewer", nil)
+	}
+
+	clone := *settings
+	clone.MeetingURLTemplate = trimmed
+
+	updated, err := s.contactCfg.UpdateContactFormSettings(ctx, &clone, settings.UpdatedAt.UTC())
+	if err != nil {
+		return nil, support.MapRepositoryError(err, "contact settings")
+	}
+
+	return &MeetingURLTemplate{
+		Template:  strings.TrimSpace(updated.MeetingURLTemplate),
+		UpdatedAt: updated.UpdatedAt,
+	}, nil
+}
+
+func (s *service) ListReservations(ctx context.Context, filter ReservationFilter) ([]model.MeetingReservation, error) {
+	repoFilter := repository.MeetingReservationListFilter{
+		Status: filter.Status,
+		Email:  filter.Email,
+	}
+	if filter.Date != nil {
+		repoFilter.Date = filter.Date
+	}
+
+	reservations, err := s.reservations.ListReservations(ctx, repoFilter)
+	if err != nil {
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to load reservations", err)
+	}
+	return reservations, nil
+}
+
+func (s *service) UpdateReservationStatus(ctx context.Context, id uint64, status model.MeetingReservationStatus, reason string) (*model.MeetingReservation, error) {
+	if id == 0 {
+		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "reservation id must be provided", nil)
+	}
+
+	switch status {
+	case model.MeetingReservationStatusPending,
+		model.MeetingReservationStatusConfirmed,
+		model.MeetingReservationStatusCancelled:
+	default:
+		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "unsupported reservation status", nil)
+	}
+
+	reservation, err := s.reservations.UpdateReservationStatus(ctx, id, status, reason)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, errs.New(errs.CodeNotFound, http.StatusNotFound, "reservation not found", err)
+		}
+		if errors.Is(err, repository.ErrInvalidInput) {
+			return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid reservation status", err)
+		}
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to update reservation", err)
+	}
+
+	return reservation, nil
+}
+
+func (s *service) ListReservationNotifications(ctx context.Context, reservationID uint64) ([]model.MeetingNotification, error) {
+	if reservationID == 0 {
+		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "reservation id must be provided", nil)
+	}
+
+	notifications, err := s.notifications.ListNotifications(ctx, reservationID)
+	if err != nil {
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to load reservation notifications", err)
+	}
+	return notifications, nil
+}
+
+func (s *service) RetryReservationNotification(ctx context.Context, reservationID uint64) (*model.MeetingReservation, error) {
+	if reservationID == 0 {
+		return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "reservation id must be provided", nil)
+	}
+
+	reservation, err := s.reservations.FindReservationByID(ctx, reservationID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, errs.New(errs.CodeNotFound, http.StatusNotFound, "reservation not found", err)
+		}
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to load reservation", err)
+	}
+
+	notification := &model.MeetingNotification{
+		ReservationID: reservation.ID,
+		Type:          "confirmation_email",
+		Status:        "pending",
+	}
+	if _, err := s.notifications.RecordNotification(ctx, notification); err != nil && !errors.Is(err, repository.ErrInvalidInput) {
+		return nil, errs.New(errs.CodeInternal, http.StatusInternalServerError, "failed to record retry notification", err)
+	}
+
+	return reservation, nil
 }
 
 func (s *service) Summary(ctx context.Context) (*model.AdminSummary, error) {
@@ -1031,6 +1285,9 @@ func validateContactSettingsInput(input ContactSettingsInput) error {
 	if len(input.Topics) == 0 {
 		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "at least one topic is required", nil)
 	}
+	if len(strings.TrimSpace(input.MeetingURLTemplate)) > 0 && len(input.MeetingURLTemplate) > 4000 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "meetingUrlTemplate must be 4000 characters or fewer", nil)
+	}
 	seen := make(map[string]struct{}, len(input.Topics))
 	for _, topic := range input.Topics {
 		id := strings.TrimSpace(topic.ID)
@@ -1286,6 +1543,149 @@ func buildSocialLinks(inputs []ProfileSocialLinkInput) []model.ProfileSocialLink
 		})
 	}
 	return out
+}
+
+func buildTechCatalogEntry(input TechCatalogInput) (*model.TechCatalogEntry, *errs.AppError) {
+	entry := model.TechCatalogEntry{
+		Slug:        strings.TrimSpace(input.Slug),
+		DisplayName: strings.TrimSpace(input.DisplayName),
+		Category:    strings.TrimSpace(input.Category),
+		Level:       input.Level,
+		Icon:        strings.TrimSpace(input.Icon),
+		SortOrder:   input.SortOrder,
+		Active:      input.Active,
+	}
+	if appErr := validateTechCatalogEntry(entry); appErr != nil {
+		return nil, appErr
+	}
+	return &entry, nil
+}
+
+func mergeTechCatalogUpdate(current model.TechCatalogEntry, input TechCatalogUpdateInput) (model.TechCatalogEntry, *errs.AppError) {
+	updated := current
+
+	if input.Slug != nil {
+		updated.Slug = strings.TrimSpace(*input.Slug)
+	}
+	if input.DisplayName != nil {
+		updated.DisplayName = strings.TrimSpace(*input.DisplayName)
+	}
+	if input.Category != nil {
+		updated.Category = strings.TrimSpace(*input.Category)
+	}
+	if input.Level != nil {
+		updated.Level = *input.Level
+	}
+	if input.Icon != nil {
+		updated.Icon = strings.TrimSpace(*input.Icon)
+	}
+	if input.SortOrder != nil {
+		updated.SortOrder = *input.SortOrder
+	}
+	if input.Active != nil {
+		updated.Active = *input.Active
+	}
+
+	if appErr := validateTechCatalogEntry(updated); appErr != nil {
+		return model.TechCatalogEntry{}, appErr
+	}
+	return updated, nil
+}
+
+func validateTechCatalogEntry(entry model.TechCatalogEntry) *errs.AppError {
+	slug := strings.TrimSpace(entry.Slug)
+	if slug == "" {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "slug is required", nil)
+	}
+	if utf8.RuneCountInString(slug) > 64 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "slug must be 64 characters or fewer", nil)
+	}
+
+	displayName := strings.TrimSpace(entry.DisplayName)
+	if displayName == "" {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "displayName is required", nil)
+	}
+	if utf8.RuneCountInString(displayName) > 128 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "displayName must be 128 characters or fewer", nil)
+	}
+
+	if !isValidTechLevel(entry.Level) {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid tech level", nil)
+	}
+
+	if utf8.RuneCountInString(strings.TrimSpace(entry.Category)) > 64 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "category must be 64 characters or fewer", nil)
+	}
+
+	if utf8.RuneCountInString(strings.TrimSpace(entry.Icon)) > 128 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "icon must be 128 characters or fewer", nil)
+	}
+
+	if entry.SortOrder < 0 {
+		return errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "sortOrder must be zero or greater", nil)
+	}
+	return nil
+}
+
+func isValidTechLevel(level model.TechLevel) bool {
+	switch strings.TrimSpace(string(level)) {
+	case string(model.TechLevelBeginner), string(model.TechLevelIntermediate), string(model.TechLevelAdvanced):
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeSocialLinks(inputs []SocialLinkInput) ([]model.ProfileSocialLink, *errs.AppError) {
+	if len(inputs) == 0 {
+		return []model.ProfileSocialLink{}, nil
+	}
+
+	links := make([]model.ProfileSocialLink, 0, len(inputs))
+	for idx, input := range inputs {
+		provider := model.ProfileSocialProvider(strings.TrimSpace(string(input.Provider)))
+		if !isValidSocialProvider(provider) {
+			return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("socialLinks[%d] has invalid provider", idx), nil)
+		}
+
+		label := normalizeLocalized(input.Label)
+		if strings.TrimSpace(label.Ja) == "" && strings.TrimSpace(label.En) == "" {
+			return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("socialLinks[%d] label is required", idx), nil)
+		}
+
+		url := strings.TrimSpace(input.URL)
+		if url == "" {
+			return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("socialLinks[%d] url is required", idx), nil)
+		}
+
+		if input.SortOrder < 0 {
+			return nil, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, fmt.Sprintf("socialLinks[%d] sortOrder must be zero or greater", idx), nil)
+		}
+
+		links = append(links, model.ProfileSocialLink{
+			Provider:  provider,
+			Label:     label,
+			URL:       url,
+			IsFooter:  input.IsFooter,
+			SortOrder: input.SortOrder,
+		})
+	}
+	return links, nil
+}
+
+func isValidSocialProvider(provider model.ProfileSocialProvider) bool {
+	switch provider {
+	case model.ProfileSocialProviderGitHub,
+		model.ProfileSocialProviderZenn,
+		model.ProfileSocialProviderLinkedIn,
+		model.ProfileSocialProviderX,
+		model.ProfileSocialProviderEmail,
+		model.ProfileSocialProviderWebsite,
+		model.ProfileSocialProviderOther:
+		return true
+	default:
+		return false
+	}
 }
 
 func copyIntPointer(value *int) *int {

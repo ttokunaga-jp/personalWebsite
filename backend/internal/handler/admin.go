@@ -45,7 +45,56 @@ func (h *AdminHandler) ListTechCatalog(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, entries)
+	c.JSON(http.StatusOK, gin.H{"data": entries})
+}
+
+func (h *AdminHandler) CreateTechCatalogEntry(c *gin.Context) {
+	var req techCatalogRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid tech catalog payload", err))
+		return
+	}
+
+	input, appErr := req.toInput()
+	if appErr != nil {
+		respondError(c, appErr)
+		return
+	}
+
+	entry, err := h.svc.CreateTechCatalogEntry(c.Request.Context(), input)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"data": entry})
+}
+
+func (h *AdminHandler) UpdateTechCatalogEntry(c *gin.Context) {
+	id, ok := parseIDParam(c)
+	if !ok {
+		return
+	}
+
+	var req techCatalogUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid tech catalog update payload", err))
+		return
+	}
+
+	input, appErr := req.toInput()
+	if appErr != nil {
+		respondError(c, appErr)
+		return
+	}
+
+	entry, err := h.svc.UpdateTechCatalogEntry(c.Request.Context(), uint64(id), input)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": entry})
 }
 
 // Profile management --------------------------------------------------------
@@ -292,6 +341,65 @@ func (h *AdminHandler) UpdateContactSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, settings)
 }
 
+// Social links & meeting template -------------------------------------------
+
+func (h *AdminHandler) ListSocialLinks(c *gin.Context) {
+	links, err := h.svc.ListSocialLinks(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": links})
+}
+
+func (h *AdminHandler) ReplaceSocialLinks(c *gin.Context) {
+	var req socialLinksReplaceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid social links payload", err))
+		return
+	}
+
+	inputs, appErr := req.toInputs()
+	if appErr != nil {
+		respondError(c, appErr)
+		return
+	}
+
+	links, err := h.svc.ReplaceSocialLinks(c.Request.Context(), inputs)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": links})
+}
+
+func (h *AdminHandler) GetMeetingURLTemplate(c *gin.Context) {
+	template, err := h.svc.GetMeetingURLTemplate(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": template})
+}
+
+func (h *AdminHandler) UpdateMeetingURLTemplate(c *gin.Context) {
+	var req meetingTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid meeting template payload", err))
+		return
+	}
+
+	template := strings.TrimSpace(req.Template)
+	updated, err := h.svc.UpdateMeetingURLTemplate(c.Request.Context(), template)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": updated})
+}
+
 func (h *AdminHandler) ListContacts(c *gin.Context) {
 	messages, err := h.svc.ListContactMessages(c.Request.Context())
 	if err != nil {
@@ -358,7 +466,7 @@ func (h *AdminHandler) ListBlacklist(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, entries)
+	c.JSON(http.StatusOK, gin.H{"data": entries})
 }
 
 func (h *AdminHandler) CreateBlacklist(c *gin.Context) {
@@ -372,7 +480,7 @@ func (h *AdminHandler) CreateBlacklist(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, entry)
+	c.JSON(http.StatusCreated, gin.H{"data": entry})
 }
 
 func (h *AdminHandler) UpdateBlacklist(c *gin.Context) {
@@ -390,7 +498,7 @@ func (h *AdminHandler) UpdateBlacklist(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, entry)
+	c.JSON(http.StatusOK, gin.H{"data": entry})
 }
 
 func (h *AdminHandler) DeleteBlacklist(c *gin.Context) {
@@ -403,6 +511,185 @@ func (h *AdminHandler) DeleteBlacklist(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// Reservations ----------------------------------------------------------------
+
+type reservationResponse struct {
+	ID                     uint64                         `json:"id"`
+	Name                   string                         `json:"name"`
+	Email                  string                         `json:"email"`
+	Topic                  string                         `json:"topic"`
+	Message                string                         `json:"message"`
+	StartAt                time.Time                      `json:"startAt"`
+	EndAt                  time.Time                      `json:"endAt"`
+	DurationMinutes        int                            `json:"durationMinutes"`
+	GoogleEventID          string                         `json:"googleEventId,omitempty"`
+	GoogleCalendarStatus   string                         `json:"googleCalendarStatus,omitempty"`
+	Status                 model.MeetingReservationStatus `json:"status"`
+	ConfirmationSentAt     *time.Time                     `json:"confirmationSentAt,omitempty"`
+	LastNotificationSentAt *time.Time                     `json:"lastNotificationSentAt,omitempty"`
+	LookupHash             string                         `json:"lookupHash"`
+	CancellationReason     string                         `json:"cancellationReason,omitempty"`
+	CreatedAt              time.Time                      `json:"createdAt"`
+	UpdatedAt              time.Time                      `json:"updatedAt"`
+	Notifications          []model.MeetingNotification    `json:"notifications,omitempty"`
+}
+
+type reservationUpdateRequest struct {
+	Status             string `json:"status"`
+	CancellationReason string `json:"cancellationReason"`
+}
+
+func (h *AdminHandler) ListReservations(c *gin.Context) {
+	filter, err := parseReservationFilter(c)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	reservations, err := h.svc.ListReservations(c.Request.Context(), filter)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	response := make([]reservationResponse, 0, len(reservations))
+	for _, reservation := range reservations {
+		notifications, err := h.svc.ListReservationNotifications(c.Request.Context(), reservation.ID)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		response = append(response, makeReservationResponse(reservation, notifications))
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": response})
+}
+
+func (h *AdminHandler) UpdateReservationStatus(c *gin.Context) {
+	id, ok := parseIDParam(c)
+	if !ok {
+		return
+	}
+
+	var req reservationUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, errs.New(errs.CodeInvalidInput, http.StatusBadRequest, "invalid reservation update payload", err))
+		return
+	}
+
+	status := model.MeetingReservationStatus(strings.TrimSpace(strings.ToLower(req.Status)))
+	reservation, err := h.svc.UpdateReservationStatus(c.Request.Context(), uint64(id), status, req.CancellationReason)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	notifications, err := h.svc.ListReservationNotifications(c.Request.Context(), reservation.ID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": makeReservationResponse(*reservation, notifications)})
+}
+
+func (h *AdminHandler) RetryReservationNotification(c *gin.Context) {
+	id, ok := parseIDParam(c)
+	if !ok {
+		return
+	}
+
+	reservation, err := h.svc.RetryReservationNotification(c.Request.Context(), uint64(id))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	notifications, err := h.svc.ListReservationNotifications(c.Request.Context(), reservation.ID)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": makeReservationResponse(*reservation, notifications)})
+}
+
+func parseReservationFilter(c *gin.Context) (adminsvc.ReservationFilter, error) {
+	filter := adminsvc.ReservationFilter{}
+
+	statusValues := c.QueryArray("status")
+	if value := strings.TrimSpace(c.Query("status")); value != "" {
+		statusValues = append(statusValues, value)
+	}
+	if len(statusValues) > 0 {
+		for _, raw := range statusValues {
+			for _, piece := range strings.Split(raw, ",") {
+				value := strings.TrimSpace(strings.ToLower(piece))
+				if value == "" {
+					continue
+				}
+				status := model.MeetingReservationStatus(value)
+				switch status {
+				case model.MeetingReservationStatusPending,
+					model.MeetingReservationStatusConfirmed,
+					model.MeetingReservationStatusCancelled:
+					filter.Status = append(filter.Status, status)
+				default:
+					return adminsvc.ReservationFilter{}, errs.New(
+						errs.CodeInvalidInput,
+						http.StatusBadRequest,
+						fmt.Sprintf("unsupported reservation status %q", value),
+						nil,
+					)
+				}
+			}
+		}
+	}
+
+	filter.Email = strings.TrimSpace(c.Query("email"))
+
+	if dateString := strings.TrimSpace(c.Query("date")); dateString != "" {
+		parsed, err := time.Parse("2006-01-02", dateString)
+		if err != nil {
+			return adminsvc.ReservationFilter{}, errs.New(
+				errs.CodeInvalidInput,
+				http.StatusBadRequest,
+				"invalid date format (expected YYYY-MM-DD)",
+				err,
+			)
+		}
+		filter.Date = &parsed
+	}
+
+	return filter, nil
+}
+
+func makeReservationResponse(reservation model.MeetingReservation, notifications []model.MeetingNotification) reservationResponse {
+	response := reservationResponse{
+		ID:                     reservation.ID,
+		Name:                   strings.TrimSpace(reservation.Name),
+		Email:                  strings.TrimSpace(reservation.Email),
+		Topic:                  strings.TrimSpace(reservation.Topic),
+		Message:                reservation.Message,
+		StartAt:                reservation.StartAt,
+		EndAt:                  reservation.EndAt,
+		DurationMinutes:        reservation.DurationMinutes,
+		GoogleEventID:          strings.TrimSpace(reservation.GoogleEventID),
+		GoogleCalendarStatus:   strings.TrimSpace(reservation.GoogleCalendarStatus),
+		Status:                 reservation.Status,
+		ConfirmationSentAt:     reservation.ConfirmationSentAt,
+		LastNotificationSentAt: reservation.LastNotificationSentAt,
+		LookupHash:             reservation.LookupHash,
+		CancellationReason:     strings.TrimSpace(reservation.CancellationReason),
+		CreatedAt:              reservation.CreatedAt,
+		UpdatedAt:              reservation.UpdatedAt,
+	}
+	if len(notifications) > 0 {
+		response.Notifications = notifications
+	}
+	return response
 }
 
 // Helpers ------------------------------------------------------------------
@@ -761,19 +1048,103 @@ type blacklistRequest struct {
 	Reason string `json:"reason"`
 }
 
+type techCatalogRequest struct {
+	Slug        string `json:"slug"`
+	DisplayName string `json:"displayName"`
+	Category    string `json:"category"`
+	Level       string `json:"level"`
+	Icon        string `json:"icon"`
+	SortOrder   int    `json:"sortOrder"`
+	Active      *bool  `json:"active"`
+}
+
+func (r techCatalogRequest) toInput() (adminsvc.TechCatalogInput, *errs.AppError) {
+	active := true
+	if r.Active != nil {
+		active = *r.Active
+	}
+	return adminsvc.TechCatalogInput{
+		Slug:        r.Slug,
+		DisplayName: r.DisplayName,
+		Category:    r.Category,
+		Level:       model.TechLevel(strings.TrimSpace(strings.ToLower(r.Level))),
+		Icon:        r.Icon,
+		SortOrder:   r.SortOrder,
+		Active:      active,
+	}, nil
+}
+
+type techCatalogUpdateRequest struct {
+	Slug        *string `json:"slug"`
+	DisplayName *string `json:"displayName"`
+	Category    *string `json:"category"`
+	Level       *string `json:"level"`
+	Icon        *string `json:"icon"`
+	SortOrder   *int    `json:"sortOrder"`
+	Active      *bool   `json:"active"`
+}
+
+func (r techCatalogUpdateRequest) toInput() (adminsvc.TechCatalogUpdateInput, *errs.AppError) {
+	input := adminsvc.TechCatalogUpdateInput{
+		Slug:        r.Slug,
+		DisplayName: r.DisplayName,
+		Category:    r.Category,
+		Icon:        r.Icon,
+		SortOrder:   r.SortOrder,
+		Active:      r.Active,
+	}
+	if r.Level != nil {
+		level := model.TechLevel(strings.TrimSpace(strings.ToLower(*r.Level)))
+		input.Level = &level
+	}
+	return input, nil
+}
+
+type socialLinksReplaceRequest struct {
+	Links []replaceSocialLinkRequest `json:"links"`
+}
+
+type replaceSocialLinkRequest struct {
+	Provider  string              `json:"provider"`
+	Label     model.LocalizedText `json:"label"`
+	URL       string              `json:"url"`
+	IsFooter  bool                `json:"isFooter"`
+	SortOrder int                 `json:"sortOrder"`
+}
+
+func (r socialLinksReplaceRequest) toInputs() ([]adminsvc.SocialLinkInput, *errs.AppError) {
+	inputs := make([]adminsvc.SocialLinkInput, 0, len(r.Links))
+	for _, link := range r.Links {
+		provider := model.ProfileSocialProvider(strings.TrimSpace(strings.ToLower(link.Provider)))
+		inputs = append(inputs, adminsvc.SocialLinkInput{
+			Provider:  provider,
+			Label:     link.Label,
+			URL:       link.URL,
+			IsFooter:  link.IsFooter,
+			SortOrder: link.SortOrder,
+		})
+	}
+	return inputs, nil
+}
+
+type meetingTemplateRequest struct {
+	Template string `json:"template"`
+}
+
 type contactSettingsRequest struct {
-	ID                uint64                `json:"id"`
-	HeroTitle         model.LocalizedText   `json:"heroTitle"`
-	HeroDescription   model.LocalizedText   `json:"heroDescription"`
-	Topics            []contactTopicRequest `json:"topics"`
-	ConsentText       model.LocalizedText   `json:"consentText"`
-	MinimumLeadHours  int                   `json:"minimumLeadHours"`
-	RecaptchaSiteKey  string                `json:"recaptchaSiteKey"`
-	SupportEmail      string                `json:"supportEmail"`
-	CalendarTimezone  string                `json:"calendarTimezone"`
-	GoogleCalendarID  string                `json:"googleCalendarId"`
-	BookingWindowDays int                   `json:"bookingWindowDays"`
-	UpdatedAt         string                `json:"updatedAt"`
+	ID                 uint64                `json:"id"`
+	HeroTitle          model.LocalizedText   `json:"heroTitle"`
+	HeroDescription    model.LocalizedText   `json:"heroDescription"`
+	Topics             []contactTopicRequest `json:"topics"`
+	ConsentText        model.LocalizedText   `json:"consentText"`
+	MinimumLeadHours   int                   `json:"minimumLeadHours"`
+	RecaptchaSiteKey   string                `json:"recaptchaSiteKey"`
+	SupportEmail       string                `json:"supportEmail"`
+	CalendarTimezone   string                `json:"calendarTimezone"`
+	GoogleCalendarID   string                `json:"googleCalendarId"`
+	BookingWindowDays  int                   `json:"bookingWindowDays"`
+	MeetingURLTemplate string                `json:"meetingUrlTemplate"`
+	UpdatedAt          string                `json:"updatedAt"`
 }
 
 type contactTopicRequest struct {
@@ -829,18 +1200,19 @@ func (r contactSettingsRequest) toInput() (adminsvc.ContactSettingsInput, error)
 	}
 
 	return adminsvc.ContactSettingsInput{
-		ID:                r.ID,
-		HeroTitle:         r.HeroTitle,
-		HeroDescription:   r.HeroDescription,
-		Topics:            topics,
-		ConsentText:       r.ConsentText,
-		MinimumLeadHours:  r.MinimumLeadHours,
-		RecaptchaSiteKey:  r.RecaptchaSiteKey,
-		SupportEmail:      r.SupportEmail,
-		CalendarTimezone:  r.CalendarTimezone,
-		GoogleCalendarID:  r.GoogleCalendarID,
-		BookingWindowDays: r.BookingWindowDays,
-		ExpectedUpdatedAt: parsed,
+		ID:                 r.ID,
+		HeroTitle:          r.HeroTitle,
+		HeroDescription:    r.HeroDescription,
+		Topics:             topics,
+		ConsentText:        r.ConsentText,
+		MinimumLeadHours:   r.MinimumLeadHours,
+		RecaptchaSiteKey:   r.RecaptchaSiteKey,
+		SupportEmail:       r.SupportEmail,
+		CalendarTimezone:   r.CalendarTimezone,
+		GoogleCalendarID:   r.GoogleCalendarID,
+		BookingWindowDays:  r.BookingWindowDays,
+		MeetingURLTemplate: strings.TrimSpace(r.MeetingURLTemplate),
+		ExpectedUpdatedAt:  parsed,
 	}, nil
 }
 

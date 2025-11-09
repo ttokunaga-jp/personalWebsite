@@ -23,7 +23,6 @@ FROM nginx:1.25-alpine
 RUN apk add --no-cache gettext
 WORKDIR /usr/share/nginx/html
 COPY --from=base /app/apps/public/dist ./
-COPY --from=base /app/apps/admin/dist ./admin
 RUN mkdir -p /etc/nginx/templates
 COPY deploy/docker/nginx/default.conf.template /etc/nginx/templates/default.conf.template
 

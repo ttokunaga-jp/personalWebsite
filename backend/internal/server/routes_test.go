@@ -77,6 +77,14 @@ func TestRegisterRoutes(t *testing.T) {
 			MinimumLeadHours: 48,
 			ConsentText:      "Testing purposes only.",
 		},
+		Security: config.SecurityConfig{
+			AdminRateLimit: config.AdminRateLimitConfig{
+				Enabled:           true,
+				RequestsPerMinute: 60,
+				Burst:             5,
+			},
+			AllowCredentials: true,
+		},
 	}
 
 	sessionManager := &stubSessionManager{}
@@ -95,6 +103,8 @@ func TestRegisterRoutes(t *testing.T) {
 		middleware.NewAdminSessionMiddleware(sessionManager, appCfg.Auth),
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
+		middleware.NewAdminModeGuard(),
+		middleware.NewAdminRateLimiter(noopLifecycle{}, appCfg),
 		nil,
 	)
 
@@ -250,6 +260,7 @@ func TestSecurityAndObservabilityFlow(t *testing.T) {
 		failReq := httptest.NewRequest(http.MethodPost, "/api/contact", bytes.NewReader(body))
 		failReq.Header.Set("Content-Type", "application/json")
 		failReq.AddCookie(csrfCookie)
+		failReq.Header.Set("X-Requested-With", "XMLHttpRequest")
 		srv.ServeHTTP(failRec, failReq)
 		require.Equal(t, http.StatusForbidden, failRec.Code)
 
@@ -258,6 +269,7 @@ func TestSecurityAndObservabilityFlow(t *testing.T) {
 		successReq := httptest.NewRequest(http.MethodPost, "/api/contact", bytes.NewReader(body))
 		successReq.Header.Set("Content-Type", "application/json")
 		successReq.Header.Set(cfg.Security.CSRFHeaderName, payload.Data.Token)
+		successReq.Header.Set("X-Requested-With", "XMLHttpRequest")
 		successReq.AddCookie(csrfCookie)
 		srv.ServeHTTP(successRec, successReq)
 
@@ -349,6 +361,12 @@ func newSecurityTestConfig() *config.AppConfig {
 			HTTPSRedirect:              false,
 			RateLimitRequestsPerMinute: 0,
 			RateLimitBurst:             0,
+			AdminRateLimit: config.AdminRateLimitConfig{
+				Enabled:           true,
+				RequestsPerMinute: 60,
+				Burst:             5,
+			},
+			AllowCredentials: true,
 		},
 		Metrics: config.MetricsConfig{
 			Enabled:   true,
@@ -463,6 +481,8 @@ func newSecurityTestEngine(t *testing.T, cfg *config.AppConfig) *gin.Engine {
 		middleware.NewAdminSessionMiddleware(sessionManager, appCfg.Auth),
 		handler.NewAdminHandler(adminSvc),
 		middleware.NewAdminGuard(),
+		middleware.NewAdminModeGuard(),
+		middleware.NewAdminRateLimiter(noopLifecycle{}, cfg),
 		securityHandler,
 	)
 
@@ -811,6 +831,34 @@ func (s *stubAdminService) ListTechCatalog(context.Context, bool) ([]model.TechC
 	}, nil
 }
 
+func (s *stubAdminService) CreateTechCatalogEntry(context.Context, adminsvc.TechCatalogInput) (*model.TechCatalogEntry, error) {
+	now := time.Now().UTC()
+	return &model.TechCatalogEntry{
+		ID:          2,
+		Slug:        "new-tech",
+		DisplayName: "New Tech",
+		Level:       model.TechLevelIntermediate,
+		SortOrder:   2,
+		Active:      true,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}, nil
+}
+
+func (s *stubAdminService) UpdateTechCatalogEntry(context.Context, uint64, adminsvc.TechCatalogUpdateInput) (*model.TechCatalogEntry, error) {
+	now := time.Now().UTC()
+	return &model.TechCatalogEntry{
+		ID:          1,
+		Slug:        "go",
+		DisplayName: "Go",
+		Level:       model.TechLevelAdvanced,
+		SortOrder:   1,
+		Active:      true,
+		CreatedAt:   now.Add(-24 * time.Hour),
+		UpdatedAt:   now,
+	}, nil
+}
+
 func (s *stubAdminService) ListResearch(context.Context) ([]model.AdminResearch, error) {
 	return nil, nil
 }
@@ -1000,6 +1048,22 @@ func (s *stubAdminService) IsEmailBlacklisted(context.Context, string) (bool, er
 	return false, nil
 }
 
+func (s *stubAdminService) ListReservations(context.Context, adminsvc.ReservationFilter) ([]model.MeetingReservation, error) {
+	return []model.MeetingReservation{}, nil
+}
+
+func (s *stubAdminService) UpdateReservationStatus(context.Context, uint64, model.MeetingReservationStatus, string) (*model.MeetingReservation, error) {
+	return &model.MeetingReservation{}, nil
+}
+
+func (s *stubAdminService) ListReservationNotifications(context.Context, uint64) ([]model.MeetingNotification, error) {
+	return []model.MeetingNotification{}, nil
+}
+
+func (s *stubAdminService) RetryReservationNotification(context.Context, uint64) (*model.MeetingReservation, error) {
+	return &model.MeetingReservation{}, nil
+}
+
 func (s *stubAdminService) Summary(context.Context) (*model.AdminSummary, error) {
 	now := time.Now().UTC()
 	return &model.AdminSummary{
@@ -1012,5 +1076,48 @@ func (s *stubAdminService) Summary(context.Context) (*model.AdminSummary, error)
 		DraftResearch:     0,
 		PendingContacts:   1,
 		BlacklistEntries:  1,
+	}, nil
+}
+
+func (s *stubAdminService) ListSocialLinks(context.Context) ([]model.ProfileSocialLink, error) {
+	return []model.ProfileSocialLink{
+		{
+			ID:        1,
+			Provider:  model.ProfileSocialProviderGitHub,
+			Label:     model.NewLocalizedText("GitHub", "GitHub"),
+			URL:       "https://github.com/example",
+			IsFooter:  true,
+			SortOrder: 1,
+		},
+	}, nil
+}
+
+func (s *stubAdminService) ReplaceSocialLinks(ctx context.Context, links []adminsvc.SocialLinkInput) ([]model.ProfileSocialLink, error) {
+	_ = ctx
+	out := make([]model.ProfileSocialLink, 0, len(links))
+	for idx, link := range links {
+		out = append(out, model.ProfileSocialLink{
+			ID:        uint64(idx + 1),
+			Provider:  link.Provider,
+			Label:     link.Label,
+			URL:       link.URL,
+			IsFooter:  link.IsFooter,
+			SortOrder: link.SortOrder,
+		})
+	}
+	return out, nil
+}
+
+func (s *stubAdminService) GetMeetingURLTemplate(context.Context) (*adminsvc.MeetingURLTemplate, error) {
+	return &adminsvc.MeetingURLTemplate{
+		Template:  "こんにちは {{guest_name}} さん。{{meeting_url}} でお会いしましょう。",
+		UpdatedAt: time.Now().UTC(),
+	}, nil
+}
+
+func (s *stubAdminService) UpdateMeetingURLTemplate(context.Context, string) (*adminsvc.MeetingURLTemplate, error) {
+	return &adminsvc.MeetingURLTemplate{
+		Template:  "Updated template",
+		UpdatedAt: time.Now().UTC(),
 	}, nil
 }

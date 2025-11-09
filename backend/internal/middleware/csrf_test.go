@@ -35,6 +35,7 @@ func TestCSRFMiddleware(t *testing.T) {
 	// Missing token should be rejected.
 	rec := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodPost, "/secure", nil)
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	engine.ServeHTTP(rec, req)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("expected forbidden when token missing, got %d", rec.Code)
@@ -48,6 +49,7 @@ func TestCSRFMiddleware(t *testing.T) {
 
 	rec2 := httptest.NewRecorder()
 	req2, _ := http.NewRequest(http.MethodPost, "/secure", nil)
+	req2.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req2.Header.Set(appCfg.Security.CSRFHeaderName, token.Value)
 	req2.AddCookie(&http.Cookie{Name: appCfg.Security.CSRFCookieName, Value: token.Cookie})
 	engine.ServeHTTP(rec2, req2)

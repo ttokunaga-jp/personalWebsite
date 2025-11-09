@@ -275,6 +275,8 @@ func newTestService(t *testing.T) Service {
 
 	bl := inmemory.NewBlacklistRepository()
 	techCatalog := inmemory.NewTechCatalogRepository()
+	reservations := inmemory.NewMeetingReservationRepository()
+	notifications := inmemory.NewMeetingNotificationRepository()
 
 	svc, err := NewService(
 		adminProfileRepo,
@@ -285,6 +287,8 @@ func newTestService(t *testing.T) Service {
 		adminHomeRepo,
 		bl,
 		techCatalog,
+		reservations,
+		notifications,
 	)
 	require.NoError(t, err)
 

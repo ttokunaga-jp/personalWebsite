@@ -79,26 +79,34 @@ type BookingConfig struct {
 }
 
 type SecurityConfig struct {
-	EnableCSRF                 bool          `mapstructure:"enable_csrf"`
-	CSRFSigningKey             string        `mapstructure:"csrf_signing_key"`
-	CSRFTokenTTL               time.Duration `mapstructure:"csrf_token_ttl"`
-	CSRFCookieName             string        `mapstructure:"csrf_cookie_name"`
-	CSRFCookieDomain           string        `mapstructure:"csrf_cookie_domain"`
-	CSRFCookieSecure           bool          `mapstructure:"csrf_cookie_secure"`
-	CSRFCookieHTTPOnly         bool          `mapstructure:"csrf_cookie_http_only"`
-	CSRFCookieSameSite         string        `mapstructure:"csrf_cookie_same_site"`
-	CSRFHeaderName             string        `mapstructure:"csrf_header_name"`
-	CSRFExemptPaths            []string      `mapstructure:"csrf_exempt_paths"`
-	HTTPSRedirect              bool          `mapstructure:"https_redirect"`
-	HSTSMaxAgeSeconds          int           `mapstructure:"hsts_max_age_seconds"`
-	ContentSecurityPolicy      string        `mapstructure:"content_security_policy"`
-	ReferrerPolicy             string        `mapstructure:"referrer_policy"`
-	RateLimitRequestsPerMinute int           `mapstructure:"rate_limit_requests_per_minute"`
-	RateLimitBurst             int           `mapstructure:"rate_limit_burst"`
-	RateLimitWhitelist         []string      `mapstructure:"rate_limit_whitelist"`
-	RateLimitExemptPaths       []string      `mapstructure:"rate_limit_exempt_paths"`
-	AllowedOrigins             []string      `mapstructure:"allowed_origins"`
-	AllowCredentials           bool          `mapstructure:"allow_credentials"`
+	EnableCSRF                 bool                 `mapstructure:"enable_csrf"`
+	CSRFSigningKey             string               `mapstructure:"csrf_signing_key"`
+	CSRFTokenTTL               time.Duration        `mapstructure:"csrf_token_ttl"`
+	CSRFCookieName             string               `mapstructure:"csrf_cookie_name"`
+	CSRFCookieDomain           string               `mapstructure:"csrf_cookie_domain"`
+	CSRFCookieSecure           bool                 `mapstructure:"csrf_cookie_secure"`
+	CSRFCookieHTTPOnly         bool                 `mapstructure:"csrf_cookie_http_only"`
+	CSRFCookieSameSite         string               `mapstructure:"csrf_cookie_same_site"`
+	CSRFHeaderName             string               `mapstructure:"csrf_header_name"`
+	CSRFExemptPaths            []string             `mapstructure:"csrf_exempt_paths"`
+	HTTPSRedirect              bool                 `mapstructure:"https_redirect"`
+	HSTSMaxAgeSeconds          int                  `mapstructure:"hsts_max_age_seconds"`
+	ContentSecurityPolicy      string               `mapstructure:"content_security_policy"`
+	ReferrerPolicy             string               `mapstructure:"referrer_policy"`
+	RateLimitRequestsPerMinute int                  `mapstructure:"rate_limit_requests_per_minute"`
+	RateLimitBurst             int                  `mapstructure:"rate_limit_burst"`
+	RateLimitWhitelist         []string             `mapstructure:"rate_limit_whitelist"`
+	RateLimitExemptPaths       []string             `mapstructure:"rate_limit_exempt_paths"`
+	AllowedOrigins             []string             `mapstructure:"allowed_origins"`
+	AllowCredentials           bool                 `mapstructure:"allow_credentials"`
+	PrimaryOrigin              string               `mapstructure:"primary_origin"`
+	AdminRateLimit             AdminRateLimitConfig `mapstructure:"admin_rate_limit"`
+}
+
+type AdminRateLimitConfig struct {
+	Enabled           bool `mapstructure:"enabled"`
+	RequestsPerMinute int  `mapstructure:"requests_per_minute"`
+	Burst             int  `mapstructure:"burst"`
 }
 
 type MetricsConfig struct {
@@ -268,6 +276,10 @@ func load() (*AppConfig, error) {
 	})
 	v.SetDefault("security.allowed_origins", []string{})
 	v.SetDefault("security.allow_credentials", true)
+	v.SetDefault("security.primary_origin", "")
+	v.SetDefault("security.admin_rate_limit.enabled", true)
+	v.SetDefault("security.admin_rate_limit.requests_per_minute", 60)
+	v.SetDefault("security.admin_rate_limit.burst", 5)
 	v.SetDefault("metrics.enabled", true)
 	v.SetDefault("metrics.endpoint", "/metrics")
 	v.SetDefault("metrics.namespace", "personal_website")
